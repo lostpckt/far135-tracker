@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="description" content="FAR 135.267 Pilot Duty & Flight Time Tracker — Part 135 Unscheduled Operations">
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="135 Tracker">
+  <link rel="apple-touch-icon" href="icon.svg">
+
+  <title>FAR 135.267 Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============================================================
+     App Header
+     ============================================================ -->
+<header class="app-header">
+  <h1>&#9992; FAR 135.267 Tracker</h1>
+  <p>Part 135 Unscheduled Operations</p>
+  <button id="install-btn" hidden onclick="installApp()">Install App</button>
+</header>
+
+<!-- ============================================================
+     Main Content — three tab sections
+     ============================================================ -->
+<main>
+
+  <!-- ── SUMMARY ─────────────────────────────────────── -->
+  <section id="section-summary" class="tab-section">
+    <div class="container">
+
+      <div class="reg-note">
+        <strong>Regulatory reference:</strong> 14 CFR §135.267 — Flight time limitations and rest requirements: Unscheduled one- and two-pilot crews.
+        For <strong>reference and record-keeping only</strong>. Always verify compliance with your OpSpec, POI, and company manual.
+        All times should be consistently Zulu or local — pick one.
+      </div>
+
+      <div class="dashboard" id="dashboard"></div>
+
+      <!-- Quick Reference -->
+      <div class="panel">
+        <h2>&#167;135.267 Quick Reference</h2>
+        <div class="help-grid">
+          <div class="help-block">
+            <h3>Rolling 24-Hour Flight Time</h3>
+            <p>Single pilot: max <strong>8 hours</strong> in any consecutive 24-hour window.<br>
+               Dual pilot: max <strong>10 hours</strong>.<br>
+               Window ends at the <em>On Blocks</em> time of the current leg.</p>
+          </div>
+          <div class="help-block">
+            <h3>10-Hour Look-Back Rest</h3>
+            <p>The pilot must have received <strong>at least 10 consecutive hours of rest</strong>
+               in the 24 hours preceding the completion of any flight segment.</p>
+          </div>
+          <div class="help-block">
+            <h3>14-Hour Duty Day</h3>
+            <p>Total duty period (Show Time to Release Time) must not exceed <strong>14 hours</strong>.</p>
+          </div>
+          <div class="help-block">
+            <h3>Quarterly Rest</h3>
+            <p>Each pilot must receive at least <strong>13 24-hour rest periods per calendar quarter</strong>.
+               Mark rest days using the checkbox in the Add Entry form.</p>
+          </div>
+          <div class="help-block">
+            <h3>Exceedance Rest Multiplier</h3>
+            <p>If flight time is exceeded (weather/delays):<br>
+               &lt;30 min over &rarr; <strong>11 hrs</strong> rest<br>
+               30–60 min over &rarr; <strong>12 hrs</strong> rest<br>
+               &gt;60 min over &rarr; <strong>16 hrs</strong> rest</p>
+          </div>
+          <div class="help-block">
+            <h3>How to Use</h3>
+            <p>One entry per flight leg. For multi-leg days, use <em>Add Another Leg</em>.
+               Show/Release Time and Rest are shared across all legs in a duty period.
+               Mark Part 91 legs to log them without affecting §135 limits.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section><!-- /summary -->
+
+  <!-- ── ADD ENTRY ────────────────────────────────────── -->
+  <section id="section-add" class="tab-section">
+    <div class="container">
+      <div class="panel">
+        <h2>Add Flight Leg</h2>
+        <div class="form-grid">
+
+          <div class="divider">Identification</div>
+          <div class="fg">
+            <label>Pilot Name / ID</label>
+            <input type="text" id="f-pilot" placeholder="e.g. J. Smith" autocomplete="name">
+          </div>
+          <div class="fg">
+            <label>Crew Configuration</label>
+            <select id="f-crew">
+              <option value="S">Single Pilot — 8 hr limit</option>
+              <option value="D">Dual Pilot — 10 hr limit</option>
+            </select>
+          </div>
+
+          <div class="divider">Duty Period</div>
+          <div class="fg">
+            <label>Show Time (Duty Start)</label>
+            <div class="dt-pair">
+              <input type="date" id="f-show-d">
+              <input type="text" id="f-show-t" placeholder="08:00" maxlength="5" inputmode="numeric">
+            </div>
+            <span class="hint">24-hr time</span>
+          </div>
+          <div class="fg">
+            <label>Release Time (Duty End)</label>
+            <div class="dt-pair">
+              <input type="date" id="f-release-d">
+              <input type="text" id="f-release-t" placeholder="22:15" maxlength="5" inputmode="numeric">
+            </div>
+            <span class="hint">24-hr time</span>
+          </div>
+
+          <div class="divider">Flight Legs</div>
+          <div style="grid-column:1/-1">
+            <div id="legs-container"></div>
+            <button type="button" class="add-leg-btn" onclick="addLeg()">+ Add Another Leg</button>
+          </div>
+
+          <div class="divider">Rest Period (After This Duty)</div>
+          <div class="fg">
+            <label>Rest Start</label>
+            <div class="dt-pair">
+              <input type="date" id="f-reststart-d">
+              <input type="text" id="f-reststart-t" placeholder="23:00" maxlength="5" inputmode="numeric">
+            </div>
+            <span class="hint">When rest began after release</span>
+          </div>
+          <div class="fg">
+            <label>Rest End (Wake-up / Next Report)</label>
+            <div class="dt-pair">
+              <input type="date" id="f-restend-d">
+              <input type="text" id="f-restend-t" placeholder="09:00" maxlength="5" inputmode="numeric">
+            </div>
+          </div>
+
+          <div class="divider">Special Entries</div>
+          <div class="fg" style="grid-column:1/-1">
+            <div class="check-row">
+              <input type="checkbox" id="f-restday">
+              <label for="f-restday">This was a 24-hour rest day (no duty or flights) — enter date in Show Time above</label>
+            </div>
+          </div>
+
+        </div><!-- /form-grid -->
+
+        <div class="form-actions">
+          <div class="row">
+            <button class="btn btn-primary" onclick="addEntry()">Add Entry</button>
+          </div>
+        </div>
+        <div class="form-err" id="form-err"></div>
+      </div><!-- /panel -->
+    </div>
+  </section><!-- /add -->
+
+  <!-- ── FLIGHT LOG ─────────────────────────────────── -->
+  <section id="section-log" class="tab-section">
+    <div class="container">
+
+      <!-- Actions row -->
+      <div class="panel" style="padding:14px 16px">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+          <button class="btn btn-export"  onclick="exportCSV()">Export CSV</button>
+          <button class="btn btn-danger"  onclick="clearAll()" style="font-size:.82rem;padding:8px 14px">Clear All</button>
+          <!-- Quarterly report controls -->
+          <div class="report-controls" style="margin:0;display:contents">
+            <div class="fg">
+              <label style="font-size:.72rem;font-weight:600;color:#555">Quarter</label>
+              <select id="rpt-q">
+                <option value="0">Q1 Jan–Mar</option>
+                <option value="1">Q2 Apr–Jun</option>
+                <option value="2">Q3 Jul–Sep</option>
+                <option value="3">Q4 Oct–Dec</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label style="font-size:.72rem;font-weight:600;color:#555">Year</label>
+              <input type="number" id="rpt-y" min="2000" max="2099" style="width:82px">
+            </div>
+            <button class="btn btn-report" onclick="quarterlyReport()">Quarterly Report</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards: shown on mobile -->
+      <div id="log-cards" class="log-cards"></div>
+
+      <!-- Table: shown on desktop -->
+      <div class="panel log-table-panel">
+        <h2>Flight Log</h2>
+        <div class="table-wrap">
+          <div id="log-table"></div>
+        </div>
+      </div>
+
+    </div>
+  </section><!-- /log -->
+
+</main>
+
+<!-- ============================================================
+     Bottom Tab Bar (mobile only)
+     ============================================================ -->
+<nav class="tab-bar">
+  <button class="tab-btn" data-tab="summary" onclick="setTab('summary')">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span>Summary</span>
+  </button>
+  <button class="tab-btn" data-tab="add" onclick="setTab('add')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    <span>Add Entry</span>
+  </button>
+  <button class="tab-btn" data-tab="log" onclick="setTab('log')">
+    <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    <span>Flight Log</span>
+  </button>
+</nav>
+
+<!-- ============================================================
+     Edit Modal
+     ============================================================ -->
+<div class="modal-overlay" id="edit-modal" onclick="closeModal(event)">
+  <div class="modal">
+    <h2>Edit Flight Entry</h2>
+    <div class="form-grid">
+
+      <div class="divider">Identification</div>
+      <div class="fg"><label>Pilot Name / ID</label><input type="text" id="m-pilot"></div>
+      <div class="fg">
+        <label>Crew Configuration</label>
+        <select id="m-crew">
+          <option value="S">Single Pilot — 8 hr limit</option>
+          <option value="D">Dual Pilot — 10 hr limit</option>
+        </select>
+      </div>
+
+      <div class="divider">Duty Period</div>
+      <div class="fg">
+        <label>Show Time</label>
+        <div class="dt-pair">
+          <input type="date" id="m-show-d">
+          <input type="text" id="m-show-t" placeholder="14:30" maxlength="5" inputmode="numeric">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Release Time</label>
+        <div class="dt-pair">
+          <input type="date" id="m-release-d">
+          <input type="text" id="m-release-t" placeholder="22:15" maxlength="5" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="divider">Flight Leg</div>
+      <div class="fg"><label>Departure ICAO</label><input type="text" id="m-dep" maxlength="4" autocapitalize="characters"></div>
+      <div class="fg"><label>Arrival ICAO</label><input type="text" id="m-arr" maxlength="4" autocapitalize="characters"></div>
+      <div class="fg">
+        <label>Off Blocks</label>
+        <div class="dt-pair">
+          <input type="date" id="m-off-d">
+          <input type="text" id="m-off-t" placeholder="09:00" maxlength="5" inputmode="numeric">
+        </div>
+      </div>
+      <div class="fg">
+        <label>On Blocks</label>
+        <div class="dt-pair">
+          <input type="date" id="m-on-d">
+          <input type="text" id="m-on-t" placeholder="11:30" maxlength="5" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="divider">Rest Period</div>
+      <div class="fg">
+        <label>Rest Start</label>
+        <div class="dt-pair">
+          <input type="date" id="m-reststart-d">
+          <input type="text" id="m-reststart-t" placeholder="23:00" maxlength="5" inputmode="numeric">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Rest End</label>
+        <div class="dt-pair">
+          <input type="date" id="m-restend-d">
+          <input type="text" id="m-restend-t" placeholder="09:00" maxlength="5" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="divider">Other</div>
+      <div class="fg"><label>Exceedance Reason</label><input type="text" id="m-reason" placeholder="e.g. Weather divert"></div>
+      <div class="fg" style="justify-content:flex-end">
+        <label>&nbsp;</label>
+        <div class="check-row p91-check">
+          <input type="checkbox" id="m-p91">
+          <label for="m-p91">Part 91 — exclude from §135 limits</label>
+        </div>
+      </div>
+      <div class="fg" style="grid-column:1/-1">
+        <div class="check-row">
+          <input type="checkbox" id="m-restday">
+          <label for="m-restday">24-hour rest day (no duty or flights)</label>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-err" id="modal-err"></div>
+    <div class="modal-actions">
+      <button class="btn-save"   onclick="saveEdit()">Save Changes</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
