@@ -209,7 +209,7 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
         {err && <p className="text-red-600 text-xs mt-3">{err}</p>}
 
         <div className="flex flex-wrap gap-2.5 mt-4 items-center">
-          <Button onClick={handleAdd} className="bg-slate-900 hover:bg-blue-600 text-sm h-8">
+          <Button onClick={handleAdd} className="bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm h-8">
             Add Entry
           </Button>
 
