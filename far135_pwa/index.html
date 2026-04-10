@@ -326,6 +326,15 @@
   </div>
 </div>
 
+<!-- Report Overlay -->
+<div class="report-overlay" id="report-overlay">
+  <div class="report-overlay-bar">
+    <button class="report-back-btn" onclick="closeReport()">&#8592; Back to Tracker</button>
+    <button class="report-print-btn" onclick="document.getElementById('report-frame').contentWindow.print()">Print / Save PDF</button>
+  </div>
+  <iframe id="report-frame" class="report-frame" title="Quarterly Report"></iframe>
+</div>
+
 <!-- Toast notification -->
 <div class="toast" id="toast"></div>
 

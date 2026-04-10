@@ -554,6 +554,11 @@ function closeModal(event) {
   editingId = null;
 }
 
+function closeReport() {
+  document.getElementById('report-overlay').classList.remove('open');
+  document.getElementById('report-frame').srcdoc = '';
+}
+
 // ============================================================
 // ADD ENTRY
 // ============================================================
@@ -769,19 +774,9 @@ function quarterlyReport() {
 
   const html = buildReportHTML({ qLabel, year, pilots, generated, allOk, totalV, restMet, restDays, part135Legs, part91Legs, totalFlight, exceedances, scRows, vRows, exRows, logRows });
 
-  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-  if (isStandalone) {
-    const blob = new Blob([html], { type: 'text/html' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `far135_report_${qLabel.replace(/[^a-z0-9]/gi,'_')}_${year}.html`;
-    a.click();
-    toast('Report downloaded — open to view and print.', 'ok');
-  } else {
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
-  }
+  const frame = document.getElementById('report-frame');
+  frame.srcdoc = html;
+  document.getElementById('report-overlay').classList.add('open');
 }
 
 function buildReportHTML(d) {
@@ -802,10 +797,8 @@ table{width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:8px}
 th{background:#f8fafc;padding:7px 9px;text-align:left;font-weight:700;color:#555;border-bottom:2px solid #e5e7eb;white-space:nowrap}
 td{padding:7px 9px;border-bottom:1px solid #f1f5f9;vertical-align:middle;white-space:nowrap}
 .disclaimer{margin-top:24px;font-size:.7rem;color:#aaa;border-top:1px solid #e5e7eb;padding-top:10px;line-height:1.5}
-.print-btn{margin-bottom:18px;padding:7px 18px;background:#1a1a2e;color:white;border:none;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer}
-@media print{.print-btn{display:none}}
+@media print{}
 </style></head><body>
-<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
 <h1>FAR 135.267 Quarterly Compliance Report</h1>
 <div class="meta">Period: <strong>${d.qLabel} ${d.year}</strong> &nbsp;|&nbsp; Pilot(s): <strong>${d.pilots}</strong> &nbsp;|&nbsp; Generated: ${d.generated}</div>
 <div class="banner">${d.allOk?'✓':'⚠'} Overall Status: ${d.allOk?'COMPLIANT':'REVIEW REQUIRED'}${!d.allOk?` — ${d.totalV} violation(s)${!d.restMet?' and rest day shortfall':''}`:''}</div>

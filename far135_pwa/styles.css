@@ -322,6 +322,37 @@ tr:hover td { background: #f8fafc; }
 .btn-cancel:hover { background: #e2e8f0; }
 .modal-err { color: var(--red); font-size: 0.82rem; margin-top: 8px; min-height: 18px; }
 
+/* ---- Report Overlay ---- */
+.report-overlay {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  flex-direction: column; background: #fff;
+}
+.report-overlay.open { display: flex; }
+.report-overlay-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: #1a1a2e;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  flex-shrink: 0;
+}
+.report-back-btn {
+  background: rgba(255,255,255,0.15); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3); border-radius: 7px;
+  padding: 8px 14px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; min-height: 40px;
+}
+.report-back-btn:hover { background: rgba(255,255,255,0.25); }
+.report-print-btn {
+  background: rgba(255,255,255,0.15); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3); border-radius: 7px;
+  padding: 8px 14px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; min-height: 40px; margin-left: auto;
+}
+.report-print-btn:hover { background: rgba(255,255,255,0.25); }
+@media print { .report-overlay-bar { display: none; } }
+.report-frame {
+  flex: 1; border: none; width: 100%; background: #fff;
+}
+
 /* ---- Toast ---- */
 .toast {
   position: fixed; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 12px);
