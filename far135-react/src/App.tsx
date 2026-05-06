@@ -22,9 +22,7 @@ export default function App() {
 
   function updateEntries(next: Entry[]) {
     const sorted = [...next].sort(
-      (a, b) =>
-        (ms(a.onBlocks) ?? ms(a.showTime) ?? 0) -
-        (ms(b.onBlocks) ?? ms(b.showTime) ?? 0)
+      (a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0)
     )
     setEntries(sorted)
     saveEntries(sorted)

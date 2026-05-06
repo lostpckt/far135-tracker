@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { parseDTPair, splitDT, ms } from '@/lib/calculations'
+import { parseDTPair, splitDT, ms, parseHobbs } from '@/lib/calculations'
 import type { Entry } from '@/types/entry'
 
 interface Props {
@@ -46,10 +46,8 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
   const [relTime, setRelTime]   = useState('')
   const [dep, setDep]           = useState('')
   const [arr, setArr]           = useState('')
-  const [offDate, setOffDate]   = useState('')
-  const [offTime, setOffTime]   = useState('')
-  const [onDate, setOnDate]     = useState('')
-  const [onTime, setOnTime]     = useState('')
+  const [offHobbs, setOffHobbs] = useState('')
+  const [onHobbs, setOnHobbs]   = useState('')
   const [rsDate, setRsDate]     = useState('')
   const [rsTime, setRsTime]     = useState('')
   const [reDate, setReDate]     = useState('')
@@ -70,8 +68,8 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
 
     const s  = splitDT(entry.showTime);    setShowDate(s.d); setShowTime(s.t)
     const r  = splitDT(entry.releaseTime); setRelDate(r.d);  setRelTime(r.t)
-    const of = splitDT(entry.offBlocks);   setOffDate(of.d); setOffTime(of.t)
-    const on = splitDT(entry.onBlocks);    setOnDate(on.d);  setOnTime(on.t)
+    setOffHobbs(entry.offBlocks || '')
+    setOnHobbs(entry.onBlocks || '')
     const rs = splitDT(entry.restStart);   setRsDate(rs.d);  setRsTime(rs.t)
     const re = splitDT(entry.restEnd);     setReDate(re.d);  setReTime(re.t)
     setErr('')
@@ -79,12 +77,12 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
 
   function handleSave() {
     setErr('')
-    const off = parseDTPair(offDate, offTime)
-    const on  = parseDTPair(onDate, onTime)
 
     if (!restDay) {
-      if (!off || !on) { setErr('Off Blocks and On Blocks are required.'); return }
-      if (ms(on)! <= ms(off)!) { setErr('On Blocks must be after Off Blocks.'); return }
+      const offN = parseHobbs(offHobbs)
+      const onN  = parseHobbs(onHobbs)
+      if (offN === null || onN === null) { setErr('Off Blocks and On Blocks Hobbs readings are required.'); return }
+      if (onN <= offN) { setErr('On Blocks Hobbs must be greater than Off Blocks Hobbs.'); return }
       const show    = parseDTPair(showDate, showTime)
       const release = parseDTPair(relDate, relTime)
       if (show && release && ms(release)! <= ms(show)!) { setErr('Release Time must be after Show Time.'); return }
@@ -98,8 +96,8 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
       releaseTime: parseDTPair(relDate, relTime),
       dep:         dep.toUpperCase().trim(),
       arr:         arr.toUpperCase().trim(),
-      offBlocks:   off,
-      onBlocks:    on,
+      offBlocks:   offHobbs.trim(),
+      onBlocks:    onHobbs.trim(),
       restStart:   parseDTPair(rsDate, rsTime),
       restEnd:     parseDTPair(reDate, reTime),
       reason,
@@ -146,8 +144,30 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
             <Label className="text-xs font-semibold text-slate-500">Arrival ICAO</Label>
             <Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} maxLength={4} className="text-sm h-8 uppercase" />
           </div>
-          <DTField label="Off Blocks" date={offDate} time={offTime} onDate={setOffDate} onTime={setOffTime} placeholder="09:00" />
-          <DTField label="On Blocks"  date={onDate}  time={onTime}  onDate={setOnDate}  onTime={setOnTime}  placeholder="11:30" />
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Off Blocks (Hobbs)</Label>
+            <Input
+              type="number"
+              value={offHobbs}
+              onChange={e => setOffHobbs(e.target.value)}
+              placeholder="12345.6"
+              step="0.1"
+              min="0"
+              className="text-sm h-8"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">On Blocks (Hobbs)</Label>
+            <Input
+              type="number"
+              value={onHobbs}
+              onChange={e => setOnHobbs(e.target.value)}
+              placeholder="12347.3"
+              step="0.1"
+              min="0"
+              className="text-sm h-8"
+            />
+          </div>
 
           <SectionLabel>Rest Period</SectionLabel>
           <DTField label="Rest Start" date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} placeholder="23:00" />

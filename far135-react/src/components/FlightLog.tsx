@@ -30,8 +30,8 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
   }
 
   const sorted = [...entries].sort((a, b) => {
-    const aMs = (a.onBlocks ? new Date(a.onBlocks).getTime() : null) ?? (a.showTime ? new Date(a.showTime).getTime() : 0)
-    const bMs = (b.onBlocks ? new Date(b.onBlocks).getTime() : null) ?? (b.showTime ? new Date(b.showTime).getTime() : 0)
+    const aMs = a.showTime ? new Date(a.showTime).getTime() : 0
+    const bMs = b.showTime ? new Date(b.showTime).getTime() : 0
     return aMs - bMs
   })
 
@@ -51,7 +51,7 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
             <tbody>
               {sorted.map(e => {
                 if (e.restDay) {
-                  const anchor = e.showTime || e.offBlocks || ''
+                  const anchor = e.showTime || ''
                   return (
                     <tr key={e.id} className="bg-green-50">
                       <td className="px-3 py-2 border-b border-slate-100">{fmtDT(anchor)}</td>
@@ -85,8 +85,8 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                       {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}
                     </td>
-                    <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{fmtDT(e.offBlocks)}</td>
-                    <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{fmtDT(e.onBlocks)}</td>
+                    <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.offBlocks || '—'}</td>
+                    <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.onBlocks || '—'}</td>
                     <td className="px-3 py-2 border-b border-slate-100 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                       {e.part91

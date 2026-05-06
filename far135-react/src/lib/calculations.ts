@@ -48,17 +48,33 @@ export function splitDT(dtStr: string): { d: string; t: string } {
   return { d: d || '', t: t || '' }
 }
 
+/** Parse a Hobbs meter reading string into a float, or null if invalid. */
+export function parseHobbs(val: string | undefined | null): number | null {
+  if (!val) return null
+  const n = parseFloat(val)
+  return isNaN(n) ? null : n
+}
+
+/** Flight time from Hobbs readings: (onHobbs - offHobbs) + 0.2 for taxi. */
+export function hobbsFlightTime(offHobbs: number | null, onHobbs: number | null): number | null {
+  if (offHobbs === null || onHobbs === null) return null
+  const diff = onHobbs - offHobbs
+  if (diff < 0) return null
+  return diff + 0.2
+}
+
 export function compute(entry: Entry, all: Entry[]): Computed {
   const c = {} as Computed
 
-  const offMs  = ms(entry.offBlocks)
-  const onMs   = ms(entry.onBlocks)
-  const showMs = ms(entry.showTime)
-  const relMs  = ms(entry.releaseTime)
-  const rsMs   = ms(entry.restStart)
-  const reMs   = ms(entry.restEnd)
+  const offHobbs = parseHobbs(entry.offBlocks)
+  const onHobbs  = parseHobbs(entry.onBlocks)
+  const showMs   = ms(entry.showTime)
+  const relMs    = ms(entry.releaseTime)
+  const rsMs     = ms(entry.restStart)
+  const reMs     = ms(entry.restEnd)
 
-  c.legFlight  = hrs(offMs, onMs)
+  // Flight time from Hobbs; duty/rest from datetime fields
+  c.legFlight  = hobbsFlightTime(offHobbs, onHobbs)
   c.dutyPeriod = hrs(showMs, relMs)
   c.consRest   = hrs(rsMs, reMs)
   c.maxFlight  = entry.crew === 'D' ? 10 : 8
@@ -74,15 +90,18 @@ export function compute(entry: Entry, all: Entry[]): Computed {
     return c
   }
 
-  if (onMs !== null) {
-    const windowStart = onMs - 86400000
+  // Rolling 24-hr window anchored to releaseTime (or showTime fallback) since Hobbs has no timestamp
+  const anchorMs = relMs ?? showMs
+  if (anchorMs !== null) {
+    const windowStart = anchorMs - 86400000
     c.rolling24 = all.reduce((sum, e) => {
       if (e.part91) return sum
-      const eOn  = ms(e.onBlocks)
-      const eOff = ms(e.offBlocks)
-      if (eOn === null || eOff === null) return sum
-      if (eOn <= onMs && eOn > windowStart && eOn >= eOff)
-        return sum + (eOn - eOff) / 3600000
+      const eAnchor = ms(e.releaseTime) ?? ms(e.showTime)
+      const eOff    = parseHobbs(e.offBlocks)
+      const eOn     = parseHobbs(e.onBlocks)
+      if (eAnchor === null || eOff === null || eOn === null) return sum
+      if (eAnchor <= anchorMs && eAnchor > windowStart)
+        return sum + hobbsFlightTime(eOff, eOn)!
       return sum
     }, 0)
   } else {
@@ -96,22 +115,23 @@ export function compute(entry: Entry, all: Entry[]): Computed {
   else if (c.excAmt <= 1)  c.reqRest = 12
   else                     c.reqRest = 16
 
+  // Lookback: anchor to releaseTime/showTime
   c.lookbackOk = null
-  if (onMs !== null) {
-    const lbStart = onMs - 86400000
+  if (anchorMs !== null) {
+    const lbStart = anchorMs - 86400000
     const found = all.some(e => {
       if (e.id === entry.id) return false
       if (e.restDay) {
         const dayStart = ms(e.showTime)
         const dayEnd   = dayStart ? dayStart + 86400000 : null
         if (!dayEnd) return false
-        return dayEnd >= lbStart && dayEnd <= onMs
+        return dayEnd >= lbStart && dayEnd <= anchorMs
       }
       const eRe = ms(e.restEnd)
       const eRs = ms(e.restStart)
       if (eRe === null || eRs === null) return false
       const restHrs = (eRe - eRs) / 3600000
-      return eRe >= lbStart && eRe <= onMs && restHrs >= 10
+      return eRe >= lbStart && eRe <= anchorMs && restHrs >= 10
     })
     const hasPrior = all.some(e =>
       e.id !== entry.id && (ms(e.restEnd) !== null || e.restDay)
@@ -133,7 +153,7 @@ export function quarterRestCount(entries: Entry[]): number {
   const qEnd   = new Date(now.getFullYear(), qMonth + 3, 1).getTime()
   return entries.filter(e => {
     if (!e.restDay) return false
-    const anchor = ms(e.showTime) ?? ms(e.offBlocks)
+    const anchor = ms(e.showTime)
     return anchor !== null && anchor >= qStart && anchor < qEnd
   }).length
 }
@@ -191,7 +211,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   const qLabel = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'][qIdx]
 
   const qEntries = entries.filter(e => {
-    const anchor = ms(e.onBlocks) ?? ms(e.showTime)
+    const anchor = ms(e.releaseTime) ?? ms(e.showTime)
     return anchor !== null && anchor >= qStart && anchor < qEnd
   })
 
@@ -215,7 +235,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
 
     if (c.flightOk === false) {
       flightFailCount++
-      violations.push({ date: fmtDT(e.onBlocks), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` })
+      violations.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` })
     } else if (c.flightOk === true) flightOkCount++
 
     if (c.dutyOk === false) {
@@ -229,7 +249,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
     } else if (c.restOk === true) restOkCount++
 
     if (c.excAmt > 0)
-      exceedances.push({ date: fmtDT(e.onBlocks), pilot: e.pilot, route: `${(e.dep || '?').toUpperCase()}→${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest })
+      exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, route: `${(e.dep || '?').toUpperCase()}→${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest })
   })
 
   // suppress unused var warnings
@@ -263,13 +283,13 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
     ? exceedances.map(x => `<tr><td>${x.date}</td><td>${x.pilot || '—'}</td><td>${x.route}</td><td style="color:#dc2626;font-weight:600">${x.over}</td><td>${x.reason}</td><td>${x.reqRest}h</td></tr>`).join('')
     : `<tr><td colspan="6" style="color:#16a34a;padding:10px">No exceedances this quarter.</td></tr>`
 
-  const sorted = [...qEntries].sort((a, b) => (ms(a.onBlocks) ?? ms(a.showTime) ?? 0) - (ms(b.onBlocks) ?? ms(b.showTime) ?? 0))
+  const sorted = [...qEntries].sort((a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0))
 
   const logRows = sorted.map(e => {
     if (e.restDay) return `<tr style="background:#f0fdf4"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:#16a34a;font-weight:600">● 24-HOUR REST DAY</td></tr>`
     const c = compute(e, entries)
-    if (e.part91) return `<tr style="background:#fffef0"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${fmtDT(e.offBlocks)}</td><td>${fmtDT(e.onBlocks)}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:#92400e;font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
-    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${fmtDT(e.offBlocks)}</td><td>${fmtDT(e.onBlocks)}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
+    if (e.part91) return `<tr style="background:#fffef0"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:#92400e;font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
+    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
   }).join('')
 
   const pilots    = [...new Set(flightLegs.map(e => e.pilot).filter(Boolean))].join(', ') || 'All Pilots'

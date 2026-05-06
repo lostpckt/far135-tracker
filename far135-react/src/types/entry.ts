@@ -6,8 +6,8 @@ export interface Entry {
   releaseTime: string
   dep: string
   arr: string
-  offBlocks: string
-  onBlocks: string
+  offBlocks: string     // Hobbs meter reading stored as numeric string, e.g. "12345.6"
+  onBlocks: string      // Hobbs meter reading stored as numeric string, e.g. "12345.6"
   restStart: string
   restEnd: string
   reason: string

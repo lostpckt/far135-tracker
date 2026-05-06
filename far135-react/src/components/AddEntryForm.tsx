@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import LegRow, { type LegData } from '@/components/LegRow'
-import { uid, parseDTPair, ms, exportCSV, generateQuarterlyReport } from '@/lib/calculations'
+import { uid, parseDTPair, ms, parseHobbs, exportCSV, generateQuarterlyReport } from '@/lib/calculations'
 import type { Entry } from '@/types/entry'
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
 }
 
 function emptyLeg(): LegData {
-  return { dep: '', arr: '', offDate: '', offTime: '', onDate: '', onTime: '', reason: '', part91: false }
+  return { dep: '', arr: '', offHobbs: '', onHobbs: '', reason: '', part91: false }
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -66,13 +66,13 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
 
     const legData: { dep: string; arr: string; off: string; on: string; reason: string; part91: boolean }[] = []
     for (let i = 0; i < legs.length; i++) {
-      const leg = legs[i]
-      const off = parseDTPair(leg.offDate, leg.offTime)
-      const on  = parseDTPair(leg.onDate,  leg.onTime)
+      const leg  = legs[i]
+      const offN = parseHobbs(leg.offHobbs)
+      const onN  = parseHobbs(leg.onHobbs)
       const label = legs.length > 1 ? `Leg ${i + 1}: ` : ''
-      if (!off || !on) { setErr(`${label}Off Blocks and On Blocks are required.`); return }
-      if (ms(on)! <= ms(off)!) { setErr(`${label}On Blocks must be after Off Blocks.`); return }
-      legData.push({ dep: leg.dep, arr: leg.arr, off, on, reason: leg.reason, part91: leg.part91 })
+      if (offN === null || onN === null) { setErr(`${label}Off Blocks and On Blocks Hobbs readings are required.`); return }
+      if (onN <= offN) { setErr(`${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`); return }
+      legData.push({ dep: leg.dep, arr: leg.arr, off: leg.offHobbs.trim(), on: leg.onHobbs.trim(), reason: leg.reason, part91: leg.part91 })
     }
 
     const restStart = parseDTPair(rsDate, rsTime)

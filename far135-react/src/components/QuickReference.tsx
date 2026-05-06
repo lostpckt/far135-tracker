@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 const sections = [
   {
     title: 'Rolling 24-Hour Flight Time',
-    body: 'Single pilot: max 8 hours in any consecutive 24-hour window. Dual pilot: max 10 hours. The window ends at the On Blocks time of the current leg and looks back 24 hours.',
+    body: 'Single pilot: max 8 hours in any consecutive 24-hour window. Dual pilot: max 10 hours. The 24-hour window is anchored to Release Time (or Show Time if no release) since Hobbs readings carry no timestamp.',
   },
   {
     title: '10-Hour Look-Back Rest',
-    body: 'Before any flight segment, the pilot must have received at least 10 consecutive hours of rest in the 24 hours preceding the completion of that segment. This tracker checks whether a qualifying rest period ended within the 24-hour lookback window.',
+    body: 'Before any flight segment, the pilot must have received at least 10 consecutive hours of rest in the 24 hours preceding the completion of that segment. This tracker checks whether a qualifying rest period ended within the 24-hour lookback window, anchored to Release Time.',
   },
   {
     title: '14-Hour Duty Day',
@@ -23,7 +23,7 @@ const sections = [
   },
   {
     title: 'How to Use This Tool',
-    body: 'Enter one row per flight leg. For a multi-leg day, Show Time and Release Time will be the same across legs; Off/On Blocks change each leg. Rest fields only need to be filled on the last leg of the day. Mark 24-hr rest days with the checkbox (no flight fields needed).',
+    body: 'Enter one row per flight leg. Off Blocks and On Blocks are Hobbs meter readings (5 digits + 1 decimal, e.g. 12345.6). Flight time is calculated as (On Hobbs − Off Hobbs) + 0.2, where the 0.2 accounts for taxi time. For a multi-leg day, Show Time and Release Time are the same across legs; Hobbs readings change each leg. Rest fields only need to be filled on the last leg of the day. Mark 24-hr rest days with the checkbox (no flight fields needed).',
   },
 ]
 

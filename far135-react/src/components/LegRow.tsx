@@ -6,10 +6,8 @@ import { X } from 'lucide-react'
 export interface LegData {
   dep: string
   arr: string
-  offDate: string
-  offTime: string
-  onDate: string
-  onTime: string
+  offHobbs: string
+  onHobbs: string
   reason: string
   part91: boolean
 }
@@ -56,19 +54,29 @@ export default function LegRow({ index, data, onChange, onRemove, showRemove }: 
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-[0.7rem]">Off Blocks</Label>
-          <div className="flex gap-1">
-            <Input type="date" value={data.offDate} onChange={e => set('offDate', e.target.value)} className="text-sm h-8 w-[140px]" />
-            <Input value={data.offTime} onChange={e => set('offTime', e.target.value)} placeholder="09:00" maxLength={5} className="text-sm h-8 w-[70px]" />
-          </div>
+          <Label className="text-[0.7rem]">Off Blocks (Hobbs)</Label>
+          <Input
+            type="number"
+            value={data.offHobbs}
+            onChange={e => set('offHobbs', e.target.value)}
+            placeholder="12345.6"
+            step="0.1"
+            min="0"
+            className="text-sm h-8 w-[110px]"
+          />
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-[0.7rem]">On Blocks</Label>
-          <div className="flex gap-1">
-            <Input type="date" value={data.onDate} onChange={e => set('onDate', e.target.value)} className="text-sm h-8 w-[140px]" />
-            <Input value={data.onTime} onChange={e => set('onTime', e.target.value)} placeholder="11:30" maxLength={5} className="text-sm h-8 w-[70px]" />
-          </div>
+          <Label className="text-[0.7rem]">On Blocks (Hobbs)</Label>
+          <Input
+            type="number"
+            value={data.onHobbs}
+            onChange={e => set('onHobbs', e.target.value)}
+            placeholder="12347.3"
+            step="0.1"
+            min="0"
+            className="text-sm h-8 w-[110px]"
+          />
         </div>
 
         <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
