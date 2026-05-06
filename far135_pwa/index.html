@@ -54,7 +54,7 @@
             <h3>Rolling 24-Hour Flight Time</h3>
             <p>Single pilot: max <strong>8 hours</strong> in any consecutive 24-hour window.<br>
                Dual pilot: max <strong>10 hours</strong>.<br>
-               Window ends at the <em>On Blocks</em> time of the current leg.</p>
+               Window is anchored at Release Time. Each leg's flight time is Hobbs delta + <strong>0.2 hrs</strong> for taxi.</p>
           </div>
           <div class="help-block">
             <h3>10-Hour Look-Back Rest</h3>
@@ -81,7 +81,8 @@
             <h3>How to Use</h3>
             <p>One entry per flight leg. For multi-leg days, use <em>Add Another Leg</em>.
                Show/Release Time and Rest are shared across all legs in a duty period.
-               Mark Part 91 legs to log them without affecting §135 limits.</p>
+               Mark Part 91 legs to log them without affecting §135 limits.<br><br>
+               <strong>Off/On Blocks:</strong> Enter the 5-digit Hobbs reading (e.g. <em>12345.6</em>) at engine start and shutdown. 0.2 hrs is added automatically for taxi. Example: Off 12345.6 / On 12347.1 = 1.5 + 0.2 = <strong>1.7 hrs logged</strong>.</p>
           </div>
         </div>
       </div>
@@ -271,18 +272,14 @@
       <div class="fg"><label>Departure ICAO</label><input type="text" id="m-dep" maxlength="4" autocapitalize="characters"></div>
       <div class="fg"><label>Arrival ICAO</label><input type="text" id="m-arr" maxlength="4" autocapitalize="characters"></div>
       <div class="fg">
-        <label>Off Blocks</label>
-        <div class="dt-pair">
-          <input type="date" id="m-off-d">
-          <input type="text" id="m-off-t" placeholder="09:00" maxlength="5" inputmode="numeric">
-        </div>
+        <label>Off Blocks (Hobbs)</label>
+        <input type="number" id="m-off" step="0.1" min="0" max="99999.9" placeholder="12345.6" inputmode="decimal">
+        <span class="hint">5-digit Hobbs at departure</span>
       </div>
       <div class="fg">
-        <label>On Blocks</label>
-        <div class="dt-pair">
-          <input type="date" id="m-on-d">
-          <input type="text" id="m-on-t" placeholder="11:30" maxlength="5" inputmode="numeric">
-        </div>
+        <label>On Blocks (Hobbs)</label>
+        <input type="number" id="m-on" step="0.1" min="0" max="99999.9" placeholder="12347.1" inputmode="decimal">
+        <span class="hint">+0.2 taxi added automatically</span>
       </div>
 
       <div class="divider">Rest Period</div>

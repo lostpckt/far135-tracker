@@ -86,14 +86,14 @@ function uid() {
 // ============================================================
 function compute(entry, all) {
   const c = {};
-  const offMs  = ms(entry.offBlocks);
-  const onMs   = ms(entry.onBlocks);
+  const offH   = parseFloat(entry.offBlocks);
+  const onH    = parseFloat(entry.onBlocks);
   const showMs = ms(entry.showTime);
   const relMs  = ms(entry.releaseTime);
   const rsMs   = ms(entry.restStart);
   const reMs   = ms(entry.restEnd);
 
-  c.legFlight  = hrs(offMs, onMs);
+  c.legFlight  = (!isNaN(offH) && !isNaN(onH)) ? (onH - offH) + 0.2 : null;
   c.dutyPeriod = hrs(showMs, relMs);
   c.consRest   = hrs(rsMs, reMs);
   c.maxFlight  = entry.crew === 'D' ? 10 : 8;
@@ -105,14 +105,16 @@ function compute(entry, all) {
     return c;
   }
 
-  // Rolling 24-hr flight time (excludes Part 91 legs)
-  if (onMs !== null) {
-    const win = onMs - 86400000;
+  // Rolling 24-hr flight time (anchored at release time; excludes Part 91 legs)
+  const anchorMs = relMs || showMs;
+  if (anchorMs !== null) {
+    const win = anchorMs - 86400000;
     c.rolling24 = all.reduce((sum, e) => {
       if (e.part91) return sum;
-      const eOn = ms(e.onBlocks), eOff = ms(e.offBlocks);
-      if (!eOn || !eOff) return sum;
-      if (eOn <= onMs && eOn > win && eOn >= eOff) return sum + (eOn - eOff) / 3600000;
+      const eAnchor = ms(e.releaseTime) || ms(e.showTime);
+      const eOff = parseFloat(e.offBlocks), eOn = parseFloat(e.onBlocks);
+      if (!eAnchor || isNaN(eOff) || isNaN(eOn)) return sum;
+      if (eAnchor <= anchorMs && eAnchor > win) return sum + (eOn - eOff) + 0.2;
       return sum;
     }, 0);
   } else {
@@ -124,20 +126,19 @@ function compute(entry, all) {
 
   // 10-hr look-back rest
   c.lookbackOk = null;
-  if (onMs !== null) {
-    const lbStart = onMs - 86400000;
+  if (anchorMs !== null) {
+    const lbStart = anchorMs - 86400000;
     const found = all.some(e => {
       if (e.id === entry.id) return false;
-      // A 24-hr rest day counts as a full 24-hour rest period (00:00 → 24:00)
       if (e.restDay) {
         const dayStart = ms(e.showTime);
         const dayEnd   = dayStart ? dayStart + 86400000 : null;
         if (!dayEnd) return false;
-        return dayEnd >= lbStart && dayEnd <= onMs; // always ≥ 10 hrs
+        return dayEnd >= lbStart && dayEnd <= anchorMs;
       }
       const eRe = ms(e.restEnd), eRs = ms(e.restStart);
       if (!eRe || !eRs) return false;
-      return eRe >= lbStart && eRe <= onMs && (eRe - eRs) / 3600000 >= 10;
+      return eRe >= lbStart && eRe <= anchorMs && (eRe - eRs) / 3600000 >= 10;
     });
     const hasPrior = all.some(e => e.id !== entry.id &&
       (ms(e.restEnd) !== null || e.restDay));
@@ -164,7 +165,7 @@ function quarterRestCount() {
   const qE = new Date(now.getFullYear(), qM + 3, 1).getTime();
   return entries.filter(e => {
     if (!e.restDay) return false;
-    const a = ms(e.showTime) || ms(e.offBlocks);
+    const a = ms(e.showTime);
     return a !== null && a >= qS && a < qE;
   }).length;
 }
@@ -203,18 +204,12 @@ function renderLegRows() {
           <input type="text" id="leg-${idx}-arr" placeholder="KJFK" maxlength="4" autocomplete="off" autocapitalize="characters">
         </div>
         <div class="lf">
-          <label>Off Blocks</label>
-          <div class="dt-pair">
-            <input type="date" id="leg-${idx}-off-d">
-            <input type="text" id="leg-${idx}-off-t" placeholder="09:00" maxlength="5" inputmode="numeric">
-          </div>
+          <label>Off Blocks (Hobbs)</label>
+          <input type="number" id="leg-${idx}-off" step="0.1" min="0" max="99999.9" placeholder="12345.6" inputmode="decimal">
         </div>
         <div class="lf">
-          <label>On Blocks</label>
-          <div class="dt-pair">
-            <input type="date" id="leg-${idx}-on-d">
-            <input type="text" id="leg-${idx}-on-t" placeholder="11:30" maxlength="5" inputmode="numeric">
-          </div>
+          <label>On Blocks (Hobbs)</label>
+          <input type="number" id="leg-${idx}-on" step="0.1" min="0" max="99999.9" placeholder="12347.1" inputmode="decimal">
         </div>
         <div class="lf leg-reason">
           <label>Exceedance Reason (optional)</label>
@@ -316,7 +311,7 @@ function renderCards() {
   }
 
   const sorted = [...entries].sort(
-    (a, b) => (ms(a.onBlocks) || ms(a.showTime) || 0) - (ms(b.onBlocks) || ms(b.showTime) || 0)
+    (a, b) => (ms(a.showTime) || 0) - (ms(b.showTime) || 0)
   );
 
   el.innerHTML = sorted.map(e => {
@@ -350,7 +345,7 @@ function renderCards() {
             </div>
           </div>
           <div class="card-route">${(e.dep||'?').toUpperCase()} &#8594; ${(e.arr||'?').toUpperCase()}</div>
-          <div class="card-times">Off: ${fmtTime(e.offBlocks)} &nbsp;|&nbsp; On: ${fmtTime(e.onBlocks)} &nbsp;|&nbsp; ${fmtHrs(c.legFlight)}</div>
+          <div class="card-times">Off: ${e.offBlocks||'—'} &nbsp;|&nbsp; On: ${e.onBlocks||'—'} &nbsp;|&nbsp; ${fmtHrs(c.legFlight)}</div>
           <div class="card-note">Excluded from §135.267 limits</div>
         </div>`;
     }
@@ -368,7 +363,7 @@ function renderCards() {
           </div>
         </div>
         <div class="card-route">${(e.dep||'—').toUpperCase()} &#8594; ${(e.arr||'—').toUpperCase()}</div>
-        <div class="card-times">Off: ${fmtTime(e.offBlocks)} &nbsp;|&nbsp; On: ${fmtTime(e.onBlocks)}</div>
+        <div class="card-times">Off: ${e.offBlocks||'—'} &nbsp;|&nbsp; On: ${e.onBlocks||'—'}</div>
         <div class="card-metrics">
           <div class="metric">
             <div class="metric-val">${fmtHrs(c.legFlight)}</div>
@@ -410,7 +405,7 @@ function renderTable() {
   }
 
   const sorted = [...entries].sort(
-    (a, b) => (ms(a.onBlocks) || ms(a.showTime) || 0) - (ms(b.onBlocks) || ms(b.showTime) || 0)
+    (a, b) => (ms(a.showTime) || 0) - (ms(b.showTime) || 0)
   );
 
   const rows = sorted.map(e => {
@@ -437,8 +432,8 @@ function renderTable() {
       <td><strong>${e.pilot||'—'}</strong></td>
       <td>${e.crew==='D'?'Dual':'Single'} ${p91Badge}</td>
       <td>${(e.dep||'—').toUpperCase()} &#8594; ${(e.arr||'—').toUpperCase()}</td>
-      <td>${fmtDT(e.offBlocks)}</td>
-      <td>${fmtDT(e.onBlocks)}</td>
+      <td>${e.offBlocks||'—'}</td>
+      <td>${e.onBlocks||'—'}</td>
       <td><strong>${fmtHrs(c.legFlight)}</strong></td>
       <td>${e.part91
         ? '<span style="color:#92400e;font-size:.75rem">Part 91</span>'
@@ -498,8 +493,8 @@ function editEntry(id) {
 
   setElDT('m-show',     e.showTime);
   setElDT('m-release',  e.releaseTime);
-  setElDT('m-off',      e.offBlocks);
-  setElDT('m-on',       e.onBlocks);
+  document.getElementById('m-off').value = e.offBlocks || '';
+  document.getElementById('m-on').value  = e.onBlocks  || '';
   setElDT('m-reststart',e.restStart);
   setElDT('m-restend',  e.restEnd);
 
@@ -512,12 +507,12 @@ function saveEdit() {
   err.textContent = '';
 
   const isRestDay = document.getElementById('m-restday').checked;
-  const off = getDT('m-off');
-  const on  = getDT('m-on');
+  const offH = parseFloat(document.getElementById('m-off').value);
+  const onH  = parseFloat(document.getElementById('m-on').value);
 
   if (!isRestDay) {
-    if (!off || !on) { err.textContent = 'Off Blocks and On Blocks are required.'; return; }
-    if (ms(on) <= ms(off)) { err.textContent = 'On Blocks must be after Off Blocks.'; return; }
+    if (isNaN(offH) || isNaN(onH)) { err.textContent = 'Off Blocks and On Blocks Hobbs are required.'; return; }
+    if (onH <= offH) { err.textContent = 'On Blocks Hobbs must be greater than Off Blocks Hobbs.'; return; }
     const show = getDT('m-show'), rel = getDT('m-release');
     if (show && rel && ms(rel) <= ms(show)) { err.textContent = 'Release Time must be after Show Time.'; return; }
   }
@@ -533,8 +528,8 @@ function saveEdit() {
     releaseTime: getDT('m-release'),
     dep:         document.getElementById('m-dep').value.toUpperCase().trim(),
     arr:         document.getElementById('m-arr').value.toUpperCase().trim(),
-    offBlocks:   off,
-    onBlocks:    on,
+    offBlocks:   isRestDay ? '' : offH.toFixed(1),
+    onBlocks:    isRestDay ? '' : onH.toFixed(1),
     restStart:   getDT('m-reststart'),
     restEnd:     getDT('m-restend'),
     reason:      document.getElementById('m-reason').value.trim(),
@@ -594,15 +589,15 @@ function addEntry() {
   const legData = [];
   for (let pos = 0; pos < legIndices.length; pos++) {
     const idx   = legIndices[pos];
-    const off   = getLegDT(idx, 'off');
-    const on    = getLegDT(idx, 'on');
+    const offH  = parseFloat(document.getElementById(`leg-${idx}-off`).value);
+    const onH   = parseFloat(document.getElementById(`leg-${idx}-on`).value);
     const label = legIndices.length > 1 ? `Leg ${pos+1}: ` : '';
-    if (!off || !on) { err.textContent = `${label}Off Blocks and On Blocks are required.`; return; }
-    if (ms(on) <= ms(off)) { err.textContent = `${label}On Blocks must be after Off Blocks.`; return; }
+    if (isNaN(offH) || isNaN(onH)) { err.textContent = `${label}Off Blocks and On Blocks Hobbs are required.`; return; }
+    if (onH <= offH) { err.textContent = `${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`; return; }
     legData.push({
       dep:    document.getElementById(`leg-${idx}-dep`).value.toUpperCase().trim(),
       arr:    document.getElementById(`leg-${idx}-arr`).value.toUpperCase().trim(),
-      off, on,
+      off: offH.toFixed(1), on: onH.toFixed(1),
       reason: document.getElementById(`leg-${idx}-reason`).value.trim(),
       part91: document.getElementById(`leg-${idx}-p91`).checked
     });
@@ -717,7 +712,7 @@ function quarterlyReport() {
   const qLabel = ['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][qIdx];
 
   const qEntries = entries.filter(e => {
-    const a = ms(e.onBlocks) || ms(e.showTime);
+    const a = ms(e.releaseTime) || ms(e.showTime);
     return a !== null && a >= qStart && a < qEnd;
   });
   if (!qEntries.length) { toast(`No entries for ${qLabel} ${year}.`, 'warn'); return; }
@@ -734,10 +729,10 @@ function quarterlyReport() {
     const c = compute(e, entries);
     totalFlight += c.legFlight || 0;
     if (e.part91) return;
-    if (c.flightOk === false) { flightFail++; violations.push({ date: fmtDT(e.onBlocks), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` }); }
+    if (c.flightOk === false) { flightFail++; violations.push({ date: fmtDT(e.releaseTime) || fmtDT(e.showTime), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` }); }
     if (c.dutyOk   === false) { dutyFail++;   violations.push({ date: fmtDT(e.showTime),  pilot: e.pilot, type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` }); }
     if (c.restOk   === false) { restFail++;   violations.push({ date: fmtDT(e.restStart), pilot: e.pilot, type: 'Rest Deficient',       detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` }); }
-    if (c.excAmt > 0) exceedances.push({ date: fmtDT(e.onBlocks), pilot: e.pilot, route: `${(e.dep||'?').toUpperCase()}→${(e.arr||'?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason||'—', reqRest: c.reqRest });
+    if (c.excAmt > 0) exceedances.push({ date: fmtDT(e.releaseTime) || fmtDT(e.showTime), pilot: e.pilot, route: `${(e.dep||'?').toUpperCase()}→${(e.arr||'?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason||'—', reqRest: c.reqRest });
   });
 
   const totalV  = flightFail + dutyFail + restFail;
@@ -768,8 +763,8 @@ function quarterlyReport() {
   const logRows = sorted.map(e => {
     if (e.restDay) return `<tr style="background:#f0fdf4"><td>${fmtDT(e.showTime)}</td><td>${e.pilot||'—'}</td><td colspan="12" style="color:#16a34a;font-weight:600">&#9679; 24-HOUR REST DAY</td></tr>`;
     const c = compute(e, entries);
-    if (e.part91) return `<tr style="background:#fffef0"><td>${fmtDT(e.showTime)}</td><td>${e.pilot||'—'}</td><td>${e.crew==='D'?'Dual':'Single'}</td><td>${(e.dep||'—').toUpperCase()}→${(e.arr||'—').toUpperCase()}</td><td>${fmtDT(e.offBlocks)}</td><td>${fmtDT(e.onBlocks)}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:#92400e;font-weight:600">&#9654; Part 91 — Excluded from §135.267</td></tr>`;
-    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot||'—'}</td><td>${e.crew==='D'?'Dual':'Single'}</td><td>${(e.dep||'—').toUpperCase()}→${(e.arr||'—').toUpperCase()}</td><td>${fmtDT(e.offBlocks)}</td><td>${fmtDT(e.onBlocks)}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!=null?fmtHrs(c.rolling24):'—'}/${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)}/${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt>0?fmtHrs(c.excAmt):'—'}</td></tr>`;
+    if (e.part91) return `<tr style="background:#fffef0"><td>${fmtDT(e.showTime)}</td><td>${e.pilot||'—'}</td><td>${e.crew==='D'?'Dual':'Single'}</td><td>${(e.dep||'—').toUpperCase()}→${(e.arr||'—').toUpperCase()}</td><td>${e.offBlocks||'—'}</td><td>${e.onBlocks||'—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:#92400e;font-weight:600">&#9654; Part 91 — Excluded from §135.267</td></tr>`;
+    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot||'—'}</td><td>${e.crew==='D'?'Dual':'Single'}</td><td>${(e.dep||'—').toUpperCase()}→${(e.arr||'—').toUpperCase()}</td><td>${e.offBlocks||'—'}</td><td>${e.onBlocks||'—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!=null?fmtHrs(c.rolling24):'—'}/${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)}/${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt>0?fmtHrs(c.excAmt):'—'}</td></tr>`;
   }).join('');
 
   const html = buildReportHTML({ qLabel, year, pilots, generated, allOk, totalV, restMet, restDays, part135Legs, part91Legs, totalFlight, exceedances, scRows, vRows, exRows, logRows });
