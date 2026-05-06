@@ -53,15 +53,15 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
                 if (e.restDay) {
                   const anchor = e.showTime || ''
                   return (
-                    <tr key={e.id} className="bg-green-50">
-                      <td className="px-3 py-2 border-b border-slate-100">{fmtDT(anchor)}</td>
-                      <td className="px-3 py-2 border-b border-slate-100 font-semibold">{e.pilot || '—'}</td>
-                      <td className="px-3 py-2 border-b border-slate-100 text-green-700 font-semibold" colSpan={14}>
+                    <tr key={e.id} className="bg-green-50 dark:bg-green-950">
+                      <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{fmtDT(anchor)}</td>
+                      <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold">{e.pilot || '—'}</td>
+                      <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={14}>
                         🟢 24-HOUR REST DAY — No flight duty
                       </td>
-                      <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                        <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 rounded p-1 mr-0.5"><Pencil size={13} /></button>
-                        <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 rounded p-1"><X size={13} /></button>
+                      <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                        <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
+                        <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>
                       </td>
                     </tr>
                   )
