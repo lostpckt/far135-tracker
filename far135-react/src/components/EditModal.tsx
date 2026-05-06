@@ -30,8 +30,8 @@ function DTField({ label, date, time, onDate, onTime, placeholder = '00:00' }: {
     <div className="flex flex-col gap-1">
       <Label className="text-xs font-semibold text-slate-500">{label}</Label>
       <div className="flex gap-1.5">
-        <Input type="date" value={date} onChange={e => onDate(e.target.value)} className="text-sm h-8 flex-[1.5]" />
-        <Input value={time} onChange={e => onTime(e.target.value)} placeholder={placeholder} maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
+        <Input type="date" value={date} onChange={e => onDate(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
+        <Input value={time} onChange={e => onTime(e.target.value)} placeholder={placeholder} maxLength={5} className="text-sm h-8 w-20 shrink-0" />
       </div>
     </div>
   )
