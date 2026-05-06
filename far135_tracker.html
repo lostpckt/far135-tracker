@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAR 135.267 Duty & Flight Time Tracker</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+
+header {
+  background: #1a1a2e; color: white;
+  padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+}
+header h1 { font-size: 1.15rem; font-weight: 700; }
+header p  { font-size: 0.78rem; opacity: 0.65; margin-top: 2px; }
+
+.container { max-width: 1500px; margin: 0 auto; padding: 20px; }
+
+/* ---- Regulatory note ---- */
+.reg-note {
+  background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 0.8rem; color: #92400e; margin-bottom: 20px;
+}
+
+/* ---- Dashboard cards ---- */
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px; margin-bottom: 20px;
+}
+.card {
+  background: white; border-radius: 10px;
+  padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.card-label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.card-value { font-size: 1.65rem; font-weight: 700; line-height: 1; }
+.card-sub   { font-size: 0.78rem; color: #aaa; margin-top: 5px; }
+.c-ok      { color: #16a34a; }
+.c-warn    { color: #dc2626; }
+.c-neutral { color: #2563eb; }
+.c-caution { color: #d97706; }
+
+/* ---- Form section ---- */
+.panel {
+  background: white; border-radius: 10px;
+  padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  margin-bottom: 20px;
+}
+.panel h2 {
+  font-size: 0.95rem; font-weight: 700;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 8px; margin-bottom: 16px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.fg { display: flex; flex-direction: column; gap: 4px; }
+.fg label { font-size: 0.78rem; font-weight: 600; color: #555; }
+.fg input, .fg select {
+  border: 1px solid #d1d5db; border-radius: 7px;
+  padding: 7px 10px; font-size: 0.88rem;
+  background: #fafafa; transition: border-color .15s;
+  width: 100%;
+}
+.fg input:focus, .fg select:focus {
+  outline: none; border-color: #2563eb; background: white;
+}
+.fg .hint { font-size: 0.7rem; color: #b0b0b0; }
+.divider {
+  grid-column: 1 / -1;
+  font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: #aaa; margin-top: 6px;
+}
+.check-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.check-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb; }
+.check-row label { font-size: 0.85rem; cursor: pointer; font-weight: 400; color: #333; }
+
+.actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
+.btn {
+  padding: 9px 22px; border-radius: 7px; border: none;
+  cursor: pointer; font-size: 0.88rem; font-weight: 600;
+  transition: all .15s;
+}
+.btn-primary { background: #1a1a2e; color: white; }
+.btn-primary:hover { background: #2563eb; }
+.btn-export  { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.btn-export:hover  { background: #16a34a; color: white; }
+.btn-danger  { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.btn-danger:hover  { background: #dc2626; color: white; }
+#form-err { color: #dc2626; font-size: 0.82rem; }
+
+/* ---- Table ---- */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th {
+  background: #f8fafc; padding: 9px 11px;
+  text-align: left; font-weight: 700; color: #555;
+  border-bottom: 2px solid #e5e7eb; white-space: nowrap;
+}
+td {
+  padding: 9px 11px; border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle; white-space: nowrap;
+}
+tr:hover td { background: #f8fafc; }
+.badge {
+  display: inline-block; padding: 2px 9px;
+  border-radius: 20px; font-size: 0.72rem; font-weight: 700;
+}
+.b-ok   { background: #f0fdf4; color: #16a34a; }
+.b-warn { background: #fef2f2; color: #dc2626; }
+.b-na   { background: #f1f5f9; color: #94a3b8; }
+.del-btn {
+  background: none; border: none; color: #dc2626;
+  cursor: pointer; padding: 3px 8px; border-radius: 5px; font-size: 0.85rem;
+}
+.del-btn:hover  { background: #fef2f2; }
+.edit-btn { background: none; border: none; color: #2563eb; cursor: pointer; padding: 3px 8px; border-radius: 5px; font-size: 0.85rem; }
+.edit-btn:hover { background: #eff6ff; }
+.empty { text-align: center; padding: 48px; color: #bbb; font-size: 0.95rem; }
+
+/* ---- Edit modal ---- */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 1000;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: white; border-radius: 12px;
+  padding: 24px; width: min(760px, 95vw);
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.modal h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+.modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.btn-save { background: #16a34a; color: white; padding: 9px 22px; border-radius: 7px; border: none; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.btn-save:hover { background: #15803d; }
+.btn-cancel { background: #f1f5f9; color: #555; padding: 9px 22px; border-radius: 7px; border: none; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.btn-cancel:hover { background: #e2e8f0; }
+
+/* ---- Multi-leg rows ---- */
+.legs-wrap { grid-column: 1 / -1; }
+.leg-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: #f8fafc; border: 1px solid #e5e7eb;
+  border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
+}
+.leg-num {
+  font-size: 0.72rem; font-weight: 700; color: #2563eb;
+  min-width: 38px; padding-top: 18px; text-align: center;
+}
+.leg-fields { display: flex; flex-wrap: wrap; gap: 10px; flex: 1; }
+.lf { display: flex; flex-direction: column; gap: 3px; }
+.lf label { font-size: 0.72rem; font-weight: 600; color: #666; }
+.lf input[type=text], .lf input[type=date], .lf input[type=number] {
+  border: 1px solid #d1d5db; border-radius: 6px;
+  padding: 6px 9px; font-size: 0.85rem; background: white;
+}
+.lf input:focus { outline: none; border-color: #2563eb; }
+.lf .dt-pair { display: flex; gap: 5px; }
+.lf .dt-pair input[type=date] { flex: 1.5; min-width: 0; }
+.lf .dt-pair input[type=text]  { flex: 1; min-width: 52px; }
+.remove-leg { background: none; border: none; color: #dc2626; cursor: pointer; padding: 4px 7px; border-radius: 5px; font-size: 1rem; align-self: center; }
+.remove-leg:hover { background: #fef2f2; }
+.add-leg-btn {
+  background: #eff6ff; color: #2563eb; border: 1px dashed #93c5fd;
+  border-radius: 7px; padding: 7px 18px; font-size: 0.85rem;
+  font-weight: 600; cursor: pointer; margin-top: 2px; width: 100%;
+}
+.add-leg-btn:hover { background: #2563eb; color: white; border-style: solid; }
+
+/* ---- Help section ---- */
+.help-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;
+}
+.help-block {
+  background: #f8fafc; border-radius: 8px; padding: 12px 14px;
+  border-left: 3px solid #2563eb;
+}
+.help-block h3 { font-size: 0.82rem; font-weight: 700; color: #1a1a2e; margin-bottom: 5px; }
+.help-block p  { font-size: 0.78rem; color: #555; line-height: 1.55; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>✈ FAR 135.267 Duty &amp; Flight Time Tracker</h1>
+    <p>Part 135 Unscheduled Operations — Pilot Records | Data stored locally in your browser</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="reg-note">
+    <strong>Regulatory reference:</strong> 14 CFR §135.267 — Flight time limitations and rest requirements: Unscheduled one- and two-pilot crews.
+    This tool is for <strong>reference and record-keeping only</strong>. Always verify compliance with your OpSpec, POI, and company manual. All times should be consistent (Zulu or local — pick one and stick with it).
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard"></div>
+
+  <!-- Entry Form -->
+  <div class="panel">
+    <h2>Add Flight Leg</h2>
+    <div class="form-grid">
+
+      <div class="divider">Identification</div>
+
+      <div class="fg">
+        <label>Pilot Name / ID</label>
+        <input type="text" id="f-pilot" placeholder="e.g. J. Smith">
+      </div>
+      <div class="fg">
+        <label>Crew Configuration</label>
+        <select id="f-crew">
+          <option value="S">Single Pilot — 8 hr limit</option>
+          <option value="D">Dual Pilot — 10 hr limit</option>
+        </select>
+      </div>
+
+      <div class="divider">Duty Period</div>
+
+      <div class="fg">
+        <label>Show Time (Duty Start)</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="f-show-d" style="flex:1.5">
+          <input type="text" id="f-show-t" placeholder="14:30" maxlength="5" style="flex:1;min-width:0">
+        </div>
+        <span class="hint">When you reported for duty (24-hr)</span>
+      </div>
+      <div class="fg">
+        <label>Release Time (Duty End)</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="f-release-d" style="flex:1.5">
+          <input type="text" id="f-release-t" placeholder="22:15" maxlength="5" style="flex:1;min-width:0">
+        </div>
+        <span class="hint">When duty officially ended (24-hr)</span>
+      </div>
+
+      <div class="divider">Flight Legs</div>
+
+      <div class="legs-wrap">
+        <div id="legs-container"></div>
+        <button type="button" class="add-leg-btn" onclick="addLeg()">+ Add Another Leg</button>
+      </div>
+
+      <div class="divider">Rest Period (After This Duty)</div>
+
+      <div class="fg">
+        <label>Rest Start</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="f-reststart-d" style="flex:1.5">
+          <input type="text" id="f-reststart-t" placeholder="23:00" maxlength="5" style="flex:1;min-width:0">
+        </div>
+        <span class="hint" style="white-space:nowrap">When rest began after release (24-hr)</span>
+      </div>
+      <div class="fg">
+        <label>Rest End</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="f-restend-d" style="flex:1.5">
+          <input type="text" id="f-restend-t" placeholder="09:00" maxlength="5" style="flex:1;min-width:0">
+        </div>
+      </div>
+
+      <div class="divider">Special Entries</div>
+
+      <div class="fg" style="justify-content:flex-end">
+        <label>&nbsp;</label>
+        <div class="check-row">
+          <input type="checkbox" id="f-restday">
+          <label for="f-restday">This was a 24-hour rest day (no duty or flights)</label>
+        </div>
+      </div>
+
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="addEntry()">Add Entry</button>
+      <button class="btn btn-export"  onclick="exportCSV()">Export CSV</button>
+      <span style="display:flex;align-items:center;gap:6px;margin-left:8px">
+        <select id="rpt-q" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:0.88rem;background:#fafafa">
+          <option value="0">Q1 (Jan–Mar)</option>
+          <option value="1">Q2 (Apr–Jun)</option>
+          <option value="2">Q3 (Jul–Sep)</option>
+          <option value="3">Q4 (Oct–Dec)</option>
+        </select>
+        <input type="number" id="rpt-y" min="2000" max="2099" style="width:80px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:0.88rem;background:#fafafa">
+        <button class="btn" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe" onclick="quarterlyReport()">Quarterly Report</button>
+      </span>
+      <button class="btn btn-danger"  onclick="clearAll()">Clear All Data</button>
+      <span id="form-err"></span>
+    </div>
+  </div>
+
+  <!-- Flight Log Table -->
+  <div class="panel">
+    <h2>Flight Log</h2>
+    <div class="table-wrap" id="tbl"></div>
+  </div>
+
+  <!-- Quick Reference -->
+  <div class="panel">
+    <h2>§135.267 Quick Reference</h2>
+    <div class="help-grid">
+      <div class="help-block">
+        <h3>Rolling 24-Hour Flight Time</h3>
+        <p>
+          Single pilot: max <strong>8 hours</strong> in any consecutive 24-hour window.<br>
+          Dual pilot: max <strong>10 hours</strong>.<br>
+          The 24-hour window is anchored at your Release Time and looks back 24 hours. Each leg's flight time is the Hobbs delta plus <strong>0.2 hours</strong> for ground operation.
+        </p>
+      </div>
+      <div class="help-block">
+        <h3>10-Hour Look-Back Rest</h3>
+        <p>
+          Before any flight segment, the pilot must have received <strong>at least 10 consecutive hours of rest</strong> in the 24 hours preceding the <em>completion</em> of that segment. This tracker checks whether a qualifying rest period ended within the 24-hour lookback window.
+        </p>
+      </div>
+      <div class="help-block">
+        <h3>14-Hour Duty Day</h3>
+        <p>
+          Total duty period (Show Time to Release Time) must not exceed <strong>14 hours</strong>. The tracker flags any duty period over 14 hours.
+        </p>
+      </div>
+      <div class="help-block">
+        <h3>Quarterly Rest Requirement</h3>
+        <p>
+          Each pilot must receive at least <strong>13 24-hour rest periods per calendar quarter</strong>. Check the "24-hour rest day" box on any day you had no duty. The dashboard shows your running count.
+        </p>
+      </div>
+      <div class="help-block">
+        <h3>Exceedance Rest Multiplier</h3>
+        <p>
+          If flight time is exceeded (e.g., due to weather or an unforeseen delay):<br>
+          &lt; 30 min over → <strong>11 hrs</strong> rest required<br>
+          30–60 min over → <strong>12 hrs</strong> rest required<br>
+          &gt; 60 min over → <strong>16 hrs</strong> rest required
+        </p>
+      </div>
+      <div class="help-block">
+        <h3>How to Use This Tool</h3>
+        <p>
+          Enter <strong>one row per flight leg</strong>. For a multi-leg day, Show Time and Release Time are the same across legs; Off/On Blocks Hobbs change each leg. Rest fields only need to be filled on the <em>last</em> leg of the day. Mark 24-hr rest days with the checkbox (no flight fields needed).<br><br>
+          <strong>Off/On Blocks:</strong> Enter the Hobbs meter reading (e.g. <em>12345.6</em>) at engine start and shutdown. The tracker automatically adds <strong>0.2 hours</strong> to each leg's Hobbs delta to account for ground ops time. Example: Off Blocks 12345.6, On Blocks 12347.1 → Hobbs delta 1.5 + 0.2 ground operations = <strong>1.7 hrs logged</strong>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal" onclick="closeModal(event)">
+  <div class="modal">
+    <h2>Edit Flight Entry</h2>
+    <div class="modal-grid">
+
+      <div class="divider">Identification</div>
+      <div class="fg"><label>Pilot Name / ID</label><input type="text" id="m-pilot"></div>
+      <div class="fg">
+        <label>Crew Configuration</label>
+        <select id="m-crew">
+          <option value="S">Single Pilot — 8 hr limit</option>
+          <option value="D">Dual Pilot — 10 hr limit</option>
+        </select>
+      </div>
+
+      <div class="divider">Duty Period</div>
+      <div class="fg">
+        <label>Show Time (Duty Start)</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="m-show-d" style="flex:1.5">
+          <input type="text" id="m-show-t" placeholder="14:30" maxlength="5" style="flex:1;min-width:0">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Release Time (Duty End)</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="m-release-d" style="flex:1.5">
+          <input type="text" id="m-release-t" placeholder="22:15" maxlength="5" style="flex:1;min-width:0">
+        </div>
+      </div>
+
+      <div class="divider">Flight Leg</div>
+      <div class="fg"><label>Departure ICAO</label><input type="text" id="m-dep" maxlength="4" style="text-transform:uppercase"></div>
+      <div class="fg"><label>Arrival ICAO</label><input type="text" id="m-arr" maxlength="4" style="text-transform:uppercase"></div>
+      <div class="fg">
+        <label>Off Blocks (Hobbs)</label>
+        <input type="number" id="m-off" step="0.1" min="0" max="99999.9" placeholder="12345.6" style="width:120px">
+        <span class="hint">Hobbs at departure</span>
+      </div>
+      <div class="fg">
+        <label>On Blocks (Hobbs)</label>
+        <input type="number" id="m-on" step="0.1" min="0" max="99999.9" placeholder="12347.1" style="width:120px">
+        <span class="hint">Hobbs at arrival (+0.2 taxi added automatically)</span>
+      </div>
+
+      <div class="divider">Rest Period</div>
+      <div class="fg">
+        <label>Rest Start</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="m-reststart-d" style="flex:1.5">
+          <input type="text" id="m-reststart-t" placeholder="23:00" maxlength="5" style="flex:1;min-width:0">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Rest End</label>
+        <div style="display:flex;gap:6px">
+          <input type="date" id="m-restend-d" style="flex:1.5">
+          <input type="text" id="m-restend-t" placeholder="09:00" maxlength="5" style="flex:1;min-width:0">
+        </div>
+      </div>
+
+      <div class="divider">Other</div>
+      <div class="fg"><label>Exceedance Reason</label><input type="text" id="m-reason" placeholder="e.g. Weather divert"></div>
+      <div class="fg" style="justify-content:flex-end">
+        <label>&nbsp;</label>
+        <div class="check-row" style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:5px 9px">
+          <input type="checkbox" id="m-p91">
+          <label for="m-p91" style="font-size:0.8rem;font-weight:600;color:#92400e;cursor:pointer">Part 91 (exclude from 135 limits)</label>
+        </div>
+      </div>
+      <div class="fg" style="justify-content:flex-end">
+        <label>&nbsp;</label>
+        <div class="check-row">
+          <input type="checkbox" id="m-restday">
+          <label for="m-restday" style="cursor:pointer">24-hour rest day</label>
+        </div>
+      </div>
+
+    </div>
+    <div id="modal-err" style="color:#dc2626;font-size:0.82rem;margin-top:10px"></div>
+    <div class="modal-actions">
+      <button class="btn-save"   onclick="saveEdit()">Save Changes</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================================
+// DATA STORE
+// =============================================================
+let entries = [];
+try { entries = JSON.parse(localStorage.getItem('far135_v1') || '[]'); } catch(e) { entries = []; }
+
+function save() {
+  localStorage.setItem('far135_v1', JSON.stringify(entries));
+}
+
+// =============================================================
+// TIME HELPERS
+// =============================================================
+function getDT(prefix) {
+  // Combine separate date + 24-hr time inputs into "YYYY-MM-DDTHH:MM"
+  const d = document.getElementById(prefix + '-d').value;
+  const t = document.getElementById(prefix + '-t').value.trim();
+  if (!d || !t) return '';
+  const norm = t.length === 4 ? t.slice(0,2) + ':' + t.slice(2) : t;
+  if (!/^\d{2}:\d{2}$/.test(norm)) return '';
+  return `${d}T${norm}`;
+}
+
+function clearDT(prefix) {
+  document.getElementById(prefix + '-d').value = '';
+  document.getElementById(prefix + '-t').value = '';
+}
+
+// ---- Multi-leg form management ----
+let legIndices = [0];
+let nextLegIdx = 1;
+
+function getLegDT(idx, field) {
+  const d = document.getElementById(`leg-${idx}-${field}-d`).value;
+  const t = document.getElementById(`leg-${idx}-${field}-t`).value.trim();
+  if (!d || !t) return '';
+  const norm = t.length === 4 ? t.slice(0,2) + ':' + t.slice(2) : t;
+  if (!/^\d{2}:\d{2}$/.test(norm)) return '';
+  return `${d}T${norm}`;
+}
+
+function renderLegRows() {
+  document.getElementById('legs-container').innerHTML = legIndices.map((idx, pos) => `
+    <div class="leg-row" data-idx="${idx}">
+      <div class="leg-num">Leg<br>${pos + 1}</div>
+      <div class="leg-fields">
+        <div class="lf">
+          <label>Dep ICAO</label>
+          <input type="text" id="leg-${idx}-dep" placeholder="KBOS" maxlength="4" style="width:68px;text-transform:uppercase">
+        </div>
+        <div class="lf">
+          <label>Arr ICAO</label>
+          <input type="text" id="leg-${idx}-arr" placeholder="KJFK" maxlength="4" style="width:68px;text-transform:uppercase">
+        </div>
+        <div class="lf">
+          <label>Off Blocks (Hobbs)</label>
+          <input type="number" id="leg-${idx}-off" step="0.1" min="0" max="99999.9" placeholder="12345.6" style="width:120px">
+        </div>
+        <div class="lf">
+          <label>On Blocks (Hobbs)</label>
+          <input type="number" id="leg-${idx}-on" step="0.1" min="0" max="99999.9" placeholder="12347.1" style="width:120px">
+        </div>
+        <div class="lf" style="flex:1;min-width:160px">
+          <label>Exceedance Reason (optional)</label>
+          <input type="text" id="leg-${idx}-reason" placeholder="e.g. Weather divert" style="width:100%">
+        </div>
+        <div class="lf" style="align-self:flex-end">
+          <div class="check-row" style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 9px;margin-top:0">
+            <input type="checkbox" id="leg-${idx}-p91">
+            <label for="leg-${idx}-p91" style="font-size:0.8rem;font-weight:600;color:#92400e;cursor:pointer">Part 91 (exclude from 135 limits)</label>
+          </div>
+        </div>
+      </div>
+      ${legIndices.length > 1
+        ? `<button class="remove-leg" onclick="removeLeg(${idx})" title="Remove leg">&#10005;</button>`
+        : ''}
+    </div>
+  `).join('');
+}
+
+function addLeg() {
+  legIndices.push(nextLegIdx++);
+  renderLegRows();
+}
+
+function removeLeg(idx) {
+  legIndices = legIndices.filter(i => i !== idx);
+  renderLegRows();
+}
+
+function ms(dtStr) {
+  // datetime-local → milliseconds. Returns null if empty/invalid.
+  if (!dtStr) return null;
+  const t = new Date(dtStr).getTime();
+  return isNaN(t) ? null : t;
+}
+
+function hrs(startMs, endMs) {
+  if (startMs === null || endMs === null) return null;
+  const h = (endMs - startMs) / 3600000;
+  return h >= 0 ? h : null;
+}
+
+function fmtHrs(h) {
+  if (h === null || h === undefined || isNaN(h)) return '—';
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${hh}h ${String(mm).padStart(2,'0')}m`;
+}
+
+function fmtDT(dtStr) {
+  if (!dtStr) return '—';
+  const d = new Date(dtStr);
+  if (isNaN(d)) return '—';
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const dy = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${mo}/${dy} ${hh}:${mi}`;
+}
+
+// =============================================================
+// CALCULATION ENGINE
+// =============================================================
+function compute(entry, all) {
+  const c = {};
+
+  const offH   = parseFloat(entry.offBlocks);
+  const onH    = parseFloat(entry.onBlocks);
+  const showMs = ms(entry.showTime);
+  const relMs  = ms(entry.releaseTime);
+  const rsMs   = ms(entry.restStart);
+  const reMs   = ms(entry.restEnd);
+
+  // Leg flight time: Hobbs delta + 0.2 for taxi
+  c.legFlight = (!isNaN(offH) && !isNaN(onH)) ? (onH - offH) + 0.2 : null;
+
+  // Duty period
+  c.dutyPeriod = hrs(showMs, relMs);
+
+  // Consecutive rest (after this duty)
+  c.consRest = hrs(rsMs, reMs);
+
+  // Max allowed by crew config
+  c.maxFlight = entry.crew === 'D' ? 10 : 8;
+
+  // Part 91 legs are logged but exempt from all Part 135 limits
+  if (entry.part91) {
+    c.rolling24  = null;
+    c.excAmt     = 0;
+    c.reqRest    = 10;
+    c.lookbackOk = null;
+    c.flightOk   = null;
+    c.dutyOk     = null;
+    c.restOk     = null;
+    return c;
+  }
+
+  // Rolling 24-hour flight time (anchored at release time; excludes Part 91 legs)
+  const anchorMs = relMs || showMs;
+  if (anchorMs !== null) {
+    const windowStart = anchorMs - 86400000;
+    c.rolling24 = all.reduce((sum, e) => {
+      if (e.part91) return sum;
+      const eAnchor = ms(e.releaseTime) || ms(e.showTime);
+      const eOff = parseFloat(e.offBlocks);
+      const eOn  = parseFloat(e.onBlocks);
+      if (eAnchor === null || isNaN(eOff) || isNaN(eOn)) return sum;
+      if (eAnchor <= anchorMs && eAnchor > windowStart) {
+        return sum + (eOn - eOff) + 0.2;
+      }
+      return sum;
+    }, 0);
+  } else {
+    c.rolling24 = null;
+  }
+
+  // Exceedance amount
+  c.excAmt = (c.rolling24 !== null) ? Math.max(0, c.rolling24 - c.maxFlight) : 0;
+
+  // Required rest after (exceedance multiplier)
+  if      (c.excAmt === 0)  c.reqRest = 10;
+  else if (c.excAmt < 0.5)  c.reqRest = 11;
+  else if (c.excAmt <= 1)   c.reqRest = 12;
+  else                      c.reqRest = 16;
+
+  // 10-hour look-back rest check
+  c.lookbackOk = null;
+  if (anchorMs !== null) {
+    const lbStart = anchorMs - 86400000;
+    const found = all.some(e => {
+      if (e.id === entry.id) return false;
+      // A 24-hr rest day counts as a full 24-hour rest period (00:00 → 24:00)
+      if (e.restDay) {
+        const dayStart = ms(e.showTime);
+        const dayEnd   = dayStart ? dayStart + 86400000 : null;
+        if (!dayEnd) return false;
+        return dayEnd >= lbStart && dayEnd <= anchorMs;
+      }
+      const eRe = ms(e.restEnd);
+      const eRs = ms(e.restStart);
+      if (eRe === null || eRs === null) return false;
+      const restHrs = (eRe - eRs) / 3600000;
+      return eRe >= lbStart && eRe <= anchorMs && restHrs >= 10;
+    });
+    const hasPrior = all.some(e => e.id !== entry.id &&
+      (ms(e.restEnd) !== null || e.restDay));
+    c.lookbackOk = hasPrior ? found : null;
+  }
+
+  // Compliance flags
+  c.flightOk = c.rolling24 !== null ? c.rolling24 <= c.maxFlight : null;
+  c.dutyOk   = c.dutyPeriod !== null ? c.dutyPeriod <= 14 : null;
+  c.restOk   = c.consRest !== null ? c.consRest >= c.reqRest : null;
+
+  return c;
+}
+
+// =============================================================
+// QUARTERLY REST COUNT
+// =============================================================
+function quarterRestCount() {
+  const now = new Date();
+  const qMonth = Math.floor(now.getMonth() / 3) * 3;
+  const qStart = new Date(now.getFullYear(), qMonth, 1).getTime();
+  const qEnd   = new Date(now.getFullYear(), qMonth + 3, 1).getTime();
+  return entries.filter(e => {
+    if (!e.restDay) return false;
+    const anchor = ms(e.showTime);
+    return anchor !== null && anchor >= qStart && anchor < qEnd;
+  }).length;
+}
+
+// =============================================================
+// RENDER — DASHBOARD
+// =============================================================
+function renderDashboard() {
+  const qCount = quarterRestCount();
+  let lastCalc = null;
+  if (entries.length) {
+    const nonRestEntries = entries.filter(e => !e.restDay);
+    if (nonRestEntries.length) {
+      const last = nonRestEntries[nonRestEntries.length - 1];
+      lastCalc = compute(last, entries);
+    }
+  }
+
+  // Count any active warnings across all entries
+  const allWarnings = entries.filter(e => {
+    if (e.restDay) return false;
+    const c = compute(e, entries);
+    return c.flightOk === false || c.dutyOk === false || c.restOk === false;
+  }).length;
+
+  const cards = [
+    {
+      label: 'Total Legs Logged',
+      value: entries.filter(e => !e.restDay).length,
+      sub: `${entries.filter(e => e.restDay).length} rest-day entries`,
+      cls: 'c-neutral'
+    },
+    {
+      label: 'Last Rolling 24-hr',
+      value: lastCalc ? fmtHrs(lastCalc.rolling24) : '—',
+      sub: lastCalc ? `Limit: ${lastCalc.maxFlight}h` : 'No entries yet',
+      cls: !lastCalc ? 'c-neutral' : lastCalc.flightOk !== false ? 'c-ok' : 'c-warn'
+    },
+    {
+      label: 'Last Duty Period',
+      value: lastCalc ? fmtHrs(lastCalc.dutyPeriod) : '—',
+      sub: 'Limit: 14h',
+      cls: !lastCalc ? 'c-neutral' : lastCalc.dutyOk !== false ? 'c-ok' : 'c-warn'
+    },
+    {
+      label: 'Last Rest Period',
+      value: lastCalc ? fmtHrs(lastCalc.consRest) : '—',
+      sub: lastCalc ? `Required: ${lastCalc.reqRest}h` : '',
+      cls: !lastCalc ? 'c-neutral' : lastCalc.restOk !== false ? 'c-ok' : 'c-warn'
+    },
+    {
+      label: 'Quarter Rest Days',
+      value: `${qCount} / 13`,
+      sub: qCount >= 13 ? 'Requirement met' : `Need ${13 - qCount} more`,
+      cls: qCount >= 13 ? 'c-ok' : qCount >= 8 ? 'c-caution' : 'c-warn'
+    },
+    {
+      label: 'Active Violations',
+      value: allWarnings,
+      sub: allWarnings === 0 ? 'All entries compliant' : 'Review flagged rows',
+      cls: allWarnings === 0 ? 'c-ok' : 'c-warn'
+    }
+  ];
+
+  document.getElementById('dashboard').innerHTML = cards.map(c => `
+    <div class="card">
+      <div class="card-label">${c.label}</div>
+      <div class="card-value ${c.cls}">${c.value}</div>
+      <div class="card-sub">${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+// =============================================================
+// RENDER — TABLE
+// =============================================================
+function badge(flag, okTxt, warnTxt) {
+  if (flag === null || flag === undefined)
+    return `<span class="badge b-na">N/A</span>`;
+  return flag
+    ? `<span class="badge b-ok">&#10003; ${okTxt}</span>`
+    : `<span class="badge b-warn">&#9888; ${warnTxt}</span>`;
+}
+
+function renderTable() {
+  const el = document.getElementById('tbl');
+  if (!entries.length) {
+    el.innerHTML = '<div class="empty">No entries yet — add your first flight leg above.</div>';
+    return;
+  }
+
+  const sorted = [...entries].sort((a, b) => (ms(a.showTime) || 0) - (ms(b.showTime) || 0));
+  const rows = sorted.map(e => {
+    if (e.restDay) {
+      const anchor = e.showTime || '';
+      return `
+        <tr style="background:#f0fdf4">
+          <td>${fmtDT(anchor)}</td>
+          <td><strong>${e.pilot || '—'}</strong></td>
+          <td colspan="14" style="color:#16a34a;font-weight:600">
+            &#128308; 24-HOUR REST DAY — No flight duty
+          </td>
+          <td style="white-space:nowrap">
+            <button class="edit-btn" onclick="editEntry('${e.id}')" title="Edit">&#9998;</button>
+            <button class="del-btn"  onclick="del('${e.id}')"       title="Delete">&#10005;</button>
+          </td>
+        </tr>`;
+    }
+
+    const c = compute(e, entries);
+    const excBadge = c.excAmt > 0
+      ? `<span class="badge b-warn">${fmtHrs(c.excAmt)}</span>`
+      : `<span class="badge b-ok">None</span>`;
+    const p91Badge = e.part91
+      ? `<span class="badge" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a">Part 91</span>`
+      : '';
+
+    return `
+      <tr${e.part91 ? ' style="background:#fffef0"' : ''}>
+        <td>${fmtDT(e.showTime)}</td>
+        <td><strong>${e.pilot || '—'}</strong></td>
+        <td>${e.crew === 'D' ? 'Dual' : 'Single'} ${p91Badge}</td>
+        <td>${(e.dep || '—').toUpperCase()} &rarr; ${(e.arr || '—').toUpperCase()}</td>
+        <td>${e.offBlocks || '—'}</td>
+        <td>${e.onBlocks || '—'}</td>
+        <td><strong>${fmtHrs(c.legFlight)}</strong></td>
+        <td>
+          ${e.part91
+            ? '<span style="color:#92400e;font-size:.75rem">Excluded (Part 91)</span>'
+            : `<strong>${c.rolling24 !== null ? fmtHrs(c.rolling24) : '—'}</strong><div style="font-size:.7rem;color:#999">Limit: ${c.maxFlight}h</div>`}
+        </td>
+        <td>${e.part91 ? '<span class="badge b-na">N/A</span>' : badge(c.flightOk, 'OK', 'EXCEEDED')}</td>
+        <td>${fmtHrs(c.dutyPeriod)}</td>
+        <td>${e.part91 ? '<span class="badge b-na">N/A</span>' : badge(c.dutyOk, 'OK', 'EXCEEDED')}</td>
+        <td>${e.part91 ? '<span class="badge b-na">N/A</span>' : badge(c.lookbackOk, '10-hr met', 'CHECK REST')}</td>
+        <td>
+          ${fmtHrs(c.consRest)}
+          <div style="font-size:.7rem;color:#999">${e.part91 ? '' : `Req: ${c.reqRest}h`}</div>
+        </td>
+        <td>${e.part91 ? '<span class="badge b-na">N/A</span>' : badge(c.restOk, 'OK', 'DEFICIENT')}</td>
+        <td>${e.part91 ? '<span class="badge b-na">N/A</span>' : excBadge}</td>
+        <td>${e.reason || '—'}</td>
+        <td style="white-space:nowrap">
+          <button class="edit-btn" onclick="editEntry('${e.id}')" title="Edit">&#9998;</button>
+          <button class="del-btn"  onclick="del('${e.id}')"       title="Delete">&#10005;</button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Show Time</th>
+          <th>Pilot</th>
+          <th>Crew</th>
+          <th>Route</th>
+          <th>Off Blocks</th>
+          <th>On Blocks</th>
+          <th>Leg Time</th>
+          <th>Rolling 24-hr</th>
+          <th>Flt OK?</th>
+          <th>Duty Period</th>
+          <th>Duty OK?</th>
+          <th>10-hr Lookback</th>
+          <th>Rest After</th>
+          <th>Rest OK?</th>
+          <th>Exceedance</th>
+          <th>Exceedance Reason</th>
+          <th>Del</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function render() {
+  renderDashboard();
+  renderTable();
+}
+
+// =============================================================
+// ADD ENTRY
+// =============================================================
+function addEntry() {
+  const err = document.getElementById('form-err');
+  err.textContent = '';
+
+  const isRestDay = document.getElementById('f-restday').checked;
+  const pilot = document.getElementById('f-pilot').value.trim();
+  const crew  = document.getElementById('f-crew').value;
+
+  if (isRestDay) {
+    // For a rest day, only a date anchor is needed — use the Show Time date field
+    const d = document.getElementById('f-show-d').value;
+    if (!d) {
+      err.textContent = 'For a rest day, enter the date in the Show Time date field so we can assign it to the correct quarter.';
+      return;
+    }
+    entries.push({ id: uid(), pilot, crew, showTime: `${d}T00:00`, restDay: true });
+    save(); render();
+    clearDT('f-show');
+    document.getElementById('f-restday').checked = false;
+    return;
+  }
+
+  const show    = getDT('f-show');
+  const release = getDT('f-release');
+  if (show && release && ms(release) <= ms(show)) { err.textContent = 'Release Time must be after Show Time.'; return; }
+
+  // Validate all legs first before committing any
+  const legData = [];
+  for (let pos = 0; pos < legIndices.length; pos++) {
+    const idx    = legIndices[pos];
+    const offH   = parseFloat(document.getElementById(`leg-${idx}-off`).value);
+    const onH    = parseFloat(document.getElementById(`leg-${idx}-on`).value);
+    const label  = legIndices.length > 1 ? `Leg ${pos + 1}: ` : '';
+    if (isNaN(offH) || isNaN(onH)) { err.textContent = `${label}Off Blocks and On Blocks Hobbs are required.`; return; }
+    if (onH <= offH) { err.textContent = `${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`; return; }
+    legData.push({
+      dep:    document.getElementById(`leg-${idx}-dep`).value.toUpperCase().trim(),
+      arr:    document.getElementById(`leg-${idx}-arr`).value.toUpperCase().trim(),
+      off: offH.toFixed(1), on: onH.toFixed(1),
+      reason: document.getElementById(`leg-${idx}-reason`).value.trim(),
+      part91: document.getElementById(`leg-${idx}-p91`).checked
+    });
+  }
+
+  const restStart = getDT('f-reststart');
+  const restEnd   = getDT('f-restend');
+
+  legData.forEach(leg => {
+    entries.push({
+      id: uid(), pilot, crew,
+      showTime:    show,
+      releaseTime: release,
+      dep:         leg.dep,
+      arr:         leg.arr,
+      offBlocks:   leg.off,
+      onBlocks:    leg.on,
+      restStart, restEnd,
+      reason:      leg.reason,
+      part91:      leg.part91,
+      restDay:     false
+    });
+  });
+
+  entries.sort((a, b) => (ms(a.showTime) || 0) - (ms(b.showTime) || 0));
+  save(); render();
+
+  // Reset form — keep pilot + crew, reset everything else
+  ['f-show','f-release','f-reststart','f-restend'].forEach(clearDT);
+  legIndices = [0];
+  nextLegIdx = 1;
+  renderLegRows();
+}
+
+// =============================================================
+// =============================================================
+// EDIT ENTRY
+// =============================================================
+let editingId = null;
+
+function splitDT(dtStr) {
+  // "2024-01-15T09:30" → { d: "2024-01-15", t: "09:30" }
+  if (!dtStr) return { d: '', t: '' };
+  const [d, t] = dtStr.split('T');
+  return { d: d || '', t: t || '' };
+}
+
+function setModalDT(prefix, dtStr) {
+  const { d, t } = splitDT(dtStr);
+  document.getElementById(`m-${prefix}-d`).value = d;
+  document.getElementById(`m-${prefix}-t`).value = t;
+}
+
+function getModalDT(prefix) {
+  const d = document.getElementById(`m-${prefix}-d`).value;
+  const t = document.getElementById(`m-${prefix}-t`).value.trim();
+  if (!d || !t) return '';
+  const norm = t.length === 4 ? t.slice(0,2) + ':' + t.slice(2) : t;
+  if (!/^\d{2}:\d{2}$/.test(norm)) return '';
+  return `${d}T${norm}`;
+}
+
+function editEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  editingId = id;
+
+  document.getElementById('m-pilot').value  = e.pilot || '';
+  document.getElementById('m-crew').value   = e.crew  || 'S';
+  document.getElementById('m-reason').value = e.reason || '';
+  document.getElementById('m-p91').checked     = !!e.part91;
+  document.getElementById('m-restday').checked = !!e.restDay;
+  document.getElementById('m-dep').value = e.dep || '';
+  document.getElementById('m-arr').value = e.arr || '';
+
+  setModalDT('show',     e.showTime);
+  setModalDT('release',  e.releaseTime);
+  document.getElementById('m-off').value = e.offBlocks || '';
+  document.getElementById('m-on').value  = e.onBlocks  || '';
+  setModalDT('reststart',e.restStart);
+  setModalDT('restend',  e.restEnd);
+
+  document.getElementById('modal-err').textContent = '';
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function saveEdit() {
+  const err = document.getElementById('modal-err');
+  err.textContent = '';
+
+  const isRestDay = document.getElementById('m-restday').checked;
+  const offH = parseFloat(document.getElementById('m-off').value);
+  const onH  = parseFloat(document.getElementById('m-on').value);
+
+  if (!isRestDay) {
+    if (isNaN(offH) || isNaN(onH)) { err.textContent = 'Off Blocks and On Blocks Hobbs are required.'; return; }
+    if (onH <= offH) { err.textContent = 'On Blocks Hobbs must be greater than Off Blocks Hobbs.'; return; }
+    const show    = getModalDT('show');
+    const release = getModalDT('release');
+    if (show && release && ms(release) <= ms(show)) { err.textContent = 'Release Time must be after Show Time.'; return; }
+  }
+
+  const idx = entries.findIndex(x => x.id === editingId);
+  if (idx === -1) return;
+
+  entries[idx] = {
+    ...entries[idx],
+    pilot:       document.getElementById('m-pilot').value.trim(),
+    crew:        document.getElementById('m-crew').value,
+    showTime:    getModalDT('show'),
+    releaseTime: getModalDT('release'),
+    dep:         document.getElementById('m-dep').value.toUpperCase().trim(),
+    arr:         document.getElementById('m-arr').value.toUpperCase().trim(),
+    offBlocks:   isRestDay ? '' : offH.toFixed(1),
+    onBlocks:    isRestDay ? '' : onH.toFixed(1),
+    restStart:   getModalDT('reststart'),
+    restEnd:     getModalDT('restend'),
+    reason:      document.getElementById('m-reason').value.trim(),
+    part91:      document.getElementById('m-p91').checked,
+    restDay:     isRestDay
+  };
+
+  entries.sort((a, b) => (ms(a.showTime) || 0) - (ms(b.showTime) || 0));
+  save(); render();
+  closeModal();
+}
+
+function closeModal(event) {
+  // Close on overlay click (not on modal content click)
+  if (event && event.target !== document.getElementById('edit-modal')) return;
+  document.getElementById('edit-modal').classList.remove('open');
+  editingId = null;
+}
+
+// =============================================================
+// DELETE / CLEAR
+// =============================================================
+function del(id) {
+  if (!confirm('Delete this entry?')) return;
+  entries = entries.filter(e => e.id !== id);
+  save(); render();
+}
+
+function clearAll() {
+  if (!confirm('Delete ALL flight log entries? This cannot be undone.')) return;
+  entries = [];
+  save(); render();
+}
+
+// =============================================================
+// EXPORT CSV
+// =============================================================
+function exportCSV() {
+  if (!entries.length) { alert('No data to export.'); return; }
+
+  const hdr = [
+    'Show Time','Pilot','Crew Config','Route',
+    'Off Blocks','On Blocks','Leg Flight (h)','Rolling 24-hr (h)',
+    'Max Allowed (h)','Flight Time OK','Duty Period (h)','Duty OK',
+    '10-hr Lookback OK','Consecutive Rest (h)','Required Rest (h)',
+    'Rest OK','Exceedance (h)','Exceedance Reason','24-hr Rest Day'
+  ].join(',');
+
+  const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+
+  const rows = entries.map(e => {
+    if (e.restDay) {
+      return [q(e.showTime),q(e.pilot),q(e.crew === 'D' ? 'Dual':'Single'),
+        '','','','','','','','','','','','','','','',q('Yes')].join(',');
+    }
+    const c = compute(e, entries);
+    return [
+      q(e.showTime), q(e.pilot), q(e.crew === 'D' ? 'Dual':'Single'),
+      q(`${(e.dep||'').toUpperCase()}-${(e.arr||'').toUpperCase()}`),
+      q(e.offBlocks), q(e.onBlocks),
+      q(c.legFlight !== null ? c.legFlight.toFixed(2) : ''),
+      q(c.rolling24 !== null ? c.rolling24.toFixed(2) : ''),
+      q(c.maxFlight),
+      q(c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED'),
+      q(c.dutyPeriod !== null ? c.dutyPeriod.toFixed(2) : ''),
+      q(c.dutyOk === null ? 'N/A' : c.dutyOk ? 'OK' : 'EXCEEDED'),
+      q(c.lookbackOk === null ? 'N/A' : c.lookbackOk ? 'OK' : 'CHECK'),
+      q(c.consRest !== null ? c.consRest.toFixed(2) : ''),
+      q(c.reqRest),
+      q(c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT'),
+      q(c.excAmt.toFixed(2)),
+      q(e.reason || ''),
+      q('No')
+    ].join(',');
+  });
+
+  const csv  = [hdr, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `far135_log_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// =============================================================
+// QUARTERLY REPORT
+// =============================================================
+function quarterlyReport() {
+  const qIdx = parseInt(document.getElementById('rpt-q').value, 10);
+  const year = parseInt(document.getElementById('rpt-y').value, 10);
+  if (isNaN(year) || year < 2000) { alert('Enter a valid year.'); return; }
+
+  const qStart = new Date(year, qIdx * 3, 1).getTime();
+  const qEnd   = new Date(year, qIdx * 3 + 3, 1).getTime();
+  const qLabel = ['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][qIdx];
+
+  // Filter entries to this quarter
+  const qEntries = entries.filter(e => {
+    const anchor = ms(e.releaseTime) || ms(e.showTime);
+    return anchor !== null && anchor >= qStart && anchor < qEnd;
+  });
+
+  if (!qEntries.length) { alert(`No entries found for ${qLabel} ${year}.`); return; }
+
+  // ---- Aggregate stats ----
+  const flightLegs   = qEntries.filter(e => !e.restDay);          // all legs (135 + 91)
+  const part135Legs  = flightLegs.filter(e => !e.part91);         // compliance-tracked only
+  const part91Legs   = flightLegs.filter(e => e.part91);
+  const restDays     = qEntries.filter(e => e.restDay).length;
+
+  let totalFlight    = 0;
+  let violations     = [];
+  let exceedances    = [];
+  let flightOkCount  = 0, flightFailCount  = 0;
+  let dutyOkCount    = 0, dutyFailCount    = 0;
+  let restOkCount    = 0, restFailCount    = 0;
+
+  flightLegs.forEach(e => {
+    const c = compute(e, entries);
+    totalFlight += c.legFlight || 0; // all legs count toward total time logged
+    if (e.part91) return;            // Part 91 legs excluded from compliance tallies
+
+    if (c.flightOk === false) {
+      flightFailCount++;
+      violations.push({ date: fmtDT(e.releaseTime) || fmtDT(e.showTime), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` });
+    } else if (c.flightOk === true) flightOkCount++;
+
+    if (c.dutyOk === false) {
+      dutyFailCount++;
+      violations.push({ date: fmtDT(e.showTime), pilot: e.pilot, type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` });
+    } else if (c.dutyOk === true) dutyOkCount++;
+
+    if (c.restOk === false) {
+      restFailCount++;
+      violations.push({ date: fmtDT(e.restStart), pilot: e.pilot, type: 'Rest Deficient', detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` });
+    } else if (c.restOk === true) restOkCount++;
+
+    if (c.excAmt > 0) {
+      exceedances.push({ date: fmtDT(e.releaseTime) || fmtDT(e.showTime), pilot: e.pilot, route: `${(e.dep||'?').toUpperCase()}→${(e.arr||'?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest });
+    }
+  });
+
+  const totalViolations = flightFailCount + dutyFailCount + restFailCount;
+  const restMet         = restDays >= 13;
+  const overallOk       = totalViolations === 0 && restMet;
+
+  // ---- Build HTML ----
+  const statusColor = overallOk ? '#16a34a' : '#dc2626';
+  const statusText  = overallOk ? 'COMPLIANT' : 'REVIEW REQUIRED';
+
+  const scRows = [
+    ['Rolling 24-hr Flight Time', flightFailCount === 0 ? 'PASS' : `${flightFailCount} VIOLATION(S)`, flightFailCount === 0],
+    ['14-Hour Duty Day Limit',    dutyFailCount   === 0 ? 'PASS' : `${dutyFailCount} VIOLATION(S)`,   dutyFailCount   === 0],
+    ['Rest Requirements',         restFailCount   === 0 ? 'PASS' : `${restFailCount} DEFICIENCY(IES)`,restFailCount   === 0],
+    ['10-hr Look-Back Rest',      'See detail rows below', null],
+    ['24-hr Rest Days (≥13/qtr)', `${restDays} of 13 required`, restMet],
+  ].map(([req, result, ok]) => {
+    const bg  = ok === null ? '#f8fafc' : ok ? '#f0fdf4' : '#fef2f2';
+    const col = ok === null ? '#555'    : ok ? '#16a34a' : '#dc2626';
+    return `<tr style="background:${bg}">
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${req}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:${col}">${result}</td>
+    </tr>`;
+  }).join('');
+
+  const vRows = violations.length ? violations.map(v => `
+    <tr>
+      <td>${v.date}</td><td>${v.pilot || '—'}</td>
+      <td style="color:#dc2626;font-weight:600">${v.type}</td><td>${v.detail}</td>
+    </tr>`).join('') : `<tr><td colspan="4" style="color:#16a34a;padding:10px">No violations recorded this quarter.</td></tr>`;
+
+  const exRows = exceedances.length ? exceedances.map(x => `
+    <tr>
+      <td>${x.date}</td><td>${x.pilot || '—'}</td><td>${x.route}</td>
+      <td style="color:#dc2626;font-weight:600">${x.over}</td>
+      <td>${x.reason}</td><td>${x.reqRest}h</td>
+    </tr>`).join('') : `<tr><td colspan="6" style="color:#16a34a;padding:10px">No exceedances this quarter.</td></tr>`;
+
+  const sortedQEntries = [...qEntries].sort((a, b) => (ms(a.showTime) || 0) - (ms(b.showTime) || 0));
+  const flag = c => c === null ? '—' : c ? '✓' : '⚠';
+  const logRows = sortedQEntries.map(e => {
+    if (e.restDay) {
+      return `<tr style="background:#f0fdf4">
+        <td>${fmtDT(e.showTime)}</td>
+        <td>${e.pilot || '—'}</td>
+        <td colspan="12" style="color:#16a34a;font-weight:600">&#9679; 24-HOUR REST DAY</td>
+      </tr>`;
+    }
+    const c = compute(e, entries);
+    if (e.part91) {
+      return `<tr style="background:#fffef0">
+        <td>${fmtDT(e.showTime)}</td>
+        <td>${e.pilot || '—'}</td>
+        <td>${e.crew === 'D' ? 'Dual' : 'Single'}</td>
+        <td>${(e.dep||'—').toUpperCase()}→${(e.arr||'—').toUpperCase()}</td>
+        <td>${e.offBlocks || '—'}</td>
+        <td>${e.onBlocks || '—'}</td>
+        <td>${fmtHrs(c.legFlight)}</td>
+        <td colspan="7" style="color:#92400e;font-weight:600">&#9654; Part 91 — Excluded from §135.267 limits</td>
+      </tr>`;
+    }
+    return `<tr>
+      <td>${fmtDT(e.showTime)}</td>
+      <td>${e.pilot || '—'}</td>
+      <td>${e.crew === 'D' ? 'Dual' : 'Single'}</td>
+      <td>${(e.dep||'—').toUpperCase()}→${(e.arr||'—').toUpperCase()}</td>
+      <td>${e.offBlocks || '—'}</td>
+      <td>${e.onBlocks || '—'}</td>
+      <td>${fmtHrs(c.legFlight)}</td>
+      <td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td>
+      <td>${flag(c.flightOk)}</td>
+      <td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td>
+      <td>${flag(c.dutyOk)}</td>
+      <td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td>
+      <td>${flag(c.restOk)}</td>
+      <td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const pilots = [...new Set(flightLegs.map(e => e.pilot).filter(Boolean))].join(', ') || 'All Pilots';
+  const generated = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
+
+  const html = `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<title>FAR 135.267 Quarterly Report — ${qLabel} ${year}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; padding: 32px; font-size: 13px; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  h2 { font-size: 0.95rem; margin: 24px 0 8px; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; }
+  .meta { color: #666; font-size: 0.8rem; margin-bottom: 20px; }
+  .status-banner {
+    background: ${overallOk ? '#f0fdf4' : '#fef2f2'};
+    border: 2px solid ${statusColor};
+    border-radius: 8px; padding: 12px 18px;
+    color: ${statusColor}; font-weight: 700; font-size: 1rem;
+    margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+  }
+  .scorecard { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+  .stat-box { background: #f8fafc; border-radius: 7px; padding: 12px 16px; }
+  .stat-box .val { font-size: 1.5rem; font-weight: 700; color: #2563eb; }
+  .stat-box .lbl { font-size: 0.75rem; color: #888; margin-top: 3px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 8px; }
+  th { background: #f8fafc; padding: 7px 10px; text-align: left; font-weight: 700; color: #555; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; white-space: nowrap; }
+  .disclaimer { margin-top: 28px; font-size: 0.72rem; color: #aaa; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+  @media print {
+    .no-print { display: none; }
+    body { padding: 16px; }
+  }
+  .print-btn {
+    margin-bottom: 20px; padding: 8px 20px;
+    background: #1a1a2e; color: white; border: none;
+    border-radius: 7px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+  }
+</style>
+</head><body>
+<button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+
+<h1>FAR 135.267 Quarterly Compliance Report</h1>
+<div class="meta">
+  Period: <strong>${qLabel} ${year}</strong> &nbsp;|&nbsp;
+  Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp;
+  Generated: ${generated}
+</div>
+
+<div class="status-banner">
+  ${overallOk ? '✓' : '⚠'} Overall Status: ${statusText}
+  ${!overallOk ? `— ${totalViolations} violation(s) and/or rest day shortfall detected` : ''}
+</div>
+
+<div class="scorecard" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">
+  <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs${part91Legs.length ? `<br><span style="color:#92400e">(+${part91Legs.length} Part 91)</span>` : ''}</div></div>
+  <div class="stat-box"><div class="val">${fmtHrs(totalFlight)}</div><div class="lbl">Total Flight Time</div></div>
+  <div class="stat-box"><div class="val" style="color:${restMet?'#16a34a':'#dc2626'}">${restDays} / 13</div><div class="lbl">24-hr Rest Days</div></div>
+  <div class="stat-box"><div class="val" style="color:${totalViolations===0?'#16a34a':'#dc2626'}">${totalViolations}</div><div class="lbl">Total Violations</div></div>
+  <div class="stat-box"><div class="val" style="color:${exceedances.length===0?'#16a34a':'#dc2626'}">${exceedances.length}</div><div class="lbl">Exceedances</div></div>
+</div>
+
+<h2>§135.267 Compliance Scorecard</h2>
+<table><thead><tr><th>Requirement</th><th>Result</th></tr></thead><tbody>${scRows}</tbody></table>
+
+<h2>Violations Log</h2>
+<table>
+  <thead><tr><th>Date/Time</th><th>Pilot</th><th>Violation Type</th><th>Detail</th></tr></thead>
+  <tbody>${vRows}</tbody>
+</table>
+
+<h2>Exceedance Detail (§135.267(c) Rest Multipliers)</h2>
+<table>
+  <thead><tr><th>Date/Time</th><th>Pilot</th><th>Route</th><th>Over Limit By</th><th>Reason</th><th>Rest Required</th></tr></thead>
+  <tbody>${exRows}</tbody>
+</table>
+
+<h2>Full Flight Log — ${qLabel} ${year}</h2>
+<table>
+  <thead><tr>
+    <th>Show Time</th><th>Pilot</th><th>Crew</th><th>Route</th>
+    <th>Off Blocks</th><th>On Blocks</th><th>Leg Time</th>
+    <th>24-hr / Limit</th><th>Flt✓</th>
+    <th>Duty</th><th>Duty✓</th>
+    <th>Rest / Req</th><th>Rest✓</th><th>Exceedance</th>
+  </tr></thead>
+  <tbody>${logRows}</tbody>
+</table>
+
+<div class="disclaimer">
+  <strong>Disclaimer:</strong> This report is generated from pilot-entered data for reference purposes only.
+  It does not constitute an official regulatory record. Verify all data against source documents.
+  Compliance determinations must be confirmed with your Director of Operations, POI, and applicable OpSpecs.
+  14 CFR §135.267 — Unscheduled one- and two-pilot crews.
+</div>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+
+// =============================================================
+// UTILS
+// =============================================================
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+
+// =============================================================
+// INIT
+// =============================================================
+(function initDefaults() {
+  const now = new Date();
+  document.getElementById('rpt-q').value = Math.floor(now.getMonth() / 3);
+  document.getElementById('rpt-y').value = now.getFullYear();
+  renderLegRows();
+})();
+render();
+</script>
+</body>
+</html>
