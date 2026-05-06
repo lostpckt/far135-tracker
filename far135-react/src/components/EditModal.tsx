@@ -89,7 +89,7 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
       const release = parseDTPair(relDate, relTime)
       if (!show)    { setErr('Show Time is required.'); return }
       if (!release) { setErr('Release Time is required.'); return }
-      if (ms(release)! <= ms(show)!) { setErr('Release Time must be after Show Time.'); return }
+      if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
     }
 
     onSave({
