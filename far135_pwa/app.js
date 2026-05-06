@@ -176,14 +176,6 @@ function quarterRestCount() {
 let legIndices = [0];
 let nextLegIdx = 1;
 
-function getLegDT(idx, field) {
-  const d = document.getElementById(`leg-${idx}-${field}-d`).value;
-  const t = document.getElementById(`leg-${idx}-${field}-t`).value.trim();
-  if (!d || !t) return '';
-  const norm = t.length === 4 ? t.slice(0,2) + ':' + t.slice(2) : t;
-  if (!/^\d{2}:\d{2}$/.test(norm)) return '';
-  return `${d}T${norm}`;
-}
 
 function renderLegRows() {
   document.getElementById('legs-container').innerHTML = legIndices.map((idx, pos) => `
@@ -537,7 +529,7 @@ function saveEdit() {
     restDay:     isRestDay
   };
 
-  entries.sort((a, b) => (ms(a.onBlocks)||ms(a.showTime)||0) - (ms(b.onBlocks)||ms(b.showTime)||0));
+  entries.sort((a, b) => (ms(a.showTime)||0) - (ms(b.showTime)||0));
   save(); render();
   closeModal();
   toast('Entry updated.', 'ok');
@@ -619,7 +611,7 @@ function addEntry() {
     });
   });
 
-  entries.sort((a, b) => (ms(a.onBlocks)||ms(a.showTime)||0) - (ms(b.onBlocks)||ms(b.showTime)||0));
+  entries.sort((a, b) => (ms(a.showTime)||0) - (ms(b.showTime)||0));
   save(); render();
 
   ['f-show','f-release','f-reststart','f-restend'].forEach(clearDT);
