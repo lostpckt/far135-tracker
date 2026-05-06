@@ -502,7 +502,9 @@ function saveEdit() {
   const offH = parseFloat(document.getElementById('m-off').value);
   const onH  = parseFloat(document.getElementById('m-on').value);
 
-  if (!isRestDay) {
+  if (isRestDay) {
+    if (!document.getElementById('m-show-d').value) { err.textContent = 'Enter a date in Show Time to assign this rest day to a quarter.'; return; }
+  } else {
     if (isNaN(offH) || isNaN(onH)) { err.textContent = 'Off Blocks and On Blocks Hobbs are required.'; return; }
     if (onH <= offH) { err.textContent = 'On Blocks Hobbs must be greater than Off Blocks Hobbs.'; return; }
     const show = getDT('m-show'), rel = getDT('m-release');
