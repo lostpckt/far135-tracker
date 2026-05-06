@@ -141,8 +141,8 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-semibold text-slate-500">Show Time (Duty Start)</Label>
             <div className="flex gap-1.5">
-              <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
-              <Input value={showTime} onChange={e => setShowTime(e.target.value)} placeholder="14:30" maxLength={5} className="text-sm h-8 w-20 shrink-0" />
+              <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+              <Input value={showTime} onChange={e => setShowTime(e.target.value)} placeholder="14:30" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
             <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
           </div>
@@ -150,8 +150,8 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-semibold text-slate-500">Release Time (Duty End)</Label>
             <div className="flex gap-1.5">
-              <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
-              <Input value={relTime} onChange={e => setRelTime(e.target.value)} placeholder="22:15" maxLength={5} className="text-sm h-8 w-20 shrink-0" />
+              <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+              <Input value={relTime} onChange={e => setRelTime(e.target.value)} placeholder="22:15" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
             <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr)</span>
           </div>
@@ -183,8 +183,8 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-semibold text-slate-500">Rest Start</Label>
             <div className="flex gap-1.5">
-              <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
-              <Input value={rsTime} onChange={e => setRsTime(e.target.value)} placeholder="23:00" maxLength={5} className="text-sm h-8 w-20 shrink-0" />
+              <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+              <Input value={rsTime} onChange={e => setRsTime(e.target.value)} placeholder="23:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
             <span className="text-[0.68rem] text-slate-400">When rest began after release (24-hr)</span>
           </div>
@@ -192,8 +192,8 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-semibold text-slate-500">Rest End (Next Report / Wake-up)</Label>
             <div className="flex gap-1.5">
-              <Input type="date" value={reDate} onChange={e => setReDate(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
-              <Input value={reTime} onChange={e => setReTime(e.target.value)} placeholder="09:00" maxLength={5} className="text-sm h-8 w-20 shrink-0" />
+              <Input type="date" value={reDate} onChange={e => setReDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+              <Input value={reTime} onChange={e => setReTime(e.target.value)} placeholder="09:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
           </div>
 

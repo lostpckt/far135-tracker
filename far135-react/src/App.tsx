@@ -9,6 +9,7 @@ import AddEntryForm from '@/components/AddEntryForm'
 import FlightLog from '@/components/FlightLog'
 import EditModal from '@/components/EditModal'
 import QuickReference from '@/components/QuickReference'
+import UpdateBanner from '@/components/UpdateBanner'
 
 export default function App() {
   const [entries, setEntries] = useState<Entry[]>(loadEntries)
@@ -42,6 +43,8 @@ export default function App() {
         />
         <QuickReference />
       </div>
+
+      <UpdateBanner />
 
       {editingEntry && (
         <EditModal
