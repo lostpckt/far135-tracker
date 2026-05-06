@@ -78,22 +78,26 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
   function handleSave() {
     setErr('')
 
-    if (!restDay) {
+    if (restDay) {
+      if (!showDate) { setErr('Enter a date in Show Time to assign this rest day to a quarter.'); return }
+    } else {
       const offN = parseHobbs(offHobbs)
       const onN  = parseHobbs(onHobbs)
       if (offN === null || onN === null) { setErr('Off Blocks and On Blocks Hobbs readings are required.'); return }
       if (onN <= offN) { setErr('On Blocks Hobbs must be greater than Off Blocks Hobbs.'); return }
       const show    = parseDTPair(showDate, showTime)
       const release = parseDTPair(relDate, relTime)
-      if (show && release && ms(release)! <= ms(show)!) { setErr('Release Time must be after Show Time.'); return }
+      if (!show)    { setErr('Show Time is required.'); return }
+      if (!release) { setErr('Release Time is required.'); return }
+      if (ms(release)! <= ms(show)!) { setErr('Release Time must be after Show Time.'); return }
     }
 
     onSave({
       ...entry,
       pilot,
       crew,
-      showTime:    parseDTPair(showDate, showTime),
-      releaseTime: parseDTPair(relDate, relTime),
+      showTime:    restDay ? `${showDate}T00:00` : parseDTPair(showDate, showTime),
+      releaseTime: restDay ? '' : parseDTPair(relDate, relTime),
       dep:         dep.toUpperCase().trim(),
       arr:         arr.toUpperCase().trim(),
       offBlocks:   offHobbs.trim(),
