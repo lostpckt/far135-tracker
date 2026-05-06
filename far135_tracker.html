@@ -999,7 +999,7 @@ function saveEdit() {
     ...entries[idx],
     pilot:       document.getElementById('m-pilot').value.trim(),
     crew:        document.getElementById('m-crew').value,
-    showTime:    getModalDT('show'),
+    showTime:    isRestDay ? `${document.getElementById('m-show-d').value}T00:00` : getModalDT('show'),
     releaseTime: getModalDT('release'),
     dep:         document.getElementById('m-dep').value.toUpperCase().trim(),
     arr:         document.getElementById('m-arr').value.toUpperCase().trim(),
@@ -1118,9 +1118,9 @@ function quarterlyReport() {
   let totalFlight    = 0;
   let violations     = [];
   let exceedances    = [];
-  let flightOkCount  = 0, flightFailCount  = 0;
-  let dutyOkCount    = 0, dutyFailCount    = 0;
-  let restOkCount    = 0, restFailCount    = 0;
+  let flightFailCount = 0;
+  let dutyFailCount   = 0;
+  let restFailCount   = 0;
 
   flightLegs.forEach(e => {
     const c = compute(e, entries);
@@ -1130,17 +1130,17 @@ function quarterlyReport() {
     if (c.flightOk === false) {
       flightFailCount++;
       violations.push({ date: fmtDT(e.releaseTime) || fmtDT(e.showTime), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` });
-    } else if (c.flightOk === true) flightOkCount++;
+    }
 
     if (c.dutyOk === false) {
       dutyFailCount++;
       violations.push({ date: fmtDT(e.showTime), pilot: e.pilot, type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` });
-    } else if (c.dutyOk === true) dutyOkCount++;
+    }
 
     if (c.restOk === false) {
       restFailCount++;
       violations.push({ date: fmtDT(e.restStart), pilot: e.pilot, type: 'Rest Deficient', detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` });
-    } else if (c.restOk === true) restOkCount++;
+    }
 
     if (c.excAmt > 0) {
       exceedances.push({ date: fmtDT(e.releaseTime) || fmtDT(e.showTime), pilot: e.pilot, route: `${(e.dep||'?').toUpperCase()}→${(e.arr||'?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest });

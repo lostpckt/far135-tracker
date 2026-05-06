@@ -37,10 +37,6 @@ function fmtDT(dtStr) {
   return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
-function fmtTime(dtStr) {
-  if (!dtStr) return '—';
-  return (dtStr.split('T')[1] || '').slice(0, 5) || '—';
-}
 
 function fmtDate(dtStr) {
   if (!dtStr) return '—';
@@ -518,7 +514,7 @@ function saveEdit() {
     ...entries[idx],
     pilot:       document.getElementById('m-pilot').value.trim(),
     crew:        document.getElementById('m-crew').value,
-    showTime:    getDT('m-show'),
+    showTime:    isRestDay ? `${document.getElementById('m-show-d').value}T00:00` : getDT('m-show'),
     releaseTime: getDT('m-release'),
     dep:         document.getElementById('m-dep').value.toUpperCase().trim(),
     arr:         document.getElementById('m-arr').value.toUpperCase().trim(),
@@ -752,7 +748,7 @@ function quarterlyReport() {
     ? exceedances.map(x => `<tr><td>${x.date}</td><td>${x.pilot||'—'}</td><td>${x.route}</td><td style="color:#dc2626;font-weight:600">${x.over}</td><td>${x.reason}</td><td>${x.reqRest}h</td></tr>`).join('')
     : `<tr><td colspan="6" style="color:#16a34a;padding:10px">No exceedances this quarter.</td></tr>`;
 
-  const sorted = [...qEntries].sort((a,b) => (ms(a.onBlocks)||ms(a.showTime)||0)-(ms(b.onBlocks)||ms(b.showTime)||0));
+  const sorted = [...qEntries].sort((a,b) => (ms(a.showTime)||0)-(ms(b.showTime)||0));
   const flag = f => f===null?'—':f?'✓':'⚠';
   const logRows = sorted.map(e => {
     if (e.restDay) return `<tr style="background:#f0fdf4"><td>${fmtDT(e.showTime)}</td><td>${e.pilot||'—'}</td><td colspan="12" style="color:#16a34a;font-weight:600">&#9679; 24-HOUR REST DAY</td></tr>`;
