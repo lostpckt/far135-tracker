@@ -37,8 +37,9 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
   const [rsTime, setRsTime]     = useState('')
   const [reDate, setReDate]     = useState('')
   const [reTime, setReTime]     = useState('')
-  const [restDay, setRestDay]   = useState(false)
-  const [legs, setLegs]         = useState<LegData[]>([emptyLeg()])
+  const [restDay, setRestDay]     = useState(false)
+  const [restDayEnd, setRestDayEnd] = useState('')
+  const [legs, setLegs]           = useState<LegData[]>([emptyLeg()])
   const [err, setErr]           = useState('')
 
   const [rptQ, setRptQ]   = useState(Math.floor(new Date().getMonth() / 3).toString())
@@ -47,7 +48,7 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
   function resetForm() {
     setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
     setRsDate(''); setRsTime(''); setReDate(''); setReTime('')
-    setRestDay(false); setLegs([emptyLeg()]); setErr('')
+    setRestDay(false); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
   }
 
   function handleAdd() {
@@ -55,7 +56,7 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
 
     if (restDay) {
       if (!showDate) { setErr('For a rest day, enter the date in the Show Time date field.'); return }
-      onAdd([...entries, { id: uid(), pilot, crew, showTime: `${showDate}T00:00`, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true }])
+      onAdd([...entries, { id: uid(), pilot, crew, showTime: `${showDate}T00:00`, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
       resetForm()
       return
     }
@@ -199,11 +200,20 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
 
           <SectionLabel>Special Entries</SectionLabel>
 
-          <div className="flex items-center gap-2 mt-1">
-            <Checkbox id="f-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
-            <label htmlFor="f-restday" className="text-sm cursor-pointer">
-              This was a 24-hour rest day (no duty or flights)
-            </label>
+          <div className="flex flex-col gap-2 mt-1">
+            <div className="flex items-center gap-2">
+              <Checkbox id="f-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
+              <label htmlFor="f-restday" className="text-sm cursor-pointer">
+                This was a 24-hour rest day (no duty or flights)
+              </label>
+            </div>
+            {restDay && (
+              <div className="flex flex-col gap-1 ml-6">
+                <Label className="text-xs font-semibold text-slate-500">End Date (if multi-day)</Label>
+                <Input type="date" value={restDayEnd} onChange={e => setRestDayEnd(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
+                <span className="text-[0.68rem] text-slate-400">Leave blank for a single rest day. Start date is set in Show Time above.</span>
+              </div>
+            )}
           </div>
 
         </div>

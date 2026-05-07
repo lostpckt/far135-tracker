@@ -13,6 +13,7 @@ export interface Entry {
   reason: string
   part91: boolean
   restDay: boolean
+  restDayEnd?: string    // YYYY-MM-DD, set when a rest day entry spans multiple days
 }
 
 export interface Computed {

@@ -146,16 +146,27 @@ export function compute(entry: Entry, all: Entry[]): Computed {
   return c
 }
 
+function countRestDaysInWindow(e: Entry, winStart: number, winEnd: number): number {
+  if (!e.restDay) return 0
+  const startStr = e.showTime ? e.showTime.split('T')[0] : ''
+  if (!startStr) return 0
+  const endStr = e.restDayEnd || startStr
+  const start = new Date(startStr + 'T00:00:00').getTime()
+  const end   = new Date(endStr  + 'T00:00:00').getTime()
+  if (isNaN(start) || isNaN(end) || end < start) return 1
+  let count = 0
+  for (let d = start; d <= end; d += 86400000) {
+    if (d >= winStart && d < winEnd) count++
+  }
+  return count
+}
+
 export function quarterRestCount(entries: Entry[]): number {
   const now    = new Date()
   const qMonth = Math.floor(now.getMonth() / 3) * 3
   const qStart = new Date(now.getFullYear(), qMonth, 1).getTime()
   const qEnd   = new Date(now.getFullYear(), qMonth + 3, 1).getTime()
-  return entries.filter(e => {
-    if (!e.restDay) return false
-    const anchor = ms(e.showTime)
-    return anchor !== null && anchor >= qStart && anchor < qEnd
-  }).length
+  return entries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd), 0)
 }
 
 export function exportCSV(entries: Entry[]): void {
@@ -220,7 +231,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   const flightLegs  = qEntries.filter(e => !e.restDay)
   const part135Legs = flightLegs.filter(e => !e.part91)
   const part91Legs  = flightLegs.filter(e => e.part91)
-  const restDays    = qEntries.filter(e => e.restDay).length
+  const restDays    = qEntries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd), 0)
 
   let totalFlight   = 0
   const violations: { date: string; pilot: string; type: string; detail: string }[] = []
@@ -286,7 +297,15 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   const sorted = [...qEntries].sort((a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0))
 
   const logRows = sorted.map(e => {
-    if (e.restDay) return `<tr style="background:#f0fdf4"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:#16a34a;font-weight:600">● 24-HOUR REST DAY</td></tr>`
+    if (e.restDay) {
+      const startStr = e.showTime ? e.showTime.split('T')[0] : ''
+      const endStr   = e.restDayEnd || startStr
+      const days     = countRestDaysInWindow(e, qStart, qEnd)
+      const label    = endStr && endStr !== startStr
+        ? `● 24-HOUR REST DAYS: ${startStr} – ${endStr} (${days} days)`
+        : `● 24-HOUR REST DAY`
+      return `<tr style="background:#f0fdf4"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:#16a34a;font-weight:600">${label}</td></tr>`
+    }
     const c = compute(e, entries)
     if (e.part91) return `<tr style="background:#fffef0"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:#92400e;font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
     return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`

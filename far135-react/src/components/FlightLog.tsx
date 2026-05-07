@@ -57,7 +57,9 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{fmtDT(anchor)}</td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold">{e.pilot || '—'}</td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={14}>
-                        🟢 24-HOUR REST DAY — No flight duty
+                        {e.restDayEnd && e.restDayEnd !== anchor.split('T')[0]
+                          ? `🟢 24-HOUR REST DAYS: ${anchor.split('T')[0]} – ${e.restDayEnd}`
+                          : '🟢 24-HOUR REST DAY — No flight duty'}
                       </td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                         <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>

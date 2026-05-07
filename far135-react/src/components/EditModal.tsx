@@ -54,8 +54,9 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
   const [reTime, setReTime]     = useState('')
   const [reason, setReason]     = useState('')
   const [part91, setPart91]     = useState(false)
-  const [restDay, setRestDay]   = useState(false)
-  const [err, setErr]           = useState('')
+  const [restDay, setRestDay]     = useState(false)
+  const [restDayEnd, setRestDayEnd] = useState('')
+  const [err, setErr]             = useState('')
 
   useEffect(() => {
     setPilot(entry.pilot || '')
@@ -63,6 +64,7 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
     setReason(entry.reason || '')
     setPart91(!!entry.part91)
     setRestDay(!!entry.restDay)
+    setRestDayEnd(entry.restDayEnd || '')
     setDep(entry.dep || '')
     setArr(entry.arr || '')
 
@@ -107,6 +109,7 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
       reason,
       part91,
       restDay,
+      restDayEnd: restDay && restDayEnd ? restDayEnd : undefined,
     })
   }
 
@@ -190,9 +193,17 @@ export default function EditModal({ entry, onSave, onClose }: Props) {
                 Part 91 (exclude from 135 limits)
               </label>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox id="m-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
-              <label htmlFor="m-restday" className="text-sm cursor-pointer">24-hour rest day</label>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox id="m-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
+                <label htmlFor="m-restday" className="text-sm cursor-pointer">24-hour rest day</label>
+              </div>
+              {restDay && (
+                <div className="flex flex-col gap-1 ml-6">
+                  <Label className="text-xs font-semibold text-slate-500">End Date (if multi-day)</Label>
+                  <Input type="date" value={restDayEnd} onChange={e => setRestDayEnd(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
+                </div>
+              )}
             </div>
           </div>
 
