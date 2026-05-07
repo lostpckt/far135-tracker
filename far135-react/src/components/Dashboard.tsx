@@ -1,5 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card'
-import { compute, fmtHrs, quarterRestCount } from '@/lib/calculations'
+import { compute, fmtHrs, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
 import type { Entry } from '@/types/entry'
 
 interface Props {
@@ -33,7 +33,16 @@ function StatCard({
 }
 
 export default function Dashboard({ entries }: Props) {
-  const qCount = quarterRestCount(entries)
+  const now    = new Date()
+  const qIdx   = Math.floor(now.getMonth() / 3)
+  const year   = now.getFullYear()
+  const qLabels = ['Q1', 'Q2', 'Q3', 'Q4']
+  const prevQLabel = qIdx === 0 ? `Q4 ${year - 1}` : `${qLabels[qIdx - 1]} ${year}`
+
+  const qCount   = quarterRestCount(entries)
+  const qHours   = quarterFlightHours(entries, qIdx, year)
+  const tqHours  = twoQuarterFlightHours(entries, qIdx, year)
+  const annHours = annualFlightHours(entries, year)
 
   const nonRestEntries = entries.filter(e => !e.restDay)
   const lastCalc = nonRestEntries.length
@@ -86,11 +95,39 @@ export default function Dashboard({ entries }: Props) {
     },
   ]
 
+  const cumulativeCards: { label: string; value: string | number; sub: string; color: Color }[] = [
+    {
+      label: `§135.267(a) ${qLabels[qIdx]} ${year}`,
+      value: fmtHrs(qHours),
+      sub:   qHours >= 500 ? '⚠ 500h quarterly limit EXCEEDED' : `${fmtHrs(500 - qHours)} remaining of 500h`,
+      color: qHours >= 500 ? 'red' : qHours >= 450 ? 'amber' : 'blue',
+    },
+    {
+      label: `${prevQLabel}–${qLabels[qIdx]} Combined`,
+      value: fmtHrs(tqHours),
+      sub:   tqHours >= 800 ? '⚠ 800h two-quarter limit EXCEEDED' : `${fmtHrs(800 - tqHours)} remaining of 800h`,
+      color: tqHours >= 800 ? 'red' : tqHours >= 750 ? 'amber' : 'blue',
+    },
+    {
+      label: `${year} Annual Hours`,
+      value: fmtHrs(annHours),
+      sub:   annHours >= 1400 ? '⚠ 1,400h annual limit EXCEEDED' : `${fmtHrs(1400 - annHours)} remaining of 1,400h`,
+      color: annHours >= 1400 ? 'red' : annHours >= 1300 ? 'amber' : 'blue',
+    },
+  ]
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-      {cards.map(c => (
-        <StatCard key={c.label} {...c} />
-      ))}
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        {cards.map(c => (
+          <StatCard key={c.label} {...c} />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        {cumulativeCards.map(c => (
+          <StatCard key={c.label} {...c} />
+        ))}
+      </div>
     </div>
   )
 }

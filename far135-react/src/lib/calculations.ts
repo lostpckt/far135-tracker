@@ -161,6 +161,34 @@ function countRestDaysInWindow(e: Entry, winStart: number, winEnd: number): numb
   return count
 }
 
+export function quarterFlightHours(entries: Entry[], qIdx: number, year: number): number {
+  const qStart = new Date(year, qIdx * 3, 1).getTime()
+  const qEnd   = new Date(year, qIdx * 3 + 3, 1).getTime()
+  return entries.reduce((sum, e) => {
+    if (e.restDay || e.part91) return sum
+    const anchor = ms(e.releaseTime) ?? ms(e.showTime)
+    if (anchor === null || anchor < qStart || anchor >= qEnd) return sum
+    return sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0)
+  }, 0)
+}
+
+export function twoQuarterFlightHours(entries: Entry[], qIdx: number, year: number): number {
+  const prevQ    = qIdx === 0 ? 3 : qIdx - 1
+  const prevYear = qIdx === 0 ? year - 1 : year
+  return quarterFlightHours(entries, qIdx, year) + quarterFlightHours(entries, prevQ, prevYear)
+}
+
+export function annualFlightHours(entries: Entry[], year: number): number {
+  const yStart = new Date(year, 0, 1).getTime()
+  const yEnd   = new Date(year + 1, 0, 1).getTime()
+  return entries.reduce((sum, e) => {
+    if (e.restDay || e.part91) return sum
+    const anchor = ms(e.releaseTime) ?? ms(e.showTime)
+    if (anchor === null || anchor < yStart || anchor >= yEnd) return sum
+    return sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0)
+  }, 0)
+}
+
 export function quarterRestCount(entries: Entry[]): number {
   const now    = new Date()
   const qMonth = Math.floor(now.getMonth() / 3) * 3
@@ -233,7 +261,8 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   const part91Legs  = flightLegs.filter(e => e.part91)
   const restDays    = qEntries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd), 0)
 
-  let totalFlight   = 0
+  let totalFlight     = 0
+  let part135Flight   = 0
   const violations: { date: string; pilot: string; type: string; detail: string }[] = []
   const exceedances: { date: string; pilot: string; route: string; over: string; reason: string; reqRest: number }[] = []
   let flightFailCount = 0, dutyFailCount = 0, restFailCount = 0
@@ -242,6 +271,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   flightLegs.forEach(e => {
     const c = compute(e, entries)
     totalFlight += c.legFlight || 0
+    if (!e.part91) part135Flight += c.legFlight || 0
     if (e.part91) return
 
     if (c.flightOk === false) {
@@ -274,12 +304,14 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
 
   const flag = (c: boolean | null) => c === null ? '—' : c ? '✓' : '⚠'
 
+  const qFlightOk = part135Flight < 500
   const scRows = [
-    ['Rolling 24-hr Flight Time', flightFailCount === 0 ? 'PASS' : `${flightFailCount} VIOLATION(S)`, flightFailCount === 0],
-    ['14-Hour Duty Day Limit',    dutyFailCount   === 0 ? 'PASS' : `${dutyFailCount} VIOLATION(S)`,   dutyFailCount   === 0],
-    ['Rest Requirements',         restFailCount   === 0 ? 'PASS' : `${restFailCount} DEFICIENCY(IES)`, restFailCount  === 0],
-    ['10-hr Look-Back Rest',      'See detail rows below', null],
-    ['24-hr Rest Days (≥13/qtr)', `${restDays} of 13 required`, restMet],
+    ['Rolling 24-hr Flight Time',          flightFailCount === 0 ? 'PASS' : `${flightFailCount} VIOLATION(S)`, flightFailCount === 0],
+    ['14-Hour Duty Day Limit',             dutyFailCount   === 0 ? 'PASS' : `${dutyFailCount} VIOLATION(S)`,   dutyFailCount   === 0],
+    ['Rest Requirements',                  restFailCount   === 0 ? 'PASS' : `${restFailCount} DEFICIENCY(IES)`, restFailCount  === 0],
+    ['10-hr Look-Back Rest',               'See detail rows below', null],
+    ['24-hr Rest Days (≥13/qtr)',          `${restDays} of 13 required`, restMet],
+    ['Quarterly Flight Hours §135.267(a)', qFlightOk ? `${fmtHrs(part135Flight)} of 500h — OK` : `${fmtHrs(part135Flight)} — EXCEEDED`, qFlightOk],
   ].map(([req, result, ok]) => {
     const bg  = ok === null ? '#f8fafc' : ok ? '#f0fdf4' : '#fef2f2'
     const col = ok === null ? '#555'    : ok ? '#16a34a' : '#dc2626'

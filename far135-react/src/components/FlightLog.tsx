@@ -98,7 +98,14 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
                     </td>
                     <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{fmtHrs(c.dutyPeriod)}</td>
-                    <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.dutyOk} okText="OK" warnText="EXCEEDED" /></td>
+                    <td className="px-3 py-2 border-b border-slate-100">
+                      <StatusBadge flag={e.part91 ? null : c.dutyOk} okText="OK" warnText="EXCEEDED" />
+                      {!e.part91 && c.dutyOk === false && c.dutyPeriod !== null && (
+                        <div className="text-[0.65rem] text-red-600 mt-0.5 whitespace-nowrap">
+                          +{fmtHrs(c.dutyPeriod - 14)} over · min {c.reqRest}h rest req'd
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                       {fmtHrs(c.consRest)}<br />
