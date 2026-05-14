@@ -122,10 +122,12 @@ export function compute(entry: Entry, all: Entry[]): Computed {
     const found = all.some(e => {
       if (e.id === entry.id) return false
       if (e.restDay) {
-        const dayStart = ms(e.showTime)
-        const dayEnd   = dayStart ? dayStart + 86400000 : null
-        if (!dayEnd) return false
-        return dayEnd >= lbStart && dayEnd <= anchorMs
+        const lastDateStr = e.restDayEnd || (e.showTime ? e.showTime.split('T')[0] : null)
+        if (!lastDateStr) return false
+        const lastDayStart = ms(lastDateStr + 'T00:00')
+        const lastDayEnd   = lastDayStart !== null ? lastDayStart + 86400000 : null
+        if (!lastDayEnd) return false
+        return lastDayEnd >= lbStart && lastDayEnd <= anchorMs
       }
       const eRe = ms(e.restEnd)
       const eRs = ms(e.restStart)
