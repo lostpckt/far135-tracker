@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-14
+
+### Added
+- Form draft autosave: all fields (show time, release time, legs, rest period, pilot name, crew config) are continuously saved to localStorage as you type; the form is fully restored if the app is closed, refreshed, or the phone sleeps mid-duty
+- "Clear form" link to discard the draft without submitting; draft is automatically cleared after a successful Add Entry
+
 ## 2026-05-06
 
 ### Added

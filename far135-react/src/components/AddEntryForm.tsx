@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,28 @@ import { Checkbox } from '@/components/ui/checkbox'
 import LegRow, { type LegData } from '@/components/LegRow'
 import { uid, parseDTPair, ms, parseHobbs, exportCSV, generateQuarterlyReport } from '@/lib/calculations'
 import type { Entry } from '@/types/entry'
+
+const DRAFT_KEY = 'far135_v1_form_draft'
+
+interface DraftState {
+  pilot: string
+  crew: 'S' | 'D'
+  showDate: string
+  showTime: string
+  relDate: string
+  relTime: string
+  rsDate: string
+  rsTime: string
+  reDate: string
+  reTime: string
+  restDay: boolean
+  restDayEnd: string
+  legs: LegData[]
+}
+
+function readDraft(): DraftState | null {
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null') } catch { return null }
+}
 
 interface Props {
   entries: Entry[]
@@ -27,28 +49,37 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function AddEntryForm({ entries, onAdd }: Props) {
-  const [pilot, setPilot]       = useState('')
-  const [crew, setCrew]         = useState<'S' | 'D'>('S')
-  const [showDate, setShowDate] = useState('')
-  const [showTime, setShowTime] = useState('')
-  const [relDate, setRelDate]   = useState('')
-  const [relTime, setRelTime]   = useState('')
-  const [rsDate, setRsDate]     = useState('')
-  const [rsTime, setRsTime]     = useState('')
-  const [reDate, setReDate]     = useState('')
-  const [reTime, setReTime]     = useState('')
-  const [restDay, setRestDay]     = useState(false)
-  const [restDayEnd, setRestDayEnd] = useState('')
-  const [legs, setLegs]           = useState<LegData[]>([emptyLeg()])
+  const d = readDraft()
+
+  const [pilot, setPilot]       = useState(d?.pilot ?? '')
+  const [crew, setCrew]         = useState<'S' | 'D'>(d?.crew ?? 'S')
+  const [showDate, setShowDate] = useState(d?.showDate ?? '')
+  const [showTime, setShowTime] = useState(d?.showTime ?? '')
+  const [relDate, setRelDate]   = useState(d?.relDate ?? '')
+  const [relTime, setRelTime]   = useState(d?.relTime ?? '')
+  const [rsDate, setRsDate]     = useState(d?.rsDate ?? '')
+  const [rsTime, setRsTime]     = useState(d?.rsTime ?? '')
+  const [reDate, setReDate]     = useState(d?.reDate ?? '')
+  const [reTime, setReTime]     = useState(d?.reTime ?? '')
+  const [restDay, setRestDay]     = useState(d?.restDay ?? false)
+  const [restDayEnd, setRestDayEnd] = useState(d?.restDayEnd ?? '')
+  const [legs, setLegs]           = useState<LegData[]>(d?.legs ?? [emptyLeg()])
   const [err, setErr]           = useState('')
 
   const [rptQ, setRptQ]   = useState(Math.floor(new Date().getMonth() / 3).toString())
   const [rptY, setRptY]   = useState(new Date().getFullYear().toString())
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayEnd, legs }))
+    } catch {}
+  }, [pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayEnd, legs])
+
   function resetForm() {
     setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
     setRsDate(''); setRsTime(''); setReDate(''); setReTime('')
     setRestDay(false); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
   }
 
   function handleAdd() {
@@ -220,7 +251,18 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
 
         {err && <p className="text-red-600 text-xs mt-3">{err}</p>}
 
-        <div className="flex flex-wrap gap-2.5 mt-4 items-center">
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-[0.68rem] text-slate-400">Draft autosaved</span>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="text-[0.68rem] text-slate-400 hover:text-red-500 underline"
+          >
+            Clear form
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2.5 mt-2 items-center">
           <Button onClick={handleAdd} className="bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm h-8">
             Add Entry
           </Button>
