@@ -43,7 +43,7 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50">
-                {['Show Time','Pilot','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance','Reason',''].map(h => (
+                {['Show Time','Release Time','Pilot','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance','Reason',''].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 border-b-2 border-slate-200 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -55,6 +55,7 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
                   return (
                     <tr key={e.id} className="bg-green-50 dark:bg-green-950">
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{fmtDT(anchor)}</td>
+                      <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">—</td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold">{e.pilot || '—'}</td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={14}>
                         {e.restDayEnd && e.restDayEnd !== anchor.split('T')[0]
@@ -80,6 +81,7 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
                 return (
                   <tr key={e.id} className={e.part91 ? 'bg-amber-50/40' : 'hover:bg-slate-50'}>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{fmtDT(e.showTime)}</td>
+                    <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.releaseTime ? fmtDT(e.releaseTime) : <span className="text-slate-400">—</span>}</td>
                     <td className="px-3 py-2 border-b border-slate-100 font-semibold whitespace-nowrap">{e.pilot || '—'}</td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                       {e.crew === 'D' ? 'Dual' : 'Single'}{p91Badge}
