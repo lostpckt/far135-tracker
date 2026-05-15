@@ -4,6 +4,7 @@
 
 ### Fixed
 - Quarterly report page had no way to return to the app — added a Close button alongside the Print button
+- "Last Rolling 24-hr" dashboard stat showed — when the most recent logged leg was Part 91 (e.g. a repositioning flight home); the accumulated Part 135 hours in the window are now shown correctly regardless of whether the last leg is Part 91
 
 ## 2026-05-14
 

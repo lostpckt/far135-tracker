@@ -79,18 +79,9 @@ export function compute(entry: Entry, all: Entry[]): Computed {
   c.consRest   = hrs(rsMs, reMs)
   c.maxFlight  = entry.crew === 'D' ? 10 : 8
 
-  if (entry.part91) {
-    c.rolling24  = null
-    c.excAmt     = 0
-    c.reqRest    = 10
-    c.lookbackOk = null
-    c.flightOk   = null
-    c.dutyOk     = null
-    c.restOk     = null
-    return c
-  }
-
-  // Rolling 24-hr window anchored to releaseTime (or showTime fallback) since Hobbs has no timestamp
+  // Rolling 24-hr window anchored to releaseTime (or showTime fallback) since Hobbs has no timestamp.
+  // Computed before the Part 91 check so the dashboard reflects accumulated Part 135 hours
+  // even when the most recent leg is a Part 91 repositioning flight.
   const anchorMs = relMs ?? showMs
   if (anchorMs !== null) {
     const windowStart = anchorMs - 86400000
@@ -106,6 +97,16 @@ export function compute(entry: Entry, all: Entry[]): Computed {
     }, 0)
   } else {
     c.rolling24 = null
+  }
+
+  if (entry.part91) {
+    c.excAmt     = 0
+    c.reqRest    = 10
+    c.lookbackOk = null
+    c.flightOk   = null
+    c.dutyOk     = null
+    c.restOk     = null
+    return c
   }
 
   c.excAmt = c.rolling24 !== null ? Math.max(0, c.rolling24 - c.maxFlight) : 0
