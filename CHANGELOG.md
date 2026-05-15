@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-05-15
+
+### Fixed
+- Quarterly report page had no way to return to the app — added a Close button alongside the Print button
+
 ## 2026-05-14
 
 ### Added
@@ -26,11 +31,6 @@
 ### Added
 - Custom altimeter-style PWA icon with airplane silhouette
 - GitHub Actions workflow to build and deploy the React app to GitHub Pages
-
-## 2026-04-10
-
-### Changed
-- Quarterly report now opens as an in-app overlay instead of a new browser window
 
 ## 2026-03-31
 
