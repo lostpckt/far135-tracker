@@ -2,6 +2,13 @@
 
 ## 2026-05-15
 
+### Added
+- **UTC time storage** — all timestamps are now stored as Zulu (UTC) internally. Times entered in the app are converted from your local timezone on save and stored with a `Z` suffix; all timestamps in the flight log display with a `Z` suffix to make the timezone unambiguous. This prevents calculation errors when crossing timezone boundaries between duty periods.
+- **Timezone selector** — a timezone picker in the header (e.g. "AKDT") sets the timezone used for all time entry and display. Change it any time; stored entries are unaffected since they're already in UTC.
+- **Local-time input with UTC preview** — Show Time, Release Time, and Rest period fields accept times in your selected local timezone. A live `→ 03:15Z on 05/15` preview appears as you type so you can sanity-check the UTC conversion before saving.
+- **One-time migration dialog** — on first load after this update, existing users are prompted to confirm whether their previous entries were recorded in local time or already in UTC. Choosing local time presents a timezone picker; each entry is converted individually using the correct DST offset for that entry's date.
+- **"Next Legal Duty Start" dashboard tile** — replaces "Last Rest Period". Shows the earliest time you can legally begin a new duty period (release time of your last leg + required rest based on §135.267 excess flight time rules). Displays in your local timezone with the Zulu equivalent in the subtitle. Green when already legal; amber when less than an hour away; red when still in the rest requirement window.
+
 ### Fixed
 - Quarterly report page had no way to return to the app — added a Close button alongside the Print button
 - "Last Rolling 24-hr" dashboard stat showed — when the most recent logged leg was Part 91 (e.g. a repositioning flight home); the accumulated Part 135 hours in the window are now shown correctly regardless of whether the last leg is Part 91

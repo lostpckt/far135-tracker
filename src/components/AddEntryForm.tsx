@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import LegRow, { type LegData } from '@/components/LegRow'
-import { uid, parseDTPair, ms, parseHobbs, exportCSV, generateQuarterlyReport } from '@/lib/calculations'
+import { uid, ms, parseHobbs, exportCSV, generateQuarterlyReport } from '@/lib/calculations'
+import { localToUtcIso, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 const DRAFT_KEY = 'far135_v1_form_draft'
@@ -34,6 +35,7 @@ function readDraft(): DraftState | null {
 interface Props {
   entries: Entry[]
   onAdd: (updated: Entry[]) => void
+  tz: string
 }
 
 function emptyLeg(): LegData {
@@ -48,26 +50,32 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export default function AddEntryForm({ entries, onAdd }: Props) {
+function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string; tz: string }) {
+  const utc = localToUtcIso(dateStr, timeStr, tz)
+  if (!utc) return null
+  return <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>
+}
+
+export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const d = readDraft()
 
-  const [pilot, setPilot]       = useState(d?.pilot ?? '')
-  const [crew, setCrew]         = useState<'S' | 'D'>(d?.crew ?? 'S')
-  const [showDate, setShowDate] = useState(d?.showDate ?? '')
-  const [showTime, setShowTime] = useState(d?.showTime ?? '')
-  const [relDate, setRelDate]   = useState(d?.relDate ?? '')
-  const [relTime, setRelTime]   = useState(d?.relTime ?? '')
-  const [rsDate, setRsDate]     = useState(d?.rsDate ?? '')
-  const [rsTime, setRsTime]     = useState(d?.rsTime ?? '')
-  const [reDate, setReDate]     = useState(d?.reDate ?? '')
-  const [reTime, setReTime]     = useState(d?.reTime ?? '')
-  const [restDay, setRestDay]     = useState(d?.restDay ?? false)
+  const [pilot, setPilot]           = useState(d?.pilot ?? '')
+  const [crew, setCrew]             = useState<'S' | 'D'>(d?.crew ?? 'S')
+  const [showDate, setShowDate]     = useState(d?.showDate ?? '')
+  const [showTime, setShowTime]     = useState(d?.showTime ?? '')
+  const [relDate, setRelDate]       = useState(d?.relDate ?? '')
+  const [relTime, setRelTime]       = useState(d?.relTime ?? '')
+  const [rsDate, setRsDate]         = useState(d?.rsDate ?? '')
+  const [rsTime, setRsTime]         = useState(d?.rsTime ?? '')
+  const [reDate, setReDate]         = useState(d?.reDate ?? '')
+  const [reTime, setReTime]         = useState(d?.reTime ?? '')
+  const [restDay, setRestDay]       = useState(d?.restDay ?? false)
   const [restDayEnd, setRestDayEnd] = useState(d?.restDayEnd ?? '')
-  const [legs, setLegs]           = useState<LegData[]>(d?.legs ?? [emptyLeg()])
-  const [err, setErr]           = useState('')
+  const [legs, setLegs]             = useState<LegData[]>(d?.legs ?? [emptyLeg()])
+  const [err, setErr]               = useState('')
 
-  const [rptQ, setRptQ]   = useState(Math.floor(new Date().getMonth() / 3).toString())
-  const [rptY, setRptY]   = useState(new Date().getFullYear().toString())
+  const [rptQ, setRptQ] = useState(Math.floor(new Date().getMonth() / 3).toString())
+  const [rptY, setRptY] = useState(new Date().getFullYear().toString())
 
   useEffect(() => {
     try {
@@ -92,8 +100,8 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
       return
     }
 
-    const show    = parseDTPair(showDate, showTime)
-    const release = parseDTPair(relDate, relTime)
+    const show    = localToUtcIso(showDate, showTime, tz)
+    const release = localToUtcIso(relDate, relTime, tz)
     if (!show)    { setErr('Show Time is required.'); return }
     if (!release) { setErr('Release Time is required.'); return }
     if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
@@ -109,8 +117,8 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
       legData.push({ dep: leg.dep, arr: leg.arr, off: leg.offHobbs.trim(), on: leg.onHobbs.trim(), reason: leg.reason, part91: leg.part91 })
     }
 
-    const restStart = parseDTPair(rsDate, rsTime)
-    const restEnd   = parseDTPair(reDate, reTime)
+    const restStart = localToUtcIso(rsDate, rsTime, tz)
+    const restEnd   = localToUtcIso(reDate, reTime, tz)
 
     const newEntries: Entry[] = legData.map(leg => ({
       id: uid(), pilot, crew,
@@ -140,6 +148,8 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
     w?.document.close()
   }
 
+  const abbr = tzAbbr(tz)
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -168,23 +178,25 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
             </Select>
           </div>
 
-          <SectionLabel>Duty Period</SectionLabel>
+          <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
 
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Show Time (Duty Start)</Label>
+            <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr})</Label>
             <div className="flex gap-1.5">
               <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
               <Input value={showTime} onChange={e => setShowTime(e.target.value)} placeholder="14:30" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
+            <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
             <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
           </div>
 
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Release Time (Duty End)</Label>
+            <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr})</Label>
             <div className="flex gap-1.5">
               <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
               <Input value={relTime} onChange={e => setRelTime(e.target.value)} placeholder="22:15" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
+            <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
             <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr)</span>
           </div>
 
@@ -210,23 +222,25 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
             </button>
           </div>
 
-          <SectionLabel>Rest Period (After This Duty)</SectionLabel>
+          <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
 
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Rest Start</Label>
+            <Label className="text-xs font-semibold text-slate-500">Rest Start ({abbr})</Label>
             <div className="flex gap-1.5">
               <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
               <Input value={rsTime} onChange={e => setRsTime(e.target.value)} placeholder="23:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
+            <UtcPreview dateStr={rsDate} timeStr={rsTime} tz={tz} />
             <span className="text-[0.68rem] text-slate-400">When rest began after release (24-hr)</span>
           </div>
 
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Rest End (Next Report / Wake-up)</Label>
+            <Label className="text-xs font-semibold text-slate-500">Rest End ({abbr})</Label>
             <div className="flex gap-1.5">
               <Input type="date" value={reDate} onChange={e => setReDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
               <Input value={reTime} onChange={e => setReTime(e.target.value)} placeholder="09:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
             </div>
+            <UtcPreview dateStr={reDate} timeStr={reTime} tz={tz} />
           </div>
 
           <SectionLabel>Special Entries</SectionLabel>

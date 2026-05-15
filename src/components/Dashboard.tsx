@@ -1,9 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { compute, fmtHrs, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
+import { utcToLocalParts, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 interface Props {
   entries: Entry[]
+  tz: string
 }
 
 function StatCard({
@@ -32,7 +34,7 @@ function StatCard({
   )
 }
 
-export default function Dashboard({ entries }: Props) {
+export default function Dashboard({ entries, tz }: Props) {
   const now    = new Date()
   const qIdx   = Math.floor(now.getMonth() / 3)
   const year   = now.getFullYear()
@@ -45,9 +47,8 @@ export default function Dashboard({ entries }: Props) {
   const annHours = annualFlightHours(entries, year)
 
   const nonRestEntries = entries.filter(e => !e.restDay)
-  const lastCalc = nonRestEntries.length
-    ? compute(nonRestEntries[nonRestEntries.length - 1], entries)
-    : null
+  const lastEntry = nonRestEntries.length ? nonRestEntries[nonRestEntries.length - 1] : null
+  const lastCalc  = lastEntry ? compute(lastEntry, entries) : null
 
   const allWarnings = entries.filter(e => {
     if (e.restDay) return false
@@ -55,7 +56,39 @@ export default function Dashboard({ entries }: Props) {
     return c.flightOk === false || c.dutyOk === false || c.restOk === false
   }).length
 
+  // Next legal duty start: releaseTime of last leg + required rest
   type Color = 'green' | 'red' | 'blue' | 'amber'
+  let nextDutyValue = '—'
+  let nextDutySub   = ''
+  let nextDutyColor: Color = 'blue'
+
+  if (lastEntry?.releaseTime && lastCalc) {
+    const releaseMs = new Date(lastEntry.releaseTime).getTime()
+    const legalMs   = releaseMs + lastCalc.reqRest * 3600000
+    const nowMs     = now.getTime()
+    const legalIso  = new Date(legalMs).toISOString()
+    const abbr      = tzAbbr(tz)
+
+    // Format the legal time in local timezone
+    const local = utcToLocalParts(legalIso, tz)
+    const localDate = local ? local.date.slice(5).replace('-', '/') : ''
+    const localTime = local ? local.time : legalIso.slice(11, 16)
+    const utcStr    = `${legalIso.slice(5, 10).replace('-', '/')} ${legalIso.slice(11, 16)}Z`
+
+    if (nowMs >= legalMs) {
+      nextDutyValue = 'Legal'
+      nextDutySub   = `Since ${localDate} ${localTime} ${abbr} · ${lastCalc.reqRest}h required`
+      nextDutyColor = 'green'
+    } else {
+      const remMs  = legalMs - nowMs
+      const remHrs = Math.floor(remMs / 3600000)
+      const remMin = Math.floor((remMs % 3600000) / 60000)
+      nextDutyValue = `${localDate} ${localTime}`
+      nextDutySub   = `${abbr} · ${utcStr} · in ${remHrs}h ${String(remMin).padStart(2, '0')}m · ${lastCalc.reqRest}h req`
+      nextDutyColor = remMs < 3600000 ? 'amber' : 'red'
+    }
+  }
+
   const cards: { label: string; value: string | number; sub: string; color: Color }[] = [
     {
       label: 'Total Legs Logged',
@@ -76,10 +109,10 @@ export default function Dashboard({ entries }: Props) {
       color: !lastCalc ? 'blue' : lastCalc.dutyOk === false ? 'red' : 'green',
     },
     {
-      label: 'Last Rest Period',
-      value: lastCalc ? fmtHrs(lastCalc.consRest) : '—',
-      sub:   lastCalc ? `Required: ${lastCalc.reqRest}h` : '',
-      color: !lastCalc ? 'blue' : lastCalc.restOk === false ? 'red' : 'green',
+      label: 'Next Legal Duty',
+      value: nextDutyValue,
+      sub:   nextDutySub,
+      color: nextDutyColor,
     },
     {
       label: 'Quarter Rest Days',

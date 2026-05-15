@@ -27,11 +27,12 @@ export function fmtDT(dtStr: string | undefined | null): string {
   if (!dtStr) return '—'
   const d = new Date(dtStr)
   if (isNaN(d.getTime())) return '—'
-  const mo = String(d.getMonth() + 1).padStart(2, '0')
-  const dy = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${mo}/${dy} ${hh}:${mi}`
+  const utc = dtStr.endsWith('Z')
+  const mo = String(utc ? d.getUTCMonth() + 1 : d.getMonth() + 1).padStart(2, '0')
+  const dy = String(utc ? d.getUTCDate()       : d.getDate()).padStart(2, '0')
+  const hh = String(utc ? d.getUTCHours()      : d.getHours()).padStart(2, '0')
+  const mi = String(utc ? d.getUTCMinutes()    : d.getMinutes()).padStart(2, '0')
+  return utc ? `${mo}/${dy} ${hh}:${mi}Z` : `${mo}/${dy} ${hh}:${mi}`
 }
 
 export function parseDTPair(date: string, time: string): string {
