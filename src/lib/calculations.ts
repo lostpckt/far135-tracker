@@ -369,6 +369,7 @@ td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle
 @media print { .no-print { display: none; } body { padding: 16px; } }
 </style></head><body>
 <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+<button class="print-btn no-print" onclick="window.close()" style="background:#6b7280;margin-left:8px">✕ Close</button>
 <h1>FAR 135.267 Quarterly Compliance Report</h1>
 <div class="meta">Period: <strong>${qLabel} ${year}</strong> &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
 <div class="status-banner">${overallOk ? '✓' : '⚠'} Overall Status: ${statusText}${!overallOk ? ` — ${totalViolations} violation(s) and/or rest day shortfall detected` : ''}</div>
