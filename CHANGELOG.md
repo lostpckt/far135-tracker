@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-16
+
+### Added
+- **Simplified rest day entry** — checking "24-hour rest day" now collapses the duty period, flight legs, and rest period fields and shows a self-contained date picker. Rest days can be logged without entering any duty or flight data — just the date (and optional end date for multi-day ranges).
+
+### Fixed
+- Rest days are now stored as UTC (Zulu) to match flight leg timestamps. Previously, rest day dates were stored in browser local time, which could cause incorrect 10-hr lookback results when the browser timezone differed from the app's selected timezone.
+- Flight log now displays rest days as a local calendar date (e.g. `05/15`) rather than a UTC timestamp, since rest days are all-day markers rather than point-in-time events.
+
 ## 2026-05-15
 
 ### Added
