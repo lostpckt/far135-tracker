@@ -24,6 +24,7 @@ interface DraftState {
   reDate: string
   reTime: string
   restDay: boolean
+  restDayStart: string
   restDayEnd: string
   legs: LegData[]
 }
@@ -69,8 +70,9 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const [rsTime, setRsTime]         = useState(d?.rsTime ?? '')
   const [reDate, setReDate]         = useState(d?.reDate ?? '')
   const [reTime, setReTime]         = useState(d?.reTime ?? '')
-  const [restDay, setRestDay]       = useState(d?.restDay ?? false)
-  const [restDayEnd, setRestDayEnd] = useState(d?.restDayEnd ?? '')
+  const [restDay, setRestDay]           = useState(d?.restDay ?? false)
+  const [restDayStart, setRestDayStart] = useState(d?.restDayStart ?? '')
+  const [restDayEnd, setRestDayEnd]     = useState(d?.restDayEnd ?? '')
   const [legs, setLegs]             = useState<LegData[]>(d?.legs ?? [emptyLeg()])
   const [err, setErr]               = useState('')
 
@@ -79,14 +81,14 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayEnd, legs }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs }))
     } catch {}
-  }, [pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayEnd, legs])
+  }, [pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs])
 
   function resetForm() {
     setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
     setRsDate(''); setRsTime(''); setReDate(''); setReTime('')
-    setRestDay(false); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
+    setRestDay(false); setRestDayStart(''); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
     try { localStorage.removeItem(DRAFT_KEY) } catch {}
   }
 
@@ -94,8 +96,8 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     setErr('')
 
     if (restDay) {
-      if (!showDate) { setErr('For a rest day, enter the date in the Show Time date field.'); return }
-      onAdd([...entries, { id: uid(), pilot, crew, showTime: `${showDate}T00:00`, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
+      if (!restDayStart) { setErr('Enter the date of the rest day.'); return }
+      onAdd([...entries, { id: uid(), pilot, crew, showTime: `${restDayStart}T00:00`, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
       resetForm()
       return
     }
@@ -178,74 +180,9 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             </Select>
           </div>
 
-          <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
-
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr})</Label>
-            <div className="flex gap-1.5">
-              <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-              <Input value={showTime} onChange={e => setShowTime(e.target.value)} placeholder="14:30" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
-            </div>
-            <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
-            <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr})</Label>
-            <div className="flex gap-1.5">
-              <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-              <Input value={relTime} onChange={e => setRelTime(e.target.value)} placeholder="22:15" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
-            </div>
-            <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
-            <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr)</span>
-          </div>
-
-          <SectionLabel>Flight Legs</SectionLabel>
-
-          <div className="col-span-full">
-            {legs.map((leg, i) => (
-              <LegRow
-                key={i}
-                index={i}
-                data={leg}
-                onChange={updated => setLegs(legs.map((l, j) => j === i ? updated : l))}
-                onRemove={() => setLegs(legs.filter((_, j) => j !== i))}
-                showRemove={legs.length > 1}
-              />
-            ))}
-            <button
-              type="button"
-              onClick={() => setLegs([...legs, emptyLeg()])}
-              className="w-full border border-dashed border-blue-300 bg-blue-50 hover:bg-blue-600 hover:text-white hover:border-solid text-blue-600 text-sm font-semibold rounded-lg py-2 mt-1 transition-colors"
-            >
-              + Add Another Leg
-            </button>
-          </div>
-
-          <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
-
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Rest Start ({abbr})</Label>
-            <div className="flex gap-1.5">
-              <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-              <Input value={rsTime} onChange={e => setRsTime(e.target.value)} placeholder="23:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
-            </div>
-            <UtcPreview dateStr={rsDate} timeStr={rsTime} tz={tz} />
-            <span className="text-[0.68rem] text-slate-400">When rest began after release (24-hr)</span>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Rest End ({abbr})</Label>
-            <div className="flex gap-1.5">
-              <Input type="date" value={reDate} onChange={e => setReDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-              <Input value={reTime} onChange={e => setReTime(e.target.value)} placeholder="09:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
-            </div>
-            <UtcPreview dateStr={reDate} timeStr={reTime} tz={tz} />
-          </div>
-
           <SectionLabel>Special Entries</SectionLabel>
 
-          <div className="flex flex-col gap-2 mt-1">
+          <div className="col-span-full flex flex-col gap-2 mt-1">
             <div className="flex items-center gap-2">
               <Checkbox id="f-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
               <label htmlFor="f-restday" className="text-sm cursor-pointer">
@@ -253,13 +190,86 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
               </label>
             </div>
             {restDay && (
-              <div className="flex flex-col gap-1 ml-6">
-                <Label className="text-xs font-semibold text-slate-500">End Date (if multi-day)</Label>
-                <Input type="date" value={restDayEnd} onChange={e => setRestDayEnd(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
-                <span className="text-[0.68rem] text-slate-400">Leave blank for a single rest day. Start date is set in Show Time above.</span>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 ml-6 mt-1">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs font-semibold text-slate-500">Rest Day Date</Label>
+                  <Input type="date" value={restDayStart} onChange={e => setRestDayStart(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs font-semibold text-slate-500">End Date (if multi-day)</Label>
+                  <Input type="date" value={restDayEnd} onChange={e => setRestDayEnd(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
+                  <span className="text-[0.68rem] text-slate-400">Leave blank for a single rest day</span>
+                </div>
               </div>
             )}
           </div>
+
+          {!restDay && <>
+            <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr})</Label>
+              <div className="flex gap-1.5">
+                <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+                <Input value={showTime} onChange={e => setShowTime(e.target.value)} placeholder="14:30" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
+              </div>
+              <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
+              <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr})</Label>
+              <div className="flex gap-1.5">
+                <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+                <Input value={relTime} onChange={e => setRelTime(e.target.value)} placeholder="22:15" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
+              </div>
+              <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
+              <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr)</span>
+            </div>
+
+            <SectionLabel>Flight Legs</SectionLabel>
+
+            <div className="col-span-full">
+              {legs.map((leg, i) => (
+                <LegRow
+                  key={i}
+                  index={i}
+                  data={leg}
+                  onChange={updated => setLegs(legs.map((l, j) => j === i ? updated : l))}
+                  onRemove={() => setLegs(legs.filter((_, j) => j !== i))}
+                  showRemove={legs.length > 1}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setLegs([...legs, emptyLeg()])}
+                className="w-full border border-dashed border-blue-300 bg-blue-50 hover:bg-blue-600 hover:text-white hover:border-solid text-blue-600 text-sm font-semibold rounded-lg py-2 mt-1 transition-colors"
+              >
+                + Add Another Leg
+              </button>
+            </div>
+
+            <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Rest Start ({abbr})</Label>
+              <div className="flex gap-1.5">
+                <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+                <Input value={rsTime} onChange={e => setRsTime(e.target.value)} placeholder="23:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
+              </div>
+              <UtcPreview dateStr={rsDate} timeStr={rsTime} tz={tz} />
+              <span className="text-[0.68rem] text-slate-400">When rest began after release (24-hr)</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Rest End ({abbr})</Label>
+              <div className="flex gap-1.5">
+                <Input type="date" value={reDate} onChange={e => setReDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+                <Input value={reTime} onChange={e => setReTime(e.target.value)} placeholder="09:00" maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
+              </div>
+              <UtcPreview dateStr={reDate} timeStr={reTime} tz={tz} />
+            </div>
+          </>}
 
         </div>
 

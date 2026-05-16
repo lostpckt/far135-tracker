@@ -59,9 +59,10 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
   const [reTime, setReTime]         = useState('')
   const [reason, setReason]         = useState('')
   const [part91, setPart91]         = useState(false)
-  const [restDay, setRestDay]       = useState(false)
-  const [restDayEnd, setRestDayEnd] = useState('')
-  const [err, setErr]               = useState('')
+  const [restDay, setRestDay]           = useState(false)
+  const [restDayDate, setRestDayDate]   = useState('')
+  const [restDayEnd, setRestDayEnd]     = useState('')
+  const [err, setErr]                   = useState('')
 
   // Split a stored timestamp (UTC or legacy local) into local date/time parts for editing.
   function splitForEdit(val: string): { d: string; t: string } {
@@ -88,6 +89,8 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
     setOnHobbs(entry.onBlocks || '')
 
     const s  = splitForEdit(entry.showTime);    setShowDate(s.d); setShowTime(s.t)
+    // For rest day entries, showTime is "YYYY-MM-DDT00:00" (no Z), date part is the rest day date.
+    if (entry.restDay) setRestDayDate(entry.showTime ? entry.showTime.slice(0, 10) : '')
     const r  = splitForEdit(entry.releaseTime); setRelDate(r.d);  setRelTime(r.t)
     const rs = splitForEdit(entry.restStart);   setRsDate(rs.d);  setRsTime(rs.t)
     const re = splitForEdit(entry.restEnd);     setReDate(re.d);  setReTime(re.t)
@@ -98,7 +101,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
     setErr('')
 
     if (restDay) {
-      if (!showDate) { setErr('Enter a date in Show Time to assign this rest day to a quarter.'); return }
+      if (!restDayDate) { setErr('Enter the date of the rest day.'); return }
     } else {
       const offN = parseHobbs(offHobbs)
       const onN  = parseHobbs(onHobbs)
@@ -115,7 +118,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
       ...entry,
       pilot,
       crew,
-      showTime:    restDay ? `${showDate}T00:00` : localToUtcIso(showDate, showTime, tz),
+      showTime:    restDay ? `${restDayDate}T00:00` : localToUtcIso(showDate, showTime, tz),
       releaseTime: restDay ? '' : localToUtcIso(relDate, relTime, tz),
       dep:         dep.toUpperCase().trim(),
       arr:         arr.toUpperCase().trim(),
@@ -157,58 +160,66 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
             </Select>
           </div>
 
-          <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
-          <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} placeholder="14:30" tz={tz} />
-          <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  placeholder="22:15" tz={tz} />
-
-          <SectionLabel>Flight Leg</SectionLabel>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Departure ICAO</Label>
-            <Input value={dep} onChange={e => setDep(e.target.value.toUpperCase())} maxLength={4} className="text-sm h-8 uppercase" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Arrival ICAO</Label>
-            <Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} maxLength={4} className="text-sm h-8 uppercase" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Off Blocks (Hobbs)</Label>
-            <Input type="number" value={offHobbs} onChange={e => setOffHobbs(e.target.value)} placeholder="12345.6" step="0.1" min="0" className="text-sm h-8" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">On Blocks (Hobbs)</Label>
-            <Input type="number" value={onHobbs} onChange={e => setOnHobbs(e.target.value)} placeholder="12347.3" step="0.1" min="0" className="text-sm h-8" />
-          </div>
-
-          <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
-          <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} placeholder="23:00" tz={tz} />
-          <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} placeholder="09:00" tz={tz} />
-
-          <SectionLabel>Other</SectionLabel>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Exceedance Reason</Label>
-            <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Weather divert" className="text-sm h-8" />
+          <SectionLabel>Rest Day</SectionLabel>
+          <div className="col-span-full flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox id="m-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
+              <label htmlFor="m-restday" className="text-sm cursor-pointer">24-hour rest day (no duty or flights)</label>
+            </div>
+            {restDay && (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 ml-6">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs font-semibold text-slate-500">Rest Day Date</Label>
+                  <Input type="date" value={restDayDate} onChange={e => setRestDayDate(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs font-semibold text-slate-500">End Date (if multi-day)</Label>
+                  <Input type="date" value={restDayEnd} onChange={e => setRestDayEnd(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
+                  <span className="text-[0.68rem] text-slate-400">Leave blank for a single rest day</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col gap-2 justify-end">
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          {!restDay && <>
+            <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
+            <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} placeholder="14:30" tz={tz} />
+            <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  placeholder="22:15" tz={tz} />
+
+            <SectionLabel>Flight Leg</SectionLabel>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Departure ICAO</Label>
+              <Input value={dep} onChange={e => setDep(e.target.value.toUpperCase())} maxLength={4} className="text-sm h-8 uppercase" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Arrival ICAO</Label>
+              <Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} maxLength={4} className="text-sm h-8 uppercase" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Off Blocks (Hobbs)</Label>
+              <Input type="number" value={offHobbs} onChange={e => setOffHobbs(e.target.value)} placeholder="12345.6" step="0.1" min="0" className="text-sm h-8" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">On Blocks (Hobbs)</Label>
+              <Input type="number" value={onHobbs} onChange={e => setOnHobbs(e.target.value)} placeholder="12347.3" step="0.1" min="0" className="text-sm h-8" />
+            </div>
+
+            <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
+            <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} placeholder="23:00" tz={tz} />
+            <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} placeholder="09:00" tz={tz} />
+
+            <SectionLabel>Other</SectionLabel>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Exceedance Reason</Label>
+              <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Weather divert" className="text-sm h-8" />
+            </div>
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 self-end">
               <Checkbox id="m-p91" checked={part91} onCheckedChange={v => setPart91(!!v)} />
               <label htmlFor="m-p91" className="text-xs font-semibold text-amber-800 cursor-pointer">
                 Part 91 (exclude from 135 limits)
               </label>
             </div>
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <Checkbox id="m-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
-                <label htmlFor="m-restday" className="text-sm cursor-pointer">24-hour rest day</label>
-              </div>
-              {restDay && (
-                <div className="flex flex-col gap-1 ml-6">
-                  <Label className="text-xs font-semibold text-slate-500">End Date (if multi-day)</Label>
-                  <Input type="date" value={restDayEnd} onChange={e => setRestDayEnd(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
-                </div>
-              )}
-            </div>
-          </div>
+          </>}
 
         </div>
 
