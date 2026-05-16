@@ -59,6 +59,7 @@ export default function App() {
         <AddEntryForm entries={entries} onAdd={updateEntries} tz={tz} />
         <FlightLog
           entries={entries}
+          tz={tz}
           onEdit={setEditingEntry}
           onDelete={id => updateEntries(entries.filter(e => e.id !== id))}
         />

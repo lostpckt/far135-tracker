@@ -97,7 +97,8 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
 
     if (restDay) {
       if (!restDayStart) { setErr('Enter the date of the rest day.'); return }
-      onAdd([...entries, { id: uid(), pilot, crew, showTime: `${restDayStart}T00:00`, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
+      const rdShowTime = localToUtcIso(restDayStart, '00:00', tz) || `${restDayStart}T00:00`
+      onAdd([...entries, { id: uid(), pilot, crew, showTime: rdShowTime, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
       resetForm()
       return
     }
@@ -139,7 +140,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     const q = parseInt(rptQ, 10)
     const y = parseInt(rptY, 10)
     if (isNaN(y) || y < 2000) { alert('Enter a valid year.'); return }
-    const html = generateQuarterlyReport(entries, q, y)
+    const html = generateQuarterlyReport(entries, q, y, tz)
     if (!html) {
       const labels = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)']
       alert(`No entries found for ${labels[q]} ${y}.`)
@@ -291,7 +292,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             Add Entry
           </Button>
 
-          <Button variant="outline" onClick={() => exportCSV(entries)} className="text-green-700 border-green-200 bg-green-50 hover:bg-green-600 hover:text-white text-sm h-8">
+          <Button variant="outline" onClick={() => exportCSV(entries, tz)} className="text-green-700 border-green-200 bg-green-50 hover:bg-green-600 hover:text-white text-sm h-8">
             Export CSV
           </Button>
 

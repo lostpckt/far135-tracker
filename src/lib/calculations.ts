@@ -1,4 +1,5 @@
 import type { Entry, Computed } from '@/types/entry'
+import { localToUtcIso, utcToLocalParts } from '@/lib/timezone'
 
 export function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -64,7 +65,7 @@ export function hobbsFlightTime(offHobbs: number | null, onHobbs: number | null)
   return diff + 0.2
 }
 
-export function compute(entry: Entry, all: Entry[]): Computed {
+export function compute(entry: Entry, all: Entry[], tz?: string): Computed {
   const c = {} as Computed
 
   const offHobbs = parseHobbs(entry.offBlocks)
@@ -124,10 +125,26 @@ export function compute(entry: Entry, all: Entry[]): Computed {
     const found = all.some(e => {
       if (e.id === entry.id) return false
       if (e.restDay) {
-        const lastDateStr = e.restDayEnd || (e.showTime ? e.showTime.split('T')[0] : null)
-        if (!lastDateStr) return false
-        const lastDayStart = ms(lastDateStr + 'T00:00')
-        const lastDayEnd   = lastDayStart !== null ? lastDayStart + 86400000 : null
+        let lastDayEnd: number | null
+        if (e.showTime?.endsWith('Z')) {
+          // UTC storage: showTime is local midnight as UTC
+          const dayStart = ms(e.showTime)
+          if (dayStart === null) return false
+          if (e.restDayEnd) {
+            const endMs = tz
+              ? ms(localToUtcIso(e.restDayEnd, '00:00', tz))
+              : ms(e.restDayEnd + 'T00:00')
+            lastDayEnd = (endMs ?? dayStart) + 86400000
+          } else {
+            lastDayEnd = dayStart + 86400000
+          }
+        } else {
+          // Legacy no-Z: browser local time
+          const lastDateStr = e.restDayEnd || (e.showTime ? e.showTime.split('T')[0] : null)
+          if (!lastDateStr) return false
+          const lastDayStart = ms(lastDateStr + 'T00:00')
+          lastDayEnd = lastDayStart !== null ? lastDayStart + 86400000 : null
+        }
         if (!lastDayEnd) return false
         return lastDayEnd >= lbStart && lastDayEnd <= anchorMs
       }
@@ -150,13 +167,28 @@ export function compute(entry: Entry, all: Entry[]): Computed {
   return c
 }
 
-function countRestDaysInWindow(e: Entry, winStart: number, winEnd: number): number {
+function countRestDaysInWindow(e: Entry, winStart: number, winEnd: number, tz?: string): number {
   if (!e.restDay) return 0
-  const startStr = e.showTime ? e.showTime.split('T')[0] : ''
-  if (!startStr) return 0
-  const endStr = e.restDayEnd || startStr
-  const start = new Date(startStr + 'T00:00:00').getTime()
-  const end   = new Date(endStr  + 'T00:00:00').getTime()
+  let start: number
+  let end: number
+  if (e.showTime?.endsWith('Z')) {
+    start = ms(e.showTime) ?? NaN
+    const endDateStr = e.restDayEnd
+    if (endDateStr) {
+      const endMs = tz
+        ? ms(localToUtcIso(endDateStr, '00:00', tz))
+        : ms(endDateStr + 'T00:00')
+      end = endMs ?? start
+    } else {
+      end = start
+    }
+  } else {
+    const startStr = e.showTime ? e.showTime.split('T')[0] : ''
+    if (!startStr) return 0
+    const endStr = e.restDayEnd || startStr
+    start = new Date(startStr + 'T00:00:00').getTime()
+    end   = new Date(endStr  + 'T00:00:00').getTime()
+  }
   if (isNaN(start) || isNaN(end) || end < start) return 1
   let count = 0
   for (let d = start; d <= end; d += 86400000) {
@@ -193,15 +225,15 @@ export function annualFlightHours(entries: Entry[], year: number): number {
   }, 0)
 }
 
-export function quarterRestCount(entries: Entry[]): number {
+export function quarterRestCount(entries: Entry[], tz?: string): number {
   const now    = new Date()
   const qMonth = Math.floor(now.getMonth() / 3) * 3
   const qStart = new Date(now.getFullYear(), qMonth, 1).getTime()
   const qEnd   = new Date(now.getFullYear(), qMonth + 3, 1).getTime()
-  return entries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd), 0)
+  return entries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd, tz), 0)
 }
 
-export function exportCSV(entries: Entry[]): void {
+export function exportCSV(entries: Entry[], tz?: string): void {
   if (!entries.length) { alert('No data to export.'); return }
 
   const hdr = [
@@ -219,7 +251,7 @@ export function exportCSV(entries: Entry[]): void {
       return [q(e.showTime), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
         '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', q('Yes')].join(',')
     }
-    const c = compute(e, entries)
+    const c = compute(e, entries, tz)
     return [
       q(e.showTime), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
       q(`${(e.dep || '').toUpperCase()}-${(e.arr || '').toUpperCase()}`),
@@ -248,7 +280,7 @@ export function exportCSV(entries: Entry[]): void {
   a.click()
 }
 
-export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: number): string {
+export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: number, tz?: string): string {
   const qStart = new Date(year, qIdx * 3, 1).getTime()
   const qEnd   = new Date(year, qIdx * 3 + 3, 1).getTime()
   const qLabel = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'][qIdx]
@@ -263,7 +295,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   const flightLegs  = qEntries.filter(e => !e.restDay)
   const part135Legs = flightLegs.filter(e => !e.part91)
   const part91Legs  = flightLegs.filter(e => e.part91)
-  const restDays    = qEntries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd), 0)
+  const restDays    = qEntries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd, tz), 0)
 
   let totalFlight     = 0
   let part135Flight   = 0
@@ -273,7 +305,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   let flightOkCount = 0, dutyOkCount = 0, restOkCount = 0
 
   flightLegs.forEach(e => {
-    const c = compute(e, entries)
+    const c = compute(e, entries, tz)
     totalFlight += c.legFlight || 0
     if (!e.part91) part135Flight += c.legFlight || 0
     if (e.part91) return
@@ -334,15 +366,17 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
 
   const logRows = sorted.map(e => {
     if (e.restDay) {
-      const startStr = e.showTime ? e.showTime.split('T')[0] : ''
+      const startStr = e.showTime?.endsWith('Z') && tz
+        ? (utcToLocalParts(e.showTime, tz)?.date ?? e.showTime.slice(0, 10))
+        : (e.showTime ? e.showTime.split('T')[0] : '')
       const endStr   = e.restDayEnd || startStr
-      const days     = countRestDaysInWindow(e, qStart, qEnd)
+      const days     = countRestDaysInWindow(e, qStart, qEnd, tz)
       const label    = endStr && endStr !== startStr
         ? `● 24-HOUR REST DAYS: ${startStr} – ${endStr} (${days} days)`
         : `● 24-HOUR REST DAY`
       return `<tr style="background:#f0fdf4"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:#16a34a;font-weight:600">${label}</td></tr>`
     }
-    const c = compute(e, entries)
+    const c = compute(e, entries, tz)
     if (e.part91) return `<tr style="background:#fffef0"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:#92400e;font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
     return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
   }).join('')

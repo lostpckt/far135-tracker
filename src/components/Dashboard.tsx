@@ -41,18 +41,18 @@ export default function Dashboard({ entries, tz }: Props) {
   const qLabels = ['Q1', 'Q2', 'Q3', 'Q4']
   const prevQLabel = qIdx === 0 ? `Q4 ${year - 1}` : `${qLabels[qIdx - 1]} ${year}`
 
-  const qCount   = quarterRestCount(entries)
+  const qCount   = quarterRestCount(entries, tz)
   const qHours   = quarterFlightHours(entries, qIdx, year)
   const tqHours  = twoQuarterFlightHours(entries, qIdx, year)
   const annHours = annualFlightHours(entries, year)
 
   const nonRestEntries = entries.filter(e => !e.restDay)
   const lastEntry = nonRestEntries.length ? nonRestEntries[nonRestEntries.length - 1] : null
-  const lastCalc  = lastEntry ? compute(lastEntry, entries) : null
+  const lastCalc  = lastEntry ? compute(lastEntry, entries, tz) : null
 
   const allWarnings = entries.filter(e => {
     if (e.restDay) return false
-    const c = compute(e, entries)
+    const c = compute(e, entries, tz)
     return c.flightOk === false || c.dutyOk === false || c.restOk === false
   }).length
 

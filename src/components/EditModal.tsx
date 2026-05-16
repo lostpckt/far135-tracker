@@ -89,8 +89,13 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
     setOnHobbs(entry.onBlocks || '')
 
     const s  = splitForEdit(entry.showTime);    setShowDate(s.d); setShowTime(s.t)
-    // For rest day entries, showTime is "YYYY-MM-DDT00:00" (no Z), date part is the rest day date.
-    if (entry.restDay) setRestDayDate(entry.showTime ? entry.showTime.slice(0, 10) : '')
+    if (entry.restDay) {
+      // New Z format: convert UTC timestamp back to local date; legacy no-Z: take date part as-is.
+      const rdDate = entry.showTime?.endsWith('Z')
+        ? (utcToLocalParts(entry.showTime, tz)?.date ?? entry.showTime.slice(0, 10))
+        : (entry.showTime ? entry.showTime.slice(0, 10) : '')
+      setRestDayDate(rdDate)
+    }
     const r  = splitForEdit(entry.releaseTime); setRelDate(r.d);  setRelTime(r.t)
     const rs = splitForEdit(entry.restStart);   setRsDate(rs.d);  setRsTime(rs.t)
     const re = splitForEdit(entry.restEnd);     setReDate(re.d);  setReTime(re.t)
@@ -118,7 +123,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
       ...entry,
       pilot,
       crew,
-      showTime:    restDay ? `${restDayDate}T00:00` : localToUtcIso(showDate, showTime, tz),
+      showTime:    restDay ? (localToUtcIso(restDayDate, '00:00', tz) || `${restDayDate}T00:00`) : localToUtcIso(showDate, showTime, tz),
       releaseTime: restDay ? '' : localToUtcIso(relDate, relTime, tz),
       dep:         dep.toUpperCase().trim(),
       arr:         arr.toUpperCase().trim(),

@@ -2,10 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Pencil, X } from 'lucide-react'
 import { compute, fmtDT, fmtHrs } from '@/lib/calculations'
+import { utcToLocalParts } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 interface Props {
   entries: Entry[]
+  tz: string
   onEdit: (entry: Entry) => void
   onDelete: (id: string) => void
 }
@@ -17,7 +19,7 @@ function StatusBadge({ flag, okText, warnText }: { flag: boolean | null; okText:
     : <Badge className="bg-red-50 text-red-700 text-[0.68rem]">⚠ {warnText}</Badge>
 }
 
-export default function FlightLog({ entries, onEdit, onDelete }: Props) {
+export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
   if (!entries.length) {
     return (
       <Card>
@@ -52,14 +54,19 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
               {sorted.map(e => {
                 if (e.restDay) {
                   const anchor = e.showTime || ''
+                  // Show the local date for rest days (they're calendar markers, not point-in-time)
+                  const localDate = anchor.endsWith('Z')
+                    ? (utcToLocalParts(anchor, tz)?.date ?? anchor.slice(0, 10))
+                    : anchor.slice(0, 10)
+                  const localDateFmt = localDate.slice(5).replace('-', '/')
                   return (
                     <tr key={e.id} className="bg-green-50 dark:bg-green-950">
-                      <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{fmtDT(anchor)}</td>
+                      <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{localDateFmt}</td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">—</td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold">{e.pilot || '—'}</td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={14}>
-                        {e.restDayEnd && e.restDayEnd !== anchor.split('T')[0]
-                          ? `🟢 24-HOUR REST DAYS: ${anchor.split('T')[0]} – ${e.restDayEnd}`
+                        {e.restDayEnd && e.restDayEnd !== localDate
+                          ? `🟢 24-HOUR REST DAYS: ${localDate} – ${e.restDayEnd}`
                           : '🟢 24-HOUR REST DAY — No flight duty'}
                       </td>
                       <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
@@ -70,7 +77,7 @@ export default function FlightLog({ entries, onEdit, onDelete }: Props) {
                   )
                 }
 
-                const c = compute(e, entries)
+                const c = compute(e, entries, tz)
                 const excBadge = c.excAmt > 0
                   ? <Badge className="bg-red-50 text-red-700 text-[0.68rem]">{fmtHrs(c.excAmt)}</Badge>
                   : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
