@@ -456,9 +456,10 @@ h1 { font-size: 1.3rem; margin-bottom: 4px; }
 h2 { font-size: 0.95rem; margin: 24px 0 8px; border-bottom: 2px solid ${col.border}; padding-bottom: 5px; }
 .meta { color: ${col.muted}; font-size: 0.8rem; margin-bottom: 20px; }
 .status-banner { background: ${overallOk ? col.greenBg : col.redBg}; border: 2px solid ${statusColor}; border-radius: 8px; padding: 12px 18px; color: ${statusColor}; font-weight: 700; font-size: 1rem; margin-bottom: 20px; }
-.stat-box { background: ${col.surface}; border-radius: 7px; padding: 12px 16px; display:inline-block; margin: 0 8px 8px 0; min-width:140px; }
+.stat-box { background: ${col.surface}; border-radius: 7px; padding: 12px 16px; display:inline-block; margin: 0 8px 8px 0; width:148px; vertical-align:top; }
 .stat-box .val { font-size: 1.5rem; font-weight: 700; color: ${col.blue}; }
 .stat-box .lbl { font-size: 0.75rem; color: ${col.muted}; margin-top: 3px; }
+.stat-box .sub { font-size: 0.68rem; margin-top: 2px; min-height: 1em; }
 table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 8px; }
 th { background: ${col.surface}; padding: 7px 10px; text-align: left; font-weight: 700; color: ${col.muted}; border-bottom: 2px solid ${col.border}; white-space: nowrap; }
 td { padding: 7px 10px; border-bottom: 1px solid ${col.rowBorder}; vertical-align: middle; white-space: nowrap; }
@@ -489,10 +490,10 @@ function toggleLog() {
 <div class="meta">Period: <strong>${qLabel} ${year}</strong> &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
 <div class="status-banner">${overallOk ? '✓' : '⚠'} Overall Status: ${statusText}${!overallOk ? ` — ${totalViolations} violation(s) and/or rest day shortfall detected` : ''}</div>
 <div style="margin-bottom:20px">
-  <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs${part91Legs.length ? `<br><span style="color:${col.amber}">(+${part91Legs.length} Part 91)</span>` : ''}</div></div>
-  <div class="stat-box"><div class="val">${fmtHrs(totalFlight)}</div><div class="lbl">Total Flight Time</div></div>
-  <div class="stat-box"><div class="val" style="color:${restMet?col.green:col.red}">${restDays} / 13</div><div class="lbl">24-hr Rest Days</div></div>
-  <div class="stat-box"><div class="val" style="color:${totalViolations===0?col.green:col.red}">${totalViolations}</div><div class="lbl">Total Violations</div></div>
+  <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs</div><div class="sub">${part91Legs.length ? `<span style="color:${col.amber}">+${part91Legs.length} Part 91</span>` : ''}</div></div>
+  <div class="stat-box"><div class="val">${fmtHrs(totalFlight)}</div><div class="lbl">Total Flight Time</div><div class="sub"></div></div>
+  <div class="stat-box"><div class="val" style="color:${restMet?col.green:col.red}">${restDays} / 13</div><div class="lbl">24-hr Rest Days</div><div class="sub"></div></div>
+  <div class="stat-box"><div class="val" style="color:${totalViolations===0?col.green:col.red}">${totalViolations}</div><div class="lbl">Total Violations</div><div class="sub"></div></div>
 </div>
 <h2>Scorecard</h2><table><thead><tr><th>Requirement</th><th>Result</th></tr></thead><tbody>${scRows}</tbody></table>
 <h2>Violations Detail</h2><table><thead><tr><th>Date</th><th>Pilot</th><th>Type</th><th>Detail</th></tr></thead><tbody>${vRows}</tbody></table>

@@ -2,6 +2,9 @@
 
 ## 2026-05-18
 
+### Changed
+- **Quarterly report stat boxes are now uniform** — all four boxes (Part 135 Legs, Total Flight Time, 24-hr Rest Days, Total Violations) share identical fixed width and height; the Part 91 leg count appears in a consistent sub-line slot so no box is taller than the others
+
 ### Fixed
 - **Next Legal Duty tile now auto-updates** — the tile previously froze at page-load time and would not flip to "Legal" until the browser was refreshed; it now recalculates every 60 seconds
 - **Edit modal loads correct entry** — switched from a `useEffect`-based state reset to React's `key`-based remount pattern, eliminating a lint warning and ensuring the modal always reflects the selected entry
