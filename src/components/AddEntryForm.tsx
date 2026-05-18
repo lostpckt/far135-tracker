@@ -37,6 +37,7 @@ interface Props {
   entries: Entry[]
   onAdd: (updated: Entry[]) => void
   tz: string
+  dark: boolean
 }
 
 function emptyLeg(): LegData {
@@ -57,7 +58,7 @@ function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string
   return <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>
 }
 
-export default function AddEntryForm({ entries, onAdd, tz }: Props) {
+export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
   const d = readDraft()
 
   const [pilot, setPilot]           = useState(d?.pilot ?? '')
@@ -82,14 +83,14 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   useEffect(() => {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({ pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs }))
-    } catch {}
+    } catch { /* localStorage unavailable */ }
   }, [pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs])
 
   function resetForm() {
     setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
     setRsDate(''); setRsTime(''); setReDate(''); setReTime('')
     setRestDay(false); setRestDayStart(''); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
-    try { localStorage.removeItem(DRAFT_KEY) } catch {}
+    try { localStorage.removeItem(DRAFT_KEY) } catch { /* localStorage unavailable */ }
   }
 
   function handleAdd() {
@@ -140,7 +141,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     const q = parseInt(rptQ, 10)
     const y = parseInt(rptY, 10)
     if (isNaN(y) || y < 2000) { alert('Enter a valid year.'); return }
-    const html = generateQuarterlyReport(entries, q, y, tz)
+    const html = generateQuarterlyReport(entries, q, y, tz, dark)
     if (!html) {
       const labels = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)']
       alert(`No entries found for ${labels[q]} ${y}.`)

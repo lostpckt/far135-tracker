@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { compute, fmtHrs, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
 import { utcToLocalParts, tzAbbr } from '@/lib/timezone'
@@ -35,7 +36,12 @@ function StatCard({
 }
 
 export default function Dashboard({ entries, tz }: Props) {
-  const now    = new Date()
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(id)
+  }, [])
+
   const qIdx   = Math.floor(now.getMonth() / 3)
   const year   = now.getFullYear()
   const qLabels = ['Q1', 'Q2', 'Q3', 'Q4']

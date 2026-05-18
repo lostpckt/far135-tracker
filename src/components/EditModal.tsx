@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,65 +42,47 @@ function DTField({ label, date, time, onDate, onTime, placeholder = '00:00', tz 
   )
 }
 
-export default function EditModal({ entry, tz, onSave, onClose }: Props) {
-  const [pilot, setPilot]           = useState('')
-  const [crew, setCrew]             = useState<'S' | 'D'>('S')
-  const [showDate, setShowDate]     = useState('')
-  const [showTime, setShowTime]     = useState('')
-  const [relDate, setRelDate]       = useState('')
-  const [relTime, setRelTime]       = useState('')
-  const [dep, setDep]               = useState('')
-  const [arr, setArr]               = useState('')
-  const [offHobbs, setOffHobbs]     = useState('')
-  const [onHobbs, setOnHobbs]       = useState('')
-  const [rsDate, setRsDate]         = useState('')
-  const [rsTime, setRsTime]         = useState('')
-  const [reDate, setReDate]         = useState('')
-  const [reTime, setReTime]         = useState('')
-  const [reason, setReason]         = useState('')
-  const [part91, setPart91]         = useState(false)
-  const [restDay, setRestDay]           = useState(false)
-  const [restDayDate, setRestDayDate]   = useState('')
-  const [restDayEnd, setRestDayEnd]     = useState('')
-  const [err, setErr]                   = useState('')
-
-  // Split a stored timestamp (UTC or legacy local) into local date/time parts for editing.
-  function splitForEdit(val: string): { d: string; t: string } {
-    if (!val) return { d: '', t: '' }
-    if (val.endsWith('Z')) {
-      const parts = utcToLocalParts(val, tz)
-      return parts ? { d: parts.date, t: parts.time } : { d: '', t: '' }
-    }
-    // Legacy entry without Z — split as-is
-    const idx = val.indexOf('T')
-    return idx >= 0 ? { d: val.slice(0, idx), t: val.slice(idx + 1) } : { d: val, t: '' }
+// Split a stored timestamp (UTC or legacy local) into local date/time parts for editing.
+function splitForEdit(val: string, tz: string): { d: string; t: string } {
+  if (!val) return { d: '', t: '' }
+  if (val.endsWith('Z')) {
+    const parts = utcToLocalParts(val, tz)
+    return parts ? { d: parts.date, t: parts.time } : { d: '', t: '' }
   }
+  const idx = val.indexOf('T')
+  return idx >= 0 ? { d: val.slice(0, idx), t: val.slice(idx + 1) } : { d: val, t: '' }
+}
 
-  useEffect(() => {
-    setPilot(entry.pilot || '')
-    setCrew(entry.crew || 'S')
-    setReason(entry.reason || '')
-    setPart91(!!entry.part91)
-    setRestDay(!!entry.restDay)
-    setRestDayEnd(entry.restDayEnd || '')
-    setDep(entry.dep || '')
-    setArr(entry.arr || '')
-    setOffHobbs(entry.offBlocks || '')
-    setOnHobbs(entry.onBlocks || '')
+export default function EditModal({ entry, tz, onSave, onClose }: Props) {
+  // State initialized from props on mount. Parent uses key={entry.id} to remount on entry change.
+  const s  = splitForEdit(entry.showTime,    tz)
+  const r  = splitForEdit(entry.releaseTime, tz)
+  const rs = splitForEdit(entry.restStart,   tz)
+  const re = splitForEdit(entry.restEnd,     tz)
+  const rdDateInit = entry.showTime?.endsWith('Z')
+    ? (utcToLocalParts(entry.showTime, tz)?.date ?? entry.showTime.slice(0, 10))
+    : (entry.showTime ? entry.showTime.slice(0, 10) : '')
 
-    const s  = splitForEdit(entry.showTime);    setShowDate(s.d); setShowTime(s.t)
-    if (entry.restDay) {
-      // New Z format: convert UTC timestamp back to local date; legacy no-Z: take date part as-is.
-      const rdDate = entry.showTime?.endsWith('Z')
-        ? (utcToLocalParts(entry.showTime, tz)?.date ?? entry.showTime.slice(0, 10))
-        : (entry.showTime ? entry.showTime.slice(0, 10) : '')
-      setRestDayDate(rdDate)
-    }
-    const r  = splitForEdit(entry.releaseTime); setRelDate(r.d);  setRelTime(r.t)
-    const rs = splitForEdit(entry.restStart);   setRsDate(rs.d);  setRsTime(rs.t)
-    const re = splitForEdit(entry.restEnd);     setReDate(re.d);  setReTime(re.t)
-    setErr('')
-  }, [entry]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [pilot, setPilot]             = useState(entry.pilot || '')
+  const [crew, setCrew]               = useState<'S' | 'D'>(entry.crew || 'S')
+  const [showDate, setShowDate]       = useState(s.d)
+  const [showTime, setShowTime]       = useState(s.t)
+  const [relDate, setRelDate]         = useState(r.d)
+  const [relTime, setRelTime]         = useState(r.t)
+  const [dep, setDep]                 = useState(entry.dep || '')
+  const [arr, setArr]                 = useState(entry.arr || '')
+  const [offHobbs, setOffHobbs]       = useState(entry.offBlocks || '')
+  const [onHobbs, setOnHobbs]         = useState(entry.onBlocks || '')
+  const [rsDate, setRsDate]           = useState(rs.d)
+  const [rsTime, setRsTime]           = useState(rs.t)
+  const [reDate, setReDate]           = useState(re.d)
+  const [reTime, setReTime]           = useState(re.t)
+  const [reason, setReason]           = useState(entry.reason || '')
+  const [part91, setPart91]           = useState(!!entry.part91)
+  const [restDay, setRestDay]         = useState(!!entry.restDay)
+  const [restDayDate, setRestDayDate] = useState(rdDateInit)
+  const [restDayEnd, setRestDayEnd]   = useState(entry.restDayEnd || '')
+  const [err, setErr]                 = useState('')
 
   function handleSave() {
     setErr('')

@@ -57,12 +57,12 @@ export function parseHobbs(val: string | undefined | null): number | null {
   return isNaN(n) ? null : n
 }
 
-/** Flight time from Hobbs readings: (onHobbs - offHobbs) + 0.2 for taxi. */
+/** Flight time from Hobbs readings: onHobbs - offHobbs. */
 export function hobbsFlightTime(offHobbs: number | null, onHobbs: number | null): number | null {
   if (offHobbs === null || onHobbs === null) return null
   const diff = onHobbs - offHobbs
   if (diff < 0) return null
-  return diff + 0.2
+  return diff
 }
 
 export function compute(entry: Entry, all: Entry[], tz?: string): Computed {
@@ -280,7 +280,7 @@ export function exportCSV(entries: Entry[], tz?: string): void {
   a.click()
 }
 
-export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: number, tz?: string): string {
+export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: number, tz?: string, dark = false): string {
   const qStart = new Date(year, qIdx * 3, 1).getTime()
   const qEnd   = new Date(year, qIdx * 3 + 3, 1).getTime()
   const qLabel = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'][qIdx]
@@ -297,12 +297,11 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
   const part91Legs  = flightLegs.filter(e => e.part91)
   const restDays    = qEntries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd, tz), 0)
 
-  let totalFlight     = 0
-  let part135Flight   = 0
+  let totalFlight   = 0
+  let part135Flight = 0
   const violations: { date: string; pilot: string; type: string; detail: string }[] = []
   const exceedances: { date: string; pilot: string; route: string; over: string; reason: string; reqRest: number }[] = []
   let flightFailCount = 0, dutyFailCount = 0, restFailCount = 0
-  let flightOkCount = 0, dutyOkCount = 0, restOkCount = 0
 
   flightLegs.forEach(e => {
     const c = compute(e, entries, tz)
@@ -313,32 +312,44 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
     if (c.flightOk === false) {
       flightFailCount++
       violations.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` })
-    } else if (c.flightOk === true) flightOkCount++
-
+    }
     if (c.dutyOk === false) {
       dutyFailCount++
       violations.push({ date: fmtDT(e.showTime), pilot: e.pilot, type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
-    } else if (c.dutyOk === true) dutyOkCount++
-
+    }
     if (c.restOk === false) {
       restFailCount++
       violations.push({ date: fmtDT(e.restStart), pilot: e.pilot, type: 'Rest Deficient', detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` })
-    } else if (c.restOk === true) restOkCount++
-
+    }
     if (c.excAmt > 0)
       exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, route: `${(e.dep || '?').toUpperCase()}→${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest })
   })
 
-  // suppress unused var warnings
-  void flightOkCount; void dutyOkCount; void restOkCount
-
   const totalViolations = flightFailCount + dutyFailCount + restFailCount
-  const restMet  = restDays >= 13
+  const restMet   = restDays >= 13
   const overallOk = totalViolations === 0 && restMet
-  const statusColor = overallOk ? '#16a34a' : '#dc2626'
+
+  // Color palette — adapts to dark / light mode
+  const col = dark ? {
+    bg: '#0f172a', fg: '#e2e8f0', muted: '#94a3b8', border: '#334155',
+    surface: '#1e293b', blue: '#60a5fa',
+    greenBg: '#052e16', green: '#4ade80',
+    redBg:   '#450a0a', red:   '#f87171',
+    amberBg: '#431407', amber: '#fbbf24',
+    rowBorder: '#1e293b', printBtn: '#334155',
+  } : {
+    bg: '#ffffff', fg: '#1a1a2e', muted: '#666', border: '#e5e7eb',
+    surface: '#f8fafc', blue: '#2563eb',
+    greenBg: '#f0fdf4', green: '#16a34a',
+    redBg:   '#fef2f2', red:   '#dc2626',
+    amberBg: '#fffef0', amber: '#92400e',
+    rowBorder: '#f1f5f9', printBtn: '#1a1a2e',
+  }
+
+  const statusColor = overallOk ? col.green : col.red
   const statusText  = overallOk ? 'COMPLIANT' : 'REVIEW REQUIRED'
 
-  const flag = (c: boolean | null) => c === null ? '—' : c ? '✓' : '⚠'
+  const flag = (v: boolean | null) => v === null ? '—' : v ? '✓' : '⚠'
 
   const qFlightOk = part135Flight < 500
   const scRows = [
@@ -349,36 +360,87 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
     ['24-hr Rest Days (≥13/qtr)',          `${restDays} of 13 required`, restMet],
     ['Quarterly Flight Hours §135.267(a)', qFlightOk ? `${fmtHrs(part135Flight)} of 500h — OK` : `${fmtHrs(part135Flight)} — EXCEEDED`, qFlightOk],
   ].map(([req, result, ok]) => {
-    const bg  = ok === null ? '#f8fafc' : ok ? '#f0fdf4' : '#fef2f2'
-    const col = ok === null ? '#555'    : ok ? '#16a34a' : '#dc2626'
-    return `<tr style="background:${bg}"><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${req}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:${col}">${result}</td></tr>`
+    const rowBg  = ok === null ? col.surface : ok ? col.greenBg : col.redBg
+    const rowCol = ok === null ? col.muted   : ok ? col.green   : col.red
+    return `<tr style="background:${rowBg}"><td style="padding:8px 12px;border-bottom:1px solid ${col.border}">${req}</td><td style="padding:8px 12px;border-bottom:1px solid ${col.border};font-weight:700;color:${rowCol}">${result}</td></tr>`
   }).join('')
 
   const vRows = violations.length
-    ? violations.map(v => `<tr><td>${v.date}</td><td>${v.pilot || '—'}</td><td style="color:#dc2626;font-weight:600">${v.type}</td><td>${v.detail}</td></tr>`).join('')
-    : `<tr><td colspan="4" style="color:#16a34a;padding:10px">No violations recorded this quarter.</td></tr>`
+    ? violations.map(v => `<tr><td>${v.date}</td><td>${v.pilot || '—'}</td><td style="color:${col.red};font-weight:600">${v.type}</td><td>${v.detail}</td></tr>`).join('')
+    : `<tr><td colspan="4" style="color:${col.green};padding:10px">No violations recorded this quarter.</td></tr>`
 
   const exRows = exceedances.length
-    ? exceedances.map(x => `<tr><td>${x.date}</td><td>${x.pilot || '—'}</td><td>${x.route}</td><td style="color:#dc2626;font-weight:600">${x.over}</td><td>${x.reason}</td><td>${x.reqRest}h</td></tr>`).join('')
-    : `<tr><td colspan="6" style="color:#16a34a;padding:10px">No exceedances this quarter.</td></tr>`
+    ? exceedances.map(x => `<tr><td>${x.date}</td><td>${x.pilot || '—'}</td><td>${x.route}</td><td style="color:${col.red};font-weight:600">${x.over}</td><td>${x.reason}</td><td>${x.reqRest}h</td></tr>`).join('')
+    : `<tr><td colspan="6" style="color:${col.green};padding:10px">No exceedances this quarter.</td></tr>`
 
   const sorted = [...qEntries].sort((a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0))
 
+  // Helper: local calendar date string for an entry
+  function entryLocalDate(e: Entry): string {
+    if (!e.showTime) return ''
+    if (e.showTime.endsWith('Z') && tz) return utcToLocalParts(e.showTime, tz)?.date ?? e.showTime.slice(0, 10)
+    return e.showTime.split('T')[0] ?? ''
+  }
+
+  // Aggregate per-day totals for the summary view
+  type DaySummary = { p135: number; p91: number; pilots: Set<string>; hasViolation: boolean }
+  const dayMap = new Map<string, DaySummary>()
+  for (const e of qEntries) {
+    if (e.restDay) continue
+    const dk = entryLocalDate(e)
+    if (!dk) continue
+    if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, pilots: new Set(), hasViolation: false })
+    const d = dayMap.get(dk)!
+    if (e.pilot) d.pilots.add(e.pilot)
+    const ft = hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0
+    if (e.part91) {
+      d.p91 += ft
+    } else {
+      d.p135 += ft
+      const c = compute(e, entries, tz)
+      if (c.flightOk === false || c.dutyOk === false || c.restOk === false) d.hasViolation = true
+    }
+  }
+
+  // Daily summary rows — one row per calendar day for flight days, one per rest entry
+  const seenDates = new Set<string>()
+  const summaryRows = sorted.map(e => {
+    if (e.restDay) {
+      const startStr = e.showTime?.endsWith('Z') && tz
+        ? (utcToLocalParts(e.showTime, tz)?.date ?? e.showTime.slice(0, 10))
+        : (e.showTime ? e.showTime.split('T')[0] : '')
+      const endStr  = e.restDayEnd || startStr
+      const days    = countRestDaysInWindow(e, qStart, qEnd, tz)
+      const dateLabel = endStr && endStr !== startStr ? `${startStr} – ${endStr}` : startStr
+      const daysLabel = days > 1 ? ` (${days} days)` : ''
+      return `<tr style="background:${col.greenBg}"><td>${dateLabel}</td><td colspan="3" style="color:${col.green};font-weight:700">● REST DAY${days > 1 ? 'S' : ''}${daysLabel}</td></tr>`
+    }
+    const dk = entryLocalDate(e)
+    if (!dk || seenDates.has(dk)) return ''
+    seenDates.add(dk)
+    const d = dayMap.get(dk)
+    if (!d) return ''
+    const pilotsStr = [...d.pilots].join(', ') || '—'
+    const rowBg = d.hasViolation ? `background:${col.redBg}` : ''
+    return `<tr${rowBg ? ` style="${rowBg}"` : ''}><td>${dk}</td><td>${pilotsStr}</td><td>${d.p135 > 0 ? fmtHrs(d.p135) : '—'}</td><td style="color:${d.p91 > 0 ? col.amber : col.muted}">${d.p91 > 0 ? fmtHrs(d.p91) : '—'}</td></tr>`
+  }).filter(Boolean).join('')
+
+  // Full per-leg log rows
   const logRows = sorted.map(e => {
     if (e.restDay) {
       const startStr = e.showTime?.endsWith('Z') && tz
         ? (utcToLocalParts(e.showTime, tz)?.date ?? e.showTime.slice(0, 10))
         : (e.showTime ? e.showTime.split('T')[0] : '')
-      const endStr   = e.restDayEnd || startStr
-      const days     = countRestDaysInWindow(e, qStart, qEnd, tz)
-      const label    = endStr && endStr !== startStr
+      const endStr = e.restDayEnd || startStr
+      const days   = countRestDaysInWindow(e, qStart, qEnd, tz)
+      const label  = endStr && endStr !== startStr
         ? `● 24-HOUR REST DAYS: ${startStr} – ${endStr} (${days} days)`
         : `● 24-HOUR REST DAY`
-      return `<tr style="background:#f0fdf4"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:#16a34a;font-weight:600">${label}</td></tr>`
+      return `<tr style="background:${col.greenBg}"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:${col.green};font-weight:600">${label}</td></tr>`
     }
     const c = compute(e, entries, tz)
-    if (e.part91) return `<tr style="background:#fffef0"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:#92400e;font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
-    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?'#dc2626':'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?'#dc2626':'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?'#dc2626':'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
+    if (e.part91) return `<tr style="background:${col.amberBg}"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:${col.amber};font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
+    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?col.red:'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?col.red:'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?col.red:'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
   }).join('')
 
   const pilots    = [...new Set(flightLegs.map(e => e.pilot).filter(Boolean))].join(', ') || 'All Pilots'
@@ -389,37 +451,59 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
 <title>FAR 135.267 Quarterly Report — ${qLabel} ${year}</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; padding: 32px; font-size: 13px; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: ${col.bg}; color: ${col.fg}; padding: 32px; font-size: 13px; }
 h1 { font-size: 1.3rem; margin-bottom: 4px; }
-h2 { font-size: 0.95rem; margin: 24px 0 8px; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; }
-.meta { color: #666; font-size: 0.8rem; margin-bottom: 20px; }
-.status-banner { background: ${overallOk ? '#f0fdf4' : '#fef2f2'}; border: 2px solid ${statusColor}; border-radius: 8px; padding: 12px 18px; color: ${statusColor}; font-weight: 700; font-size: 1rem; margin-bottom: 20px; }
-.stat-box { background: #f8fafc; border-radius: 7px; padding: 12px 16px; display:inline-block; margin: 0 8px 8px 0; min-width:140px; }
-.stat-box .val { font-size: 1.5rem; font-weight: 700; color: #2563eb; }
-.stat-box .lbl { font-size: 0.75rem; color: #888; margin-top: 3px; }
+h2 { font-size: 0.95rem; margin: 24px 0 8px; border-bottom: 2px solid ${col.border}; padding-bottom: 5px; }
+.meta { color: ${col.muted}; font-size: 0.8rem; margin-bottom: 20px; }
+.status-banner { background: ${overallOk ? col.greenBg : col.redBg}; border: 2px solid ${statusColor}; border-radius: 8px; padding: 12px 18px; color: ${statusColor}; font-weight: 700; font-size: 1rem; margin-bottom: 20px; }
+.stat-box { background: ${col.surface}; border-radius: 7px; padding: 12px 16px; display:inline-block; margin: 0 8px 8px 0; min-width:140px; }
+.stat-box .val { font-size: 1.5rem; font-weight: 700; color: ${col.blue}; }
+.stat-box .lbl { font-size: 0.75rem; color: ${col.muted}; margin-top: 3px; }
 table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 8px; }
-th { background: #f8fafc; padding: 7px 10px; text-align: left; font-weight: 700; color: #555; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
-td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; white-space: nowrap; }
-.disclaimer { margin-top: 28px; font-size: 0.72rem; color: #aaa; border-top: 1px solid #e5e7eb; padding-top: 10px; }
-.print-btn { margin-bottom: 20px; padding: 8px 20px; background: #1a1a2e; color: white; border: none; border-radius: 7px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+th { background: ${col.surface}; padding: 7px 10px; text-align: left; font-weight: 700; color: ${col.muted}; border-bottom: 2px solid ${col.border}; white-space: nowrap; }
+td { padding: 7px 10px; border-bottom: 1px solid ${col.rowBorder}; vertical-align: middle; white-space: nowrap; }
+.disclaimer { margin-top: 28px; font-size: 0.72rem; color: ${col.muted}; border-top: 1px solid ${col.border}; padding-top: 10px; }
+.btn { margin-bottom: 12px; padding: 8px 20px; background: ${col.printBtn}; color: ${dark ? col.fg : 'white'}; border: none; border-radius: 7px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.btn-sec { background: #6b7280; color: white; margin-left: 8px; }
+.btn-tog { background: ${col.surface}; color: ${col.fg}; border: 1px solid ${col.border}; margin-left: 8px; }
 @media print { .no-print { display: none; } body { padding: 16px; } }
-</style></head><body>
-<button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
-<button class="print-btn no-print" onclick="window.close()" style="background:#6b7280;margin-left:8px">✕ Close</button>
+</style>
+<script>
+function toggleLog() {
+  var s = document.getElementById('summaryLog');
+  var f = document.getElementById('fullLog');
+  var b = document.getElementById('toggleBtn');
+  var showingFull = f.style.display !== 'none';
+  f.style.display = showingFull ? 'none' : '';
+  s.style.display = showingFull ? '' : 'none';
+  b.textContent = showingFull ? 'Show Full Log' : 'Show Summary';
+}
+</script>
+</head><body>
+<div class="no-print" style="margin-bottom:20px">
+  <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+  <button class="btn btn-sec" onclick="window.close()">✕ Close</button>
+  <button class="btn btn-tog" id="toggleBtn" onclick="toggleLog()">Show Full Log</button>
+</div>
 <h1>FAR 135.267 Quarterly Compliance Report</h1>
 <div class="meta">Period: <strong>${qLabel} ${year}</strong> &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
 <div class="status-banner">${overallOk ? '✓' : '⚠'} Overall Status: ${statusText}${!overallOk ? ` — ${totalViolations} violation(s) and/or rest day shortfall detected` : ''}</div>
 <div style="margin-bottom:20px">
-  <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs${part91Legs.length ? `<br><span style="color:#92400e">(+${part91Legs.length} Part 91)</span>` : ''}</div></div>
+  <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs${part91Legs.length ? `<br><span style="color:${col.amber}">(+${part91Legs.length} Part 91)</span>` : ''}</div></div>
   <div class="stat-box"><div class="val">${fmtHrs(totalFlight)}</div><div class="lbl">Total Flight Time</div></div>
-  <div class="stat-box"><div class="val" style="color:${restMet?'#16a34a':'#dc2626'}">${restDays} / 13</div><div class="lbl">24-hr Rest Days</div></div>
-  <div class="stat-box"><div class="val" style="color:${totalViolations===0?'#16a34a':'#dc2626'}">${totalViolations}</div><div class="lbl">Total Violations</div></div>
+  <div class="stat-box"><div class="val" style="color:${restMet?col.green:col.red}">${restDays} / 13</div><div class="lbl">24-hr Rest Days</div></div>
+  <div class="stat-box"><div class="val" style="color:${totalViolations===0?col.green:col.red}">${totalViolations}</div><div class="lbl">Total Violations</div></div>
 </div>
 <h2>Scorecard</h2><table><thead><tr><th>Requirement</th><th>Result</th></tr></thead><tbody>${scRows}</tbody></table>
 <h2>Violations Detail</h2><table><thead><tr><th>Date</th><th>Pilot</th><th>Type</th><th>Detail</th></tr></thead><tbody>${vRows}</tbody></table>
 <h2>Exceedances</h2><table><thead><tr><th>Date</th><th>Pilot</th><th>Route</th><th>Over Limit</th><th>Reason</th><th>Req Rest</th></tr></thead><tbody>${exRows}</tbody></table>
-<h2>Full Flight Log</h2>
+<h2>Flight Log</h2>
+<div id="summaryLog">
+<table><thead><tr><th>Date</th><th>Pilot(s)</th><th>Part 135 Time</th><th>Part 91 Time</th></tr></thead><tbody>${summaryRows}</tbody></table>
+</div>
+<div id="fullLog" style="display:none">
 <table><thead><tr><th>Show Time</th><th>Pilot</th><th>Crew</th><th>Route</th><th>Off Blocks</th><th>On Blocks</th><th>Leg Time</th><th>Rolling 24-hr</th><th>Flt✓</th><th>Duty</th><th>Duty✓</th><th>Rest After</th><th>Rest✓</th><th>Exc</th></tr></thead><tbody>${logRows}</tbody></table>
+</div>
 <div class="disclaimer">This report is for reference and record-keeping only. Always verify compliance with your OpSpec, POI, and company manual. Generated by FAR 135.267 Duty &amp; Flight Time Tracker.</div>
 </body></html>`
 }

@@ -56,7 +56,7 @@ export default function App() {
       <div className="max-w-screen-2xl mx-auto p-5 space-y-5">
         <RegNote />
         <Dashboard entries={entries} tz={tz} />
-        <AddEntryForm entries={entries} onAdd={updateEntries} tz={tz} />
+        <AddEntryForm entries={entries} onAdd={updateEntries} tz={tz} dark={dark} />
         <FlightLog
           entries={entries}
           tz={tz}
@@ -74,6 +74,7 @@ export default function App() {
 
       {editingEntry && (
         <EditModal
+          key={editingEntry.id}
           entry={editingEntry}
           tz={tz}
           onSave={updated => {
