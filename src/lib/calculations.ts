@@ -459,7 +459,7 @@ h2 { font-size: 0.95rem; margin: 24px 0 8px; border-bottom: 2px solid ${col.bord
 .stat-box { background: ${col.surface}; border-radius: 7px; padding: 12px 16px; display:inline-block; margin: 0 8px 8px 0; width:148px; vertical-align:top; }
 .stat-box .val { font-size: 1.5rem; font-weight: 700; color: ${col.blue}; }
 .stat-box .lbl { font-size: 0.75rem; color: ${col.muted}; margin-top: 3px; }
-.stat-box .sub { font-size: 0.68rem; margin-top: 2px; min-height: 1em; }
+.stat-box .sub { font-size: 0.68rem; line-height: 1; margin-top: 2px; min-height: 1em; }
 table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 8px; }
 th { background: ${col.surface}; padding: 7px 10px; text-align: left; font-weight: 700; color: ${col.muted}; border-bottom: 2px solid ${col.border}; white-space: nowrap; }
 td { padding: 7px 10px; border-bottom: 1px solid ${col.rowBorder}; vertical-align: middle; white-space: nowrap; }
