@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-18
+
+### Fixed
+- **Next Legal Duty tile now auto-updates** — the tile previously froze at page-load time and would not flip to "Legal" until the browser was refreshed; it now recalculates every 60 seconds
+- **Edit modal loads correct entry** — switched from a `useEffect`-based state reset to React's `key`-based remount pattern, eliminating a lint warning and ensuring the modal always reflects the selected entry
+
+### Changed
+- **Hobbs flight time is now exact** — removed the 0.2-hour taxi allowance from Hobbs calculations; flight time is now `onHobbs − offHobbs` with no addition
+- **Quarterly report honors dark/light mode** — the generated report now matches the app's current theme
+- **Quarterly report flight log defaults to daily summary** — shows total Part 135 and Part 91 hours per day (and rest day markers) instead of a full per-leg table; a "Show Full Log" button reveals the detailed view
+
 ## 2026-05-16
 
 ### Added
