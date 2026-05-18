@@ -5,6 +5,7 @@
 ### Fixed
 - **Part 91 row contrast in dark mode** — "Excluded (Part 91)" text, the Part 91 badge, row background, and N/A exceedance badge now use dark-mode-aware colors (`amber-400`, `amber-950`) so they're legible on the dark slate background
 - **Dashboard tiles uniform height** — "Next Legal Duty" subtitle shortened so it fits on one line at 3-column width (iPad mini portrait); all six tiles in both rows now render at the same height
+- **Quick Reference tile updated** — removed outdated "+ 0.2 taxi time" language from the "How to Use This Tool" section; flight time description now correctly reads `On Hobbs − Off Hobbs`
 
 
 

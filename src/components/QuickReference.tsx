@@ -23,7 +23,7 @@ const sections = [
   },
   {
     title: 'How to Use This Tool',
-    body: 'Enter one row per flight leg. Off Blocks and On Blocks are Hobbs meter readings (5 digits + 1 decimal, e.g. 12345.6). Flight time is calculated as (On Hobbs − Off Hobbs) + 0.2, where the 0.2 accounts for taxi time. For a multi-leg day, Show Time and Release Time are the same across legs; Hobbs readings change each leg. Rest fields only need to be filled on the last leg of the day. Mark 24-hr rest days with the checkbox (no flight fields needed).',
+    body: 'Enter one row per flight leg. Off Blocks and On Blocks are Hobbs meter readings (5 digits + 1 decimal, e.g. 12345.6). Flight time is calculated as On Hobbs − Off Hobbs. For a multi-leg day, Show Time and Release Time are the same across legs; Hobbs readings change each leg. Rest fields only need to be filled on the last leg of the day. Mark 24-hr rest days with the checkbox (no flight fields needed).',
   },
 ]
 
