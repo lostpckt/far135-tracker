@@ -2,6 +2,12 @@
 
 ## 2026-05-18
 
+### Fixed
+- **Part 91 row contrast in dark mode** — "Excluded (Part 91)" text, the Part 91 badge, row background, and N/A exceedance badge now use dark-mode-aware colors (`amber-400`, `amber-950`) so they're legible on the dark slate background
+- **Dashboard tiles uniform height** — "Next Legal Duty" subtitle shortened so it fits on one line at 3-column width (iPad mini portrait); all six tiles in both rows now render at the same height
+
+
+
 ### Changed
 - **Quarterly report stat boxes are now uniform** — all four boxes share identical fixed width and height; the Part 91 leg count moves to a dedicated sub-line with `line-height: 1` so filled and empty sub-lines render at the same pixel height
 

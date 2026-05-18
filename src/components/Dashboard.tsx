@@ -25,7 +25,7 @@ function StatCard({
   }[color]
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardContent className="pt-4 pb-3 px-4">
         <p className="text-[0.7rem] text-muted-foreground uppercase tracking-wide mb-1.5">{label}</p>
         <p className={`text-2xl font-bold leading-none ${valueClass}`}>{value}</p>
@@ -83,14 +83,14 @@ export default function Dashboard({ entries, tz }: Props) {
 
     if (nowMs >= legalMs) {
       nextDutyValue = 'Legal'
-      nextDutySub   = `Since ${localDate} ${localTime} ${abbr} · ${lastCalc.reqRest}h required`
+      nextDutySub   = `Since ${localDate} ${localTime} ${abbr}`
       nextDutyColor = 'green'
     } else {
       const remMs  = legalMs - nowMs
       const remHrs = Math.floor(remMs / 3600000)
       const remMin = Math.floor((remMs % 3600000) / 60000)
       nextDutyValue = `${localDate} ${localTime}`
-      nextDutySub   = `${abbr} · ${utcStr} · in ${remHrs}h ${String(remMin).padStart(2, '0')}m · ${lastCalc.reqRest}h req`
+      nextDutySub   = `${utcStr} · in ${remHrs}h ${String(remMin).padStart(2, '0')}m`
       nextDutyColor = remMs < 3600000 ? 'amber' : 'red'
     }
   }

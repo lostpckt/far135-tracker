@@ -82,11 +82,11 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                   ? <Badge className="bg-red-50 text-red-700 text-[0.68rem]">{fmtHrs(c.excAmt)}</Badge>
                   : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
                 const p91Badge = e.part91
-                  ? <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-[0.68rem] ml-1">Part 91</Badge>
+                  ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>
                   : null
 
                 return (
-                  <tr key={e.id} className={e.part91 ? 'bg-amber-50/40' : 'hover:bg-slate-50'}>
+                  <tr key={e.id} className={e.part91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{fmtDT(e.showTime)}</td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.releaseTime ? fmtDT(e.releaseTime) : <span className="text-slate-400">—</span>}</td>
                     <td className="px-3 py-2 border-b border-slate-100 font-semibold whitespace-nowrap">{e.pilot || '—'}</td>
@@ -101,7 +101,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                     <td className="px-3 py-2 border-b border-slate-100 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                       {e.part91
-                        ? <span className="text-amber-700 text-[0.7rem]">Excluded (Part 91)</span>
+                        ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
                         : <><span className="font-semibold">{c.rolling24 !== null ? fmtHrs(c.rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {c.maxFlight}h</span></>
                       }
                     </td>
@@ -121,7 +121,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                       {!e.part91 && <span className="text-[0.68rem] text-slate-400">Req: {c.reqRest}h</span>}
                     </td>
                     <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" /></td>
-                    <td className="px-3 py-2 border-b border-slate-100">{e.part91 ? <Badge className="bg-slate-100 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
+                    <td className="px-3 py-2 border-b border-slate-100">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.reason || '—'}</td>
                     <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                       <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 rounded p-1 mr-0.5"><Pencil size={13} /></button>
