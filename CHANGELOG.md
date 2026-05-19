@@ -2,6 +2,9 @@
 
 ## 2026-05-19
 
+### Fixed
+- **Date/time field height mismatch** — time inputs now render at the same height as their paired date inputs
+
 ### Changed
 - **Show Time date defaults to today** — the date field in the Add Entry form now pre-fills with today's local date instead of being blank
 - **Native time picker on all time fields** — Show Time, Release Time, Rest Start, and Rest End now use `type="time"` in both the Add Entry form and Edit modal, bringing up the OS scroll-wheel/clock picker on mobile instead of the keyboard

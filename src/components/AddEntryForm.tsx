@@ -213,7 +213,7 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
               <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr})</Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
+                <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
               </div>
               <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
               <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
@@ -223,7 +223,7 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
               <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr})</Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
+                <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
               </div>
               <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
               <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr)</span>
@@ -257,7 +257,7 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
               <Label className="text-xs font-semibold text-slate-500">Rest Start ({abbr})</Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={rsTime} onChange={e => setRsTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
+                <Input type="time" value={rsTime} onChange={e => setRsTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
               </div>
               <UtcPreview dateStr={rsDate} timeStr={rsTime} tz={tz} />
               <span className="text-[0.68rem] text-slate-400">When rest began after release (24-hr)</span>
@@ -267,7 +267,7 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
               <Label className="text-xs font-semibold text-slate-500">Rest End ({abbr})</Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={reDate} onChange={e => setReDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={reTime} onChange={e => setReTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
+                <Input type="time" value={reTime} onChange={e => setReTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
               </div>
               <UtcPreview dateStr={reDate} timeStr={reTime} tz={tz} />
             </div>
