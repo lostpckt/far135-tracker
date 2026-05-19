@@ -80,6 +80,14 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
       >
         {checkLabel}
       </button>
+      <a
+        href="https://buymeacoffee.com/lostpckt"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hidden lg:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 shrink-0 whitespace-nowrap"
+      >
+        ☕ Buy me a coffee
+      </a>
 
       {/* Mobile: overflow menu */}
       <div className="relative lg:hidden shrink-0" ref={menuRef}>
@@ -107,6 +115,15 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
             >
               {checkLabel}
             </button>
+            <a
+              href="https://buymeacoffee.com/lostpckt"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-left px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              onClick={() => setMenuOpen(false)}
+            >
+              ☕ Buy me a coffee
+            </a>
           </div>
         )}
       </div>
