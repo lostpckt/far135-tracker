@@ -11,6 +11,7 @@ import FlightLog from '@/components/FlightLog'
 import EditModal from '@/components/EditModal'
 import QuickReference from '@/components/QuickReference'
 import UpdateBanner from '@/components/UpdateBanner'
+import InstallBanner from '@/components/InstallBanner'
 import TzMigrationDialog from '@/components/TzMigrationDialog'
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950">
       <Header dark={dark} onToggleDark={() => setDark(d => !d)} tz={tz} onTzChange={handleTzChange} />
       <div className="max-w-screen-2xl mx-auto p-5 space-y-5">
+        <InstallBanner />
         <RegNote />
         <Dashboard entries={entries} tz={tz} />
         <AddEntryForm entries={entries} onAdd={updateEntries} tz={tz} dark={dark} />

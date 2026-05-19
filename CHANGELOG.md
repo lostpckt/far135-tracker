@@ -2,6 +2,9 @@
 
 ## 2026-05-19
 
+### Added
+- **Install banner** — users viewing the app in a browser (mobile or desktop) see a one-time dismissible prompt with platform-specific instructions for adding the app to their home screen; hidden automatically when already running as an installed PWA
+
 ### Fixed
 - **Date/time field height mismatch** — time inputs now render at the same height as their paired date inputs
 
