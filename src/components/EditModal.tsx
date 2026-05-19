@@ -24,10 +24,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function DTField({ label, date, time, onDate, onTime, placeholder = '00:00', tz }: {
+function DTField({ label, date, time, onDate, onTime, tz }: {
   label: string; date: string; time: string
   onDate: (v: string) => void; onTime: (v: string) => void
-  placeholder?: string; tz: string
+  tz: string
 }) {
   const utc = localToUtcIso(date, time, tz)
   return (
@@ -35,7 +35,7 @@ function DTField({ label, date, time, onDate, onTime, placeholder = '00:00', tz 
       <Label className="text-xs font-semibold text-slate-500">{label}</Label>
       <div className="flex gap-1.5">
         <Input type="date" value={date} onChange={e => onDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-        <Input value={time} onChange={e => onTime(e.target.value)} placeholder={placeholder} maxLength={5} className="text-sm h-8 flex-1 min-w-0" />
+        <Input type="time" value={time} onChange={e => onTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0" />
       </div>
       {utc && <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>}
     </div>
@@ -170,8 +170,8 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
 
           {!restDay && <>
             <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
-            <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} placeholder="14:30" tz={tz} />
-            <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  placeholder="22:15" tz={tz} />
+            <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} />
+            <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} />
 
             <SectionLabel>Flight Leg</SectionLabel>
             <div className="flex flex-col gap-1">
@@ -192,8 +192,8 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
             </div>
 
             <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
-            <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} placeholder="23:00" tz={tz} />
-            <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} placeholder="09:00" tz={tz} />
+            <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} tz={tz} />
+            <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} tz={tz} />
 
             <SectionLabel>Other</SectionLabel>
             <div className="flex flex-col gap-1">
