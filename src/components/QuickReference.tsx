@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const sections = [
@@ -28,21 +30,39 @@ const sections = [
 ]
 
 export default function QuickReference() {
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('far135_qr_collapsed') !== 'false'
+  )
+
+  function toggle() {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem('far135_qr_collapsed', String(next))
+  }
+
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-bold">§135.267 Quick Reference</CardTitle>
+      <CardHeader className="pb-2 cursor-pointer select-none" onClick={toggle}>
+        <CardTitle className="text-sm font-bold flex items-center justify-between">
+          §135.267 Quick Reference
+          <ChevronDown
+            size={16}
+            className={`text-slate-400 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`}
+          />
+        </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3.5">
-          {sections.map(s => (
-            <div key={s.title} className="bg-slate-50 dark:bg-slate-800 rounded-lg px-3.5 py-3 border-l-[3px] border-blue-500">
-              <h3 className="text-[0.8rem] font-bold text-slate-800 dark:text-slate-100 mb-1">{s.title}</h3>
-              <p className="text-[0.78rem] text-slate-500 dark:text-slate-400 leading-relaxed">{s.body}</p>
-            </div>
-          ))}
-        </div>
-      </CardContent>
+      {!collapsed && (
+        <CardContent>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3.5">
+            {sections.map(s => (
+              <div key={s.title} className="bg-slate-50 dark:bg-slate-800 rounded-lg px-3.5 py-3 border-l-[3px] border-blue-500">
+                <h3 className="text-[0.8rem] font-bold text-slate-800 dark:text-slate-100 mb-1">{s.title}</h3>
+                <p className="text-[0.78rem] text-slate-500 dark:text-slate-400 leading-relaxed">{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      )}
     </Card>
   )
 }
