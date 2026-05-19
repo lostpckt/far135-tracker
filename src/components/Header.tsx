@@ -69,20 +69,20 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
 
       {/* Desktop: inline buttons */}
       <ChangelogModal>
-        <button className="hidden sm:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 shrink-0">
+        <button className="hidden lg:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 shrink-0">
           What's new
         </button>
       </ChangelogModal>
       <button
         onClick={checkForUpdate}
         disabled={checking}
-        className="hidden sm:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 disabled:cursor-wait w-[118px] text-center shrink-0"
+        className="hidden lg:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 disabled:cursor-wait w-[118px] text-center shrink-0"
       >
         {checkLabel}
       </button>
 
       {/* Mobile: overflow menu */}
-      <div className="relative sm:hidden shrink-0" ref={menuRef}>
+      <div className="relative lg:hidden shrink-0" ref={menuRef}>
         <button
           onClick={() => setMenuOpen(o => !o)}
           className="p-2 rounded-lg hover:bg-slate-700 transition-colors opacity-50 hover:opacity-100"
