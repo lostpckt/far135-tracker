@@ -61,7 +61,7 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
       <button
         onClick={checkForUpdate}
         disabled={checking}
-        className="text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 disabled:cursor-wait"
+        className="text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 disabled:cursor-wait w-[118px] text-center shrink-0"
       >
         {checking ? 'Checking…' : checked ? 'Up to date' : 'Check for update'}
       </button>
