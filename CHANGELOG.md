@@ -8,6 +8,7 @@
 - **Install banner** — users viewing the app in a browser (mobile or desktop) see a one-time dismissible prompt with platform-specific instructions for adding the app to their home screen; hidden automatically when already running as an installed PWA
 
 ### Fixed
+- **Last Rolling 24-hr tile clears when window expires** — the tile now shows `—` with "Window cleared" once more than 24 hours have passed since the last release time, rather than showing a stale accumulated total that no longer has regulatory significance
 - **Date/time field height mismatch** — time inputs now render at the same height as their paired date inputs
 
 ### Changed

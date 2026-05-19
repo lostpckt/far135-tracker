@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { compute, fmtHrs, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
+import { compute, fmtHrs, ms, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
 import { utcToLocalParts, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -56,6 +56,9 @@ export default function Dashboard({ entries, tz }: Props) {
   const lastEntry = nonRestEntries.length ? nonRestEntries[nonRestEntries.length - 1] : null
   const lastCalc  = lastEntry ? compute(lastEntry, entries, tz) : null
 
+  const lastAnchorMs = lastEntry ? (ms(lastEntry.releaseTime) ?? ms(lastEntry.showTime)) : null
+  const rollingWindowActive = lastAnchorMs !== null && (now.getTime() - lastAnchorMs) <= 86400000
+
   const allWarnings = entries.filter(e => {
     if (e.restDay) return false
     const c = compute(e, entries, tz)
@@ -104,9 +107,9 @@ export default function Dashboard({ entries, tz }: Props) {
     },
     {
       label: 'Last Rolling 24-hr',
-      value: lastCalc ? fmtHrs(lastCalc.rolling24) : '—',
-      sub:   lastCalc ? `Limit: ${lastCalc.maxFlight}h` : 'No entries yet',
-      color: !lastCalc ? 'blue' : lastCalc.flightOk === false ? 'red' : 'green',
+      value: !lastCalc || !rollingWindowActive ? '—' : fmtHrs(lastCalc.rolling24),
+      sub:   !lastCalc ? 'No entries yet' : !rollingWindowActive ? 'Window cleared' : `Limit: ${lastCalc.maxFlight}h`,
+      color: !lastCalc || !rollingWindowActive ? 'blue' : lastCalc.flightOk === false ? 'red' : 'green',
     },
     {
       label: 'Last Duty Period',
