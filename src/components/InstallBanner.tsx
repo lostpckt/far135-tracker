@@ -39,7 +39,7 @@ export default function InstallBanner() {
           <strong>Add to Home Screen:</strong> Tap the <strong>menu (⋮)</strong> in Chrome, then select <strong>Add to Home Screen</strong> or <strong>Install app</strong> for the best experience.
         </>}
         {os === 'desktop' && <>
-          <strong>Designed for mobile.</strong> Open <strong>{window.location.host}</strong> in Safari (iPhone) or Chrome (Android) and add it to your home screen for the best experience.
+          <strong>Designed for mobile.</strong> Open <strong>{window.location.host + window.location.pathname}</strong> in Safari (iPhone) or Chrome (Android) and add it to your home screen for the best experience.
         </>}
       </p>
       <button
