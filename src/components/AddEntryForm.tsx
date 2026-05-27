@@ -244,7 +244,10 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
               ))}
               <button
                 type="button"
-                onClick={() => setLegs([...legs, emptyLeg()])}
+                onClick={() => {
+                  const prev = legs[legs.length - 1]
+                  setLegs([...legs, { ...emptyLeg(), dep: prev?.arr ?? '', offHobbs: prev?.onHobbs ?? '' }])
+                }}
                 className="w-full border border-dashed border-blue-300 bg-blue-50 hover:bg-blue-600 hover:text-white hover:border-solid text-blue-600 text-sm font-semibold rounded-lg py-2 mt-1 transition-colors"
               >
                 + Add Another Leg
