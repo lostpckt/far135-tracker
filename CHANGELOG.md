@@ -4,6 +4,7 @@
 
 ### Added
 - **Month-grouped collapsible flight log** — entries are grouped by calendar month with a tappable header row showing the month name and a leg/rest-day count. Tap a header to collapse or expand that month. Previous months collapse automatically on first load; the current month stays expanded. Per-month preferences are persisted to `localStorage` (`far135_collapsed_months`) and correctly handle new historical months, timezone changes, and PWA cached bundles crossing a month boundary.
+- **Localized placeholder airports** — Dep/Arr ICAO placeholders updated to KSJC/KSNA
 - **Carry-forward on multi-leg days** — when tapping "+ Add Another Leg", the new leg's Dep ICAO is pre-filled with the preceding leg's Arr ICAO, and Off Blocks (Hobbs) is pre-filled with the preceding leg's On Blocks value.
 
 ## 2026-05-19

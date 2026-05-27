@@ -36,7 +36,7 @@ export default function LegRow({ index, data, onChange, onRemove, showRemove }: 
           <Input
             value={data.dep}
             onChange={e => set('dep', e.target.value.toUpperCase())}
-            placeholder="KBOS"
+            placeholder="KSJC"
             maxLength={4}
             className="w-[68px] uppercase text-sm h-8"
           />
@@ -47,7 +47,7 @@ export default function LegRow({ index, data, onChange, onRemove, showRemove }: 
           <Input
             value={data.arr}
             onChange={e => set('arr', e.target.value.toUpperCase())}
-            placeholder="KJFK"
+            placeholder="KSNA"
             maxLength={4}
             className="w-[68px] uppercase text-sm h-8"
           />
