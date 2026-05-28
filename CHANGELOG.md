@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-05-27
+
+### Fixed
+- **Multi-month rest periods now create a group for each spanned month** — a 24-hr rest entry whose end date (`restDayEnd`) falls in a later month now appears in every month group it covers, so months with no other entries are no longer invisible in the flight log.
+
 ## 2026-05-26
 
 ### Added

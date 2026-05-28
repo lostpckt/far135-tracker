@@ -92,6 +92,30 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
     else groups.push({ key, entries: [e] })
   }
 
+  // Rest day entries with restDayEnd spanning into later months must appear in
+  // each spanned month group so those months are visible in the log.
+  for (const e of sorted) {
+    if (!e.restDay || !e.restDayEnd) continue
+    const startKey = entryMonthKey(e, tz)
+    const endKey = e.restDayEnd.slice(0, 7)
+    if (endKey <= startKey) continue
+    let [year, month] = startKey.split('-').map(Number)
+    while (true) {
+      month++
+      if (month > 12) { month = 1; year++ }
+      const key = `${year}-${String(month).padStart(2, '0')}`
+      if (key > endKey) break
+      const existing = groups.find(g => g.key === key)
+      if (existing) {
+        if (!existing.entries.includes(e)) existing.entries.unshift(e)
+      } else {
+        const insertIdx = groups.findIndex(g => g.key > key)
+        if (insertIdx === -1) groups.push({ key, entries: [e] })
+        else groups.splice(insertIdx, 0, { key, entries: [e] })
+      }
+    }
+  }
+
   // Stable ref so the tz-change effect always sees the latest groups
   const groupsRef = useRef(groups)
   groupsRef.current = groups
