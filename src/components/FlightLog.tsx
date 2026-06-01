@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { compute, fmtDT, fmtHrs } from '@/lib/calculations'
 import { utcToLocalParts } from '@/lib/timezone'
@@ -75,9 +76,10 @@ function monthLabel(key: string): string {
   return new Date(key + '-02T12:00:00').toLocaleString('en-US', { month: 'long', year: 'numeric' })
 }
 
-const COLS = 18
+const COLS = 17
 
 export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
+  const [exceedanceReason, setExceedanceReason] = useState<string | null>(null)
   const sorted = [...entries].sort((a, b) => {
     const aMs = a.showTime ? new Date(a.showTime).getTime() : 0
     const bMs = b.showTime ? new Date(b.showTime).getTime() : 0
@@ -164,7 +166,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50">
-                {['Show Time','Release Time','Pilot','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance','Reason',''].map(h => (
+                {['Show Time','Release Time','Pilot','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance',''].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 border-b-2 border-slate-200 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -208,8 +210,8 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                         <tr key={e.id} className="bg-green-50 dark:bg-green-950">
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{localDateFmt}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">—</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold">{e.pilot || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={14}>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{e.pilot || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={13}>
                             {e.restDayEnd && e.restDayEnd !== localDate
                               ? `🟢 24-HOUR REST DAYS: ${localDate} – ${e.restDayEnd}`
                               : '🟢 24-HOUR REST DAY — No flight duty'}
@@ -224,7 +226,11 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
 
                     const c = compute(e, entries, tz)
                     const excBadge = c.excAmt > 0
-                      ? <Badge className="bg-red-50 text-red-700 text-[0.68rem]">{fmtHrs(c.excAmt)}</Badge>
+                      ? (
+                        <button onClick={() => setExceedanceReason(e.reason || '(no reason recorded)')}>
+                          <Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(c.excAmt)}</Badge>
+                        </button>
+                      )
                       : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
                     const p91Badge = e.part91
                       ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>
@@ -267,7 +273,6 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                         </td>
                         <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" /></td>
                         <td className="px-3 py-2 border-b border-slate-100">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.reason || '—'}</td>
                         <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                           <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 rounded p-1 mr-0.5"><Pencil size={13} /></button>
                           <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 rounded p-1"><X size={13} /></button>
@@ -281,6 +286,16 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
           </table>
         </div>
       </CardContent>
+
+      <Dialog open={exceedanceReason !== null} onOpenChange={open => { if (!open) setExceedanceReason(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Exceedance Reason</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-700 dark:text-slate-300 py-2">{exceedanceReason}</p>
+          <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-01
+
+### Changed
+- **Removed "Reason" column from flight log** — exceedance reasons are no longer shown inline. Tap a red exceedance badge to open a popover with the reason text instead.
+
+### Fixed
+- **Pilot column no longer wraps on rest-day rows** when an adjacent month group is collapsed.
+
 ## 2026-05-27
 
 ### Fixed
