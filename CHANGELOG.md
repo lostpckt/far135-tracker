@@ -4,7 +4,7 @@
 
 ### Fixed
 - **CSV export now includes rest day end date** — a new `Rest Day End` column (YYYY-MM-DD) is added to the exported CSV. For 24-hr rest day rows the column contains the end date (`restDayEnd`, or the same date as the start for single-day rests). Flight leg rows have a blank value. This makes rest periods importable by the Swift app.
-- **Rest day Show Time now exports with Z suffix** — rest day entries were stored as `YYYY-MM-DDTHH:MM` (no `Z`) internally but represent UTC midnight; the CSV export now appends `Z` so all timestamps in the file are consistently Zulu.
+- **Rest day timestamps in CSV now use consistent ISO 8601 UTC format** — `Show Time` is the local midnight UTC of the rest day start; `Rest Day End` is the local midnight UTC of the following day (exclusive interval end), e.g. a May 6 PDT rest exports as `2026-05-06T07:00Z` → `2026-05-07T07:00Z`. Eliminates apparent overlap with flights that crossed UTC midnight and makes rest entries importable by the Swift app.
 
 ## 2026-06-01
 

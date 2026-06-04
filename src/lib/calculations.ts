@@ -250,9 +250,12 @@ export function exportCSV(entries: Entry[], tz?: string): void {
     if (e.restDay) {
       const startDate  = e.showTime ? e.showTime.split('T')[0] : ''
       const endDate    = e.restDayEnd || startDate
-      const showTimeZ  = e.showTime ? (e.showTime.endsWith('Z') ? e.showTime : e.showTime + 'Z') : ''
+      // Exclusive end = midnight of the day after the last rest day (e.g. May 6 rest → end is May 7 00:00 local)
+      const endNextDay = endDate ? new Date(new Date(endDate + 'T12:00Z').getTime() + 86400000).toISOString().slice(0, 10) : ''
+      const showTimeZ  = startDate  && tz ? localToUtcIso(startDate,  '00:00', tz) : (startDate  ? startDate  + 'T00:00Z' : '')
+      const endDateZ   = endNextDay && tz ? localToUtcIso(endNextDay, '00:00', tz) : (endNextDay ? endNextDay + 'T00:00Z' : '')
       return [q(showTimeZ), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
-        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', q('Yes'), q(endDate)].join(',')
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', q('Yes'), q(endDateZ)].join(',')
     }
     const c = compute(e, entries, tz)
     return [
