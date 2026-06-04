@@ -248,9 +248,10 @@ export function exportCSV(entries: Entry[], tz?: string): void {
 
   const rows = entries.map(e => {
     if (e.restDay) {
-      const startDate = e.showTime ? e.showTime.split('T')[0] : ''
-      const endDate   = e.restDayEnd || startDate
-      return [q(e.showTime), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
+      const startDate  = e.showTime ? e.showTime.split('T')[0] : ''
+      const endDate    = e.restDayEnd || startDate
+      const showTimeZ  = e.showTime ? (e.showTime.endsWith('Z') ? e.showTime : e.showTime + 'Z') : ''
+      return [q(showTimeZ), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
         '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', q('Yes'), q(endDate)].join(',')
     }
     const c = compute(e, entries, tz)
