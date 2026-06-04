@@ -241,15 +241,17 @@ export function exportCSV(entries: Entry[], tz?: string): void {
     'Off Blocks', 'On Blocks', 'Leg Flight (h)', 'Rolling 24-hr (h)',
     'Max Allowed (h)', 'Flight Time OK', 'Duty Period (h)', 'Duty OK',
     '10-hr Lookback OK', 'Consecutive Rest (h)', 'Required Rest (h)',
-    'Rest OK', 'Exceedance (h)', 'Exceedance Reason', '24-hr Rest Day',
+    'Rest OK', 'Exceedance (h)', 'Exceedance Reason', '24-hr Rest Day', 'Rest Day End',
   ].join(',')
 
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
 
   const rows = entries.map(e => {
     if (e.restDay) {
+      const startDate = e.showTime ? e.showTime.split('T')[0] : ''
+      const endDate   = e.restDayEnd || startDate
       return [q(e.showTime), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
-        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', q('Yes')].join(',')
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', q('Yes'), q(endDate)].join(',')
     }
     const c = compute(e, entries, tz)
     return [
@@ -269,6 +271,7 @@ export function exportCSV(entries: Entry[], tz?: string): void {
       q(c.excAmt.toFixed(2)),
       q(e.reason || ''),
       q('No'),
+      q(''),
     ].join(',')
   })
 

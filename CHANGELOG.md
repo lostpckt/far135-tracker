@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-03
+
+### Fixed
+- **CSV export now includes rest day end date** — a new `Rest Day End` column (YYYY-MM-DD) is added to the exported CSV. For 24-hr rest day rows the column contains the end date (`restDayEnd`, or the same date as the start for single-day rests). Flight leg rows have a blank value. This makes rest periods importable by the Swift app.
+
 ## 2026-06-01
 
 ### Changed
