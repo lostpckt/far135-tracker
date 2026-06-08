@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-07
+
+### Changed
+- Gitignore `_reference/` directory (local iOS handoff spec, not part of the web app)
+
 ## 2026-06-03
 
 ### Fixed
