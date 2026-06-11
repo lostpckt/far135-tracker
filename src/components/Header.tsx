@@ -128,13 +128,22 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
         )}
       </div>
 
-      <button
+      <div
         onClick={onToggleDark}
-        className="p-2 rounded-lg hover:bg-slate-700 transition-colors shrink-0"
+        className="flex items-center gap-1 border border-slate-600 rounded-full px-2 py-1.5 cursor-pointer hover:bg-slate-700 transition-colors shrink-0"
         title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
       >
-        {dark ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
+        <Sun
+          size={15}
+          className="transition-colors"
+          style={{ color: !dark ? '#f59e0b' : '#64748b' }}
+        />
+        <Moon
+          size={15}
+          className="transition-colors"
+          style={{ color: dark ? '#f1f5f9' : '#64748b' }}
+        />
+      </div>
     </header>
   )
 }

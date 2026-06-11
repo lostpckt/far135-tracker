@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-11
+
+### Changed
+- **Theme toggle now shows both sun and moon icons** — active mode is highlighted (amber for light, cream-white for dark) so the current state is always visible at a glance.
+
 ## 2026-06-07
 
 ### Changed
