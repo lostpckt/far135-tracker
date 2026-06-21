@@ -92,6 +92,10 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
     } else {
       const offN = parseHobbs(offHobbs)
       const onN  = parseHobbs(onHobbs)
+      if (!dep.trim()) { setErr('Departure ICAO is required.'); return }
+      if (!arr.trim()) { setErr('Arrival ICAO is required.'); return }
+      if (!dep.trim()) { setErr('Departure ICAO is required.'); return }
+      if (!arr.trim()) { setErr('Arrival ICAO is required.'); return }
       if (offN === null || onN === null) { setErr('Off Blocks and On Blocks Hobbs readings are required.'); return }
       if (onN <= offN) { setErr('On Blocks Hobbs must be greater than Off Blocks Hobbs.'); return }
       const show    = localToUtcIso(showDate, showTime, tz)

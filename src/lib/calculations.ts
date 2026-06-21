@@ -352,6 +352,15 @@ export function importCSV(text: string): Entry[] | { error: string } {
     const dashIdx   = routeVal.indexOf('-')
     const dep       = dashIdx !== -1 ? routeVal.slice(0, dashIdx) : routeVal
     const arr       = dashIdx !== -1 ? routeVal.slice(dashIdx + 1) : ''
+    const offBlocks = get(row, offIdx).trim()
+    const onBlocks  = get(row, onIdx).trim()
+
+    if (!isRestDay) {
+      if (!dep || !arr) continue
+      const offN = parseHobbs(offBlocks)
+      const onN  = parseHobbs(onBlocks)
+      if (offN === null || onN === null || onN <= offN) continue
+    }
 
     const part91 = isRestDay
       ? false
@@ -365,8 +374,8 @@ export function importCSV(text: string): Entry[] | { error: string } {
       releaseTime: get(row, releaseIdx).trim() || '',
       dep,
       arr,
-      offBlocks:   get(row, offIdx).trim(),
-      onBlocks:    get(row, onIdx).trim(),
+      offBlocks,
+      onBlocks,
       restStart:   get(row, restStartIdx).trim(),
       restEnd:     get(row, restEndIdx).trim(),
       reason:      get(row, reasonIdx).trim(),

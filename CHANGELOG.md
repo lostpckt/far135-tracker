@@ -3,7 +3,8 @@
 ## 2026-06-20 (7)
 
 ### Fixed
-- **Departure and Arrival ICAO are now required** — submitting a leg without Dep or Arr ICAO now shows a validation error instead of saving a blank airport.
+- **Departure and Arrival ICAO are now required** — submitting a leg without Dep or Arr ICAO now shows a validation error in the Add Entry form and the Edit modal.
+- **CSV importer skips invalid flight legs** — rows missing dep/arr or with invalid/inconsistent Hobbs readings are silently dropped rather than imported as malformed entries. Rest day rows are unaffected.
 
 ## 2026-06-20 (6)
 
