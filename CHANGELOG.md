@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-20 (7)
+
+### Fixed
+- **Arrival ICAO is now required** — submitting a leg without an Arr ICAO now shows a validation error instead of saving a blank arrival airport.
+
 ## 2026-06-20 (6)
 
 ### Fixed

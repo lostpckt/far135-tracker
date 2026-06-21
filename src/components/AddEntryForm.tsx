@@ -110,6 +110,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       const offN = parseHobbs(leg.offHobbs)
       const onN  = parseHobbs(leg.onHobbs)
       const label = legs.length > 1 ? `Leg ${i + 1}: ` : ''
+      if (!leg.arr.trim()) { setErr(`${label}Arrival ICAO is required.`); return }
       if (offN === null || onN === null) { setErr(`${label}Off Blocks and On Blocks Hobbs readings are required.`); return }
       if (onN <= offN) { setErr(`${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`); return }
       legData.push({ dep: leg.dep, arr: leg.arr, off: leg.offHobbs.trim(), on: leg.onHobbs.trim(), reason: leg.reason, part91: leg.part91 })
