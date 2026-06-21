@@ -1,6 +1,11 @@
 # Changelog
 
-## 2026-06-20
+## 2026-06-20 (3)
+
+### Changed
+- **Flight log now groups multi-leg duty periods into a single collapsed row** — a row with multiple legs shows a chevron toggle in the Show Time column and the actions column. The collapsed row displays the full route chain (BFI→SEA→PDX), the first Off Blocks and last On Blocks reading, total flight time for the duty period, and worst-case compliance values across all legs. Tap the chevron to expand and see each leg individually, with per-leg route, blocks, rolling 24-hr, and exceedance. Duty-period level columns (Duty Period, Duty OK, Rest After, Rest OK) show "—" on expanded leg rows since they are already visible on the summary row. Single-leg duty periods are unaffected.
+
+## 2026-06-20 (2)
 
 ### Added
 - **Monthly compliance reports** — "Run Report" button (below the Flight Log) opens a dialog to choose Monthly or Quarterly, then select the period and year. Monthly reports show all the same violation detail as quarterly reports (rolling 24-hr, duty, rest, exceedances, full flight log) with an informational scorecard row showing rest days and Part 135 hours for the month.

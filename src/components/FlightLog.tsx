@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -47,16 +47,14 @@ function saveChoices(choices: Record<string, MonthChoice>) {
   } catch { /* ignore */ }
 }
 
-// Computes which month keys should be collapsed given current user choices.
-// currentMonthKey is evaluated here (not at module load) so it's never stale.
 function computeCollapsed(monthKeys: string[]): Set<string> {
   const currentKey = new Date().toISOString().slice(0, 7)
   const choices = readChoices()
   return new Set(
     monthKeys.filter(key => {
-      if (choices[key] === 'open') return false   // user explicitly opened
-      if (choices[key] === 'closed') return true  // user explicitly closed
-      return key !== currentKey                   // default: collapse past months
+      if (choices[key] === 'open') return false
+      if (choices[key] === 'closed') return true
+      return key !== currentKey
     })
   )
 }
@@ -76,10 +74,36 @@ function monthLabel(key: string): string {
   return new Date(key + '-02T12:00:00').toLocaleString('en-US', { month: 'long', year: 'numeric' })
 }
 
+// Groups entries within a month into duty periods and rest days.
+type DutyItem = { type: 'duty'; key: string; legs: Entry[] }
+type RestItem  = { type: 'rest';  entry: Entry }
+type MonthItem = DutyItem | RestItem
+
+function buildMonthItems(groupEntries: Entry[]): MonthItem[] {
+  const items: MonthItem[] = []
+  const seen = new Map<string, Entry[]>()
+  for (const e of groupEntries) {
+    if (e.restDay) {
+      items.push({ type: 'rest', entry: e })
+    } else {
+      const key = `${e.showTime}|${e.releaseTime ?? ''}`
+      if (!seen.has(key)) {
+        const legs: Entry[] = []
+        seen.set(key, legs)
+        items.push({ type: 'duty', key, legs })
+      }
+      seen.get(key)!.push(e)
+    }
+  }
+  return items
+}
+
 const COLS = 17
 
 export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
   const [exceedanceReason, setExceedanceReason] = useState<string | null>(null)
+  const [expandedDuty, setExpandedDuty] = useState<Set<string>>(new Set())
+
   const sorted = [...entries].sort((a, b) => {
     const aMs = a.showTime ? new Date(a.showTime).getTime() : 0
     const bMs = b.showTime ? new Date(b.showTime).getTime() : 0
@@ -118,7 +142,6 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
     }
   }
 
-  // Stable ref so the tz-change effect always sees the latest groups
   const groupsRef = useRef(groups)
   groupsRef.current = groups
 
@@ -126,8 +149,6 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
     computeCollapsed(groups.map(g => g.key))
   )
 
-  // When tz changes, month keys shift — recompute collapsed from the new groups.
-  // Skip the first run (useState initializer already handled it).
   const isFirstRender = useRef(true)
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
@@ -143,6 +164,15 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
       const choices = readChoices()
       choices[key] = isCollapsed ? 'open' : 'closed'
       saveChoices(choices)
+      return next
+    })
+  }, [])
+
+  const toggleDuty = useCallback((key: string) => {
+    setExpandedDuty(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }, [])
@@ -165,33 +195,34 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50">
+              <tr className="bg-slate-50 dark:bg-slate-800">
                 {['Show Time','Release Time','Pilot','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance',''].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 border-b-2 border-slate-200 whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 border-b-2 border-slate-200 dark:border-slate-700 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
 
             {groups.map(({ key, entries: groupEntries }) => {
-              const isCollapsed = collapsed.has(key)
-              const legCount = groupEntries.filter(e => !e.restDay).length
+              const isMonthCollapsed = collapsed.has(key)
+              const legCount  = groupEntries.filter(e => !e.restDay).length
               const restCount = groupEntries.filter(e => !!e.restDay).length
               const summary = [
-                legCount > 0 && `${legCount} leg${legCount !== 1 ? 's' : ''}`,
+                legCount  > 0 && `${legCount} leg${legCount !== 1 ? 's' : ''}`,
                 restCount > 0 && `${restCount} rest day${restCount !== 1 ? 's' : ''}`,
               ].filter(Boolean).join(' · ')
 
               return (
                 <tbody key={key}>
+                  {/* Month header row */}
                   <tr
                     onClick={() => toggle(key)}
                     className="cursor-pointer bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 select-none"
                   >
                     <td colSpan={COLS} className="px-3 py-2 border-b border-slate-200 dark:border-slate-600">
                       <div className="flex items-center gap-2">
-                        {isCollapsed
+                        {isMonthCollapsed
                           ? <ChevronRight size={14} className="text-slate-500 flex-shrink-0" />
-                          : <ChevronDown size={14} className="text-slate-500 flex-shrink-0" />
+                          : <ChevronDown  size={14} className="text-slate-500 flex-shrink-0" />
                         }
                         <span className="font-semibold text-slate-700 dark:text-slate-200">{monthLabel(key)}</span>
                         <span className="text-slate-400 text-[0.7rem]">{summary}</span>
@@ -199,8 +230,10 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                     </td>
                   </tr>
 
-                  {!isCollapsed && groupEntries.map(e => {
-                    if (e.restDay) {
+                  {!isMonthCollapsed && buildMonthItems(groupEntries).map(item => {
+                    // ── Rest day row ──────────────────────────────────────────
+                    if (item.type === 'rest') {
+                      const e = item.entry
                       const anchor = e.showTime || ''
                       const localDate = anchor.endsWith('Z')
                         ? (utcToLocalParts(anchor, tz)?.date ?? anchor.slice(0, 10))
@@ -224,60 +257,201 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                       )
                     }
 
-                    const c = compute(e, entries, tz)
-                    const excBadge = c.excAmt > 0
-                      ? (
-                        <button onClick={() => setExceedanceReason(e.reason || '(no reason recorded)')}>
-                          <Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(c.excAmt)}</Badge>
-                        </button>
+                    // ── Duty period ───────────────────────────────────────────
+                    const { key: dutyKey, legs } = item
+                    const isDutyExpanded = expandedDuty.has(dutyKey)
+
+                    if (legs.length === 1) {
+                      // Single-leg duty: render as a plain row (no toggle)
+                      const e = legs[0]
+                      const c = compute(e, entries, tz)
+                      const excBadge = c.excAmt > 0
+                        ? <button onClick={() => setExceedanceReason(e.reason || '(no reason recorded)')}><Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(c.excAmt)}</Badge></button>
+                        : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
+                      const p91Badge = e.part91
+                        ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>
+                        : null
+                      return (
+                        <tr key={e.id} className={e.part91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtDT(e.showTime)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtDT(e.releaseTime) : <span className="text-slate-400">—</span>}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{e.pilot || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.crew === 'D' ? 'Dual' : 'Single'}{p91Badge}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {e.part91
+                              ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
+                              : <><span className="font-semibold">{c.rolling24 !== null ? fmtHrs(c.rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {c.maxFlight}h</span></>
+                            }
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHrs(c.dutyPeriod)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                            <StatusBadge flag={e.part91 ? null : c.dutyOk} okText="OK" warnText="EXCEEDED" />
+                            {!e.part91 && c.dutyOk === false && c.dutyPeriod !== null && (
+                              <div className="text-[0.65rem] text-red-600 mt-0.5 whitespace-nowrap">+{fmtHrs(c.dutyPeriod - 14)} over · min {c.reqRest}h rest req'd</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {fmtHrs(c.consRest)}<br />
+                            {!e.part91 && <span className="text-[0.68rem] text-slate-400">Req: {c.reqRest}h</span>}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" /></td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
+                            <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>
+                          </td>
+                        </tr>
                       )
-                      : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
-                    const p91Badge = e.part91
-                      ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>
+                    }
+
+                    // ── Multi-leg duty period ─────────────────────────────────
+                    const computedLegs = legs.map(l => compute(l, entries, tz))
+                    const p135Idx = legs.reduce<number[]>((acc, l, i) => { if (!l.part91) acc.push(i); return acc }, [])
+                    const allPart91 = p135Idx.length === 0
+                    const lastP135C = allPart91 ? computedLegs[computedLegs.length - 1] : computedLegs[p135Idx[p135Idx.length - 1]]
+                    const lastC = computedLegs[computedLegs.length - 1]
+
+                    const totalFlight = computedLegs.reduce((s, c) => s + (c.legFlight ?? 0), 0)
+                    const rolling24   = lastP135C?.rolling24 ?? null
+                    const maxFlight   = lastP135C?.maxFlight ?? 8
+                    const flightOk    = allPart91 ? null : p135Idx.some(i => computedLegs[i].flightOk === false) ? false : true
+                    const dutyPeriod  = lastC?.dutyPeriod ?? null
+                    const dutyOk      = allPart91 ? null : lastC?.dutyOk ?? null
+                    const reqRest     = lastP135C?.reqRest ?? 10
+                    const lookbackOk  = allPart91 ? null
+                      : p135Idx.some(i => computedLegs[i].lookbackOk === false) ? false
+                      : p135Idx.every(i => computedLegs[i].lookbackOk === true) ? true : null
+                    const consRest    = lastC?.consRest ?? null
+                    const restOk      = allPart91 ? null
+                      : p135Idx.some(i => computedLegs[i].restOk === false) ? false
+                      : p135Idx.every(i => computedLegs[i].restOk === true) ? true : null
+                    const excAmt      = allPart91 ? 0 : Math.max(...p135Idx.map(i => computedLegs[i].excAmt), 0)
+                    const excLegIdx   = excAmt > 0 ? p135Idx.slice().reverse().find(i => computedLegs[i].excAmt === excAmt) ?? -1 : -1
+                    const excReason   = excLegIdx >= 0 ? (legs[excLegIdx].reason || '(no reason recorded)') : ''
+
+                    const p91Count = legs.filter(l => l.part91).length
+                    const p91Badge = p91Count > 0
+                      ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">{p91Count === legs.length ? 'Part 91' : `+${p91Count} Part 91`}</Badge>
                       : null
 
+                    const routeChain = [legs[0].dep, ...legs.map(l => l.arr)].filter(Boolean).map(s => s.toUpperCase()).join('→')
+
+                    const summaryExcBadge = excAmt > 0
+                      ? <button onClick={() => setExceedanceReason(excReason)}><Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(excAmt)}</Badge></button>
+                      : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
+
                     return (
-                      <tr key={e.id} className={e.part91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{fmtDT(e.showTime)}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.releaseTime ? fmtDT(e.releaseTime) : <span className="text-slate-400">—</span>}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 font-semibold whitespace-nowrap">{e.pilot || '—'}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                          {e.crew === 'D' ? 'Dual' : 'Single'}{p91Badge}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                          {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.offBlocks || '—'}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{e.onBlocks || '—'}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                          {e.part91
-                            ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
-                            : <><span className="font-semibold">{c.rolling24 !== null ? fmtHrs(c.rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {c.maxFlight}h</span></>
-                          }
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">{fmtHrs(c.dutyPeriod)}</td>
-                        <td className="px-3 py-2 border-b border-slate-100">
-                          <StatusBadge flag={e.part91 ? null : c.dutyOk} okText="OK" warnText="EXCEEDED" />
-                          {!e.part91 && c.dutyOk === false && c.dutyPeriod !== null && (
-                            <div className="text-[0.65rem] text-red-600 mt-0.5 whitespace-nowrap">
-                              +{fmtHrs(c.dutyPeriod - 14)} over · min {c.reqRest}h rest req'd
+                      <Fragment key={dutyKey}>
+                        {/* Duty period summary row */}
+                        <tr className={allPart91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => toggleDuty(dutyKey)}
+                                className="text-slate-400 hover:text-blue-500 flex-shrink-0"
+                              >
+                                {isDutyExpanded ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
+                              </button>
+                              {fmtDT(legs[0].showTime)}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                          {fmtHrs(c.consRest)}<br />
-                          {!e.part91 && <span className="text-[0.68rem] text-slate-400">Req: {c.reqRest}h</span>}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100"><StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" /></td>
-                        <td className="px-3 py-2 border-b border-slate-100">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                          <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 rounded p-1 mr-0.5"><Pencil size={13} /></button>
-                          <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 rounded p-1"><X size={13} /></button>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {legs[0].releaseTime ? fmtDT(legs[0].releaseTime) : <span className="text-slate-400">—</span>}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{legs[0].pilot || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {legs[0].crew === 'D' ? 'Dual' : 'Single'}{p91Badge}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {routeChain}
+                            <span className="text-slate-400 text-[0.65rem] ml-1">({legs.length} legs)</span>
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[0].offBlocks || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[legs.length - 1].onBlocks || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(totalFlight)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {allPart91
+                              ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
+                              : <><span className="font-semibold">{rolling24 !== null ? fmtHrs(rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {maxFlight}h</span></>
+                            }
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={flightOk} okText="OK" warnText="EXCEEDED" /></td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHrs(dutyPeriod)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                            <StatusBadge flag={dutyOk} okText="OK" warnText="EXCEEDED" />
+                            {!allPart91 && dutyOk === false && dutyPeriod !== null && (
+                              <div className="text-[0.65rem] text-red-600 mt-0.5 whitespace-nowrap">+{fmtHrs(dutyPeriod - 14)} over · min {reqRest}h rest req'd</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {fmtHrs(consRest)}<br />
+                            {!allPart91 && <span className="text-[0.68rem] text-slate-400">Req: {reqRest}h</span>}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={restOk} okText="OK" warnText="DEFICIENT" /></td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                            {allPart91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : summaryExcBadge}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            <button
+                              onClick={() => toggleDuty(dutyKey)}
+                              className="text-slate-400 hover:text-blue-500 rounded p-1"
+                              title={isDutyExpanded ? 'Collapse legs' : 'Expand legs'}
+                            >
+                              {isDutyExpanded ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {/* Expanded per-leg rows */}
+                        {isDutyExpanded && legs.map((e, legIdx) => {
+                          const c = computedLegs[legIdx]
+                          const excBadge = c.excAmt > 0
+                            ? <button onClick={() => setExceedanceReason(e.reason || '(no reason recorded)')}><Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(c.excAmt)}</Badge></button>
+                            : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
+                          return (
+                            <tr key={e.id} className="bg-sky-50/30 dark:bg-sky-950/20">
+                              <td className="pl-7 pr-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap text-slate-400 dark:text-slate-500">Leg {legIdx + 1}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                                {e.part91 && <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem]">Part 91</Badge>}
+                              </td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                                {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}
+                              </td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                                {e.part91
+                                  ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
+                                  : <><span className="font-semibold">{c.rolling24 !== null ? fmtHrs(c.rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {c.maxFlight}h</span></>
+                                }
+                              </td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                                {e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}
+                              </td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                                <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
+                                <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </Fragment>
                     )
                   })}
                 </tbody>
