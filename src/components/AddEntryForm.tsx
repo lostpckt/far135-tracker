@@ -169,7 +169,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             <div className="flex items-center gap-2">
               <Checkbox id="f-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
               <label htmlFor="f-restday" className="text-sm cursor-pointer">
-                This was a 24-hour rest day (no duty or flights)
+                This is an extended rest period (no duty or flights)
               </label>
             </div>
             {restDay && (
