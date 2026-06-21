@@ -13,7 +13,6 @@ import type { Entry } from '@/types/entry'
 const DRAFT_KEY = 'far135_v1_form_draft'
 
 interface DraftState {
-  pilot: string
   crew: 'S' | 'D'
   showDate: string
   showTime: string
@@ -60,7 +59,6 @@ function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string
 export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const d = readDraft()
 
-  const [pilot, setPilot]           = useState(d?.pilot ?? '')
   const [crew, setCrew]             = useState<'S' | 'D'>(d?.crew ?? 'S')
   const [showDate, setShowDate]     = useState(d?.showDate ?? new Date().toLocaleDateString('en-CA'))
   const [showTime, setShowTime]     = useState(d?.showTime ?? '')
@@ -78,9 +76,9 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs }))
     } catch { /* localStorage unavailable */ }
-  }, [pilot, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs])
+  }, [crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs])
 
   function resetForm() {
     setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
@@ -95,7 +93,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     if (restDay) {
       if (!restDayStart) { setErr('Enter the date of the rest day.'); return }
       const rdShowTime = localToUtcIso(restDayStart, '00:00', tz) || `${restDayStart}T00:00`
-      onAdd([...entries, { id: uid(), pilot, crew, showTime: rdShowTime, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
+      onAdd([...entries, { id: uid(), pilot: '', crew, showTime: rdShowTime, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
       resetForm()
       return
     }
@@ -121,7 +119,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     const restEnd   = localToUtcIso(reDate, reTime, tz)
 
     const newEntries: Entry[] = legData.map(leg => ({
-      id: uid(), pilot, crew,
+      id: uid(), pilot: '', crew,
       showTime: show, releaseTime: release,
       dep: leg.dep, arr: leg.arr,
       offBlocks: leg.off, onBlocks: leg.on,
@@ -142,13 +140,6 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5">
-
-          <SectionLabel>Identification</SectionLabel>
-
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Pilot Name / ID</Label>
-            <Input value={pilot} onChange={e => setPilot(e.target.value)} placeholder="e.g. J. Smith" className="text-sm h-8" />
-          </div>
 
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>

@@ -98,7 +98,7 @@ function buildMonthItems(groupEntries: Entry[]): MonthItem[] {
   return items
 }
 
-const COLS = 17
+const COLS = 16
 
 export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
   const [exceedanceReason, setExceedanceReason] = useState<string | null>(null)
@@ -196,7 +196,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                {['Show Time','Release Time','Pilot','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance',''].map(h => (
+                {['Show Time','Release Time','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance',''].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 border-b-2 border-slate-200 dark:border-slate-700 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -243,7 +243,6 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                         <tr key={e.id} className="bg-green-50 dark:bg-green-950">
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{localDateFmt}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">—</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{e.pilot || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={13}>
                             {e.restDayEnd && e.restDayEnd !== localDate
                               ? `🟢 24-HOUR REST DAYS: ${localDate} – ${e.restDayEnd}`
@@ -275,9 +274,8 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                         <tr key={e.id} className={e.part91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtDT(e.showTime)}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtDT(e.releaseTime) : <span className="text-slate-400">—</span>}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{e.pilot || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.crew === 'D' ? 'Dual' : 'Single'}{p91Badge}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.crew === 'D' ? 'Dual' : 'Single'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}{p91Badge}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
@@ -337,7 +335,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
 
                     const p91Count = legs.filter(l => l.part91).length
                     const p91Badge = p91Count > 0
-                      ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">{p91Count === legs.length ? 'Part 91' : `+${p91Count} Part 91`}</Badge>
+                      ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">{p91Count === legs.length ? 'Part 91' : `${p91Count} Part 91`}</Badge>
                       : null
 
                     const routeChain = [legs[0].dep, ...legs.map(l => l.arr)].filter(Boolean).map(s => s.toUpperCase()).join('→')
@@ -364,13 +362,13 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {legs[0].releaseTime ? fmtDT(legs[0].releaseTime) : <span className="text-slate-400">—</span>}
                           </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{legs[0].pilot || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {legs[0].crew === 'D' ? 'Dual' : 'Single'}{p91Badge}
+                            {legs[0].crew === 'D' ? 'Dual' : 'Single'}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {routeChain}
                             <span className="text-slate-400 text-[0.65rem] ml-1">({legs.length} legs)</span>
+                            {p91Badge}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[0].offBlocks || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[legs.length - 1].onBlocks || '—'}</td>
@@ -421,10 +419,8 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600">—</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                                {e.part91 && <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem]">Part 91</Badge>}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                                 {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}
+                                {e.part91 && <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>}
                               </td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>

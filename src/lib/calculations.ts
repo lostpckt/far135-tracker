@@ -237,29 +237,27 @@ export function exportCSV(entries: Entry[], tz?: string): void {
   if (!entries.length) { alert('No data to export.'); return }
 
   const hdr = [
-    'Show Time', 'Pilot', 'Crew Config', 'Route',
+    'Show Time', 'Release Time', 'Pilot', 'Crew Config', 'Route',
     'Off Blocks', 'On Blocks', 'Leg Flight (h)', 'Rolling 24-hr (h)',
     'Max Allowed (h)', 'Flight Time OK', 'Duty Period (h)', 'Duty OK',
     '10-hr Lookback OK', 'Consecutive Rest (h)', 'Required Rest (h)',
-    'Rest OK', 'Exceedance (h)', 'Exceedance Reason', '24-hr Rest Day', 'Rest Day End', 'Part 135',
+    'Rest OK', 'Exceedance (h)', 'Exceedance Reason',
+    'Rest Start', 'Rest End', '24-hr Rest Day', 'Rest Day End', 'Part 135',
   ].join(',')
 
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
 
   const rows = entries.map(e => {
     if (e.restDay) {
-      const startDate  = e.showTime ? e.showTime.split('T')[0] : ''
-      const endDate    = e.restDayEnd || startDate
-      // Exclusive end = midnight of the day after the last rest day (e.g. May 6 rest → end is May 7 00:00 local)
-      const endNextDay = endDate ? new Date(new Date(endDate + 'T12:00Z').getTime() + 86400000).toISOString().slice(0, 10) : ''
-      const showTimeZ  = startDate  && tz ? localToUtcIso(startDate,  '00:00', tz) : (startDate  ? startDate  + 'T00:00Z' : '')
-      const endDateZ   = endNextDay && tz ? localToUtcIso(endNextDay, '00:00', tz) : (endNextDay ? endNextDay + 'T00:00Z' : '')
-      return [q(showTimeZ), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
-        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', q('Yes'), q(endDateZ), q('')].join(',')
+      return [
+        q(e.showTime), q(''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
+        q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''),
+        q(''), q(''), q('Yes'), q(e.restDayEnd || ''), q(''),
+      ].join(',')
     }
     const c = compute(e, entries, tz)
     return [
-      q(e.showTime), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
+      q(e.showTime), q(e.releaseTime || ''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
       q(`${(e.dep || '').toUpperCase()}-${(e.arr || '').toUpperCase()}`),
       q(e.offBlocks), q(e.onBlocks),
       q(c.legFlight !== null ? c.legFlight.toFixed(2) : ''),
@@ -274,9 +272,8 @@ export function exportCSV(entries: Entry[], tz?: string): void {
       q(c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT'),
       q(c.excAmt.toFixed(2)),
       q(e.reason || ''),
-      q('No'),
-      q(''),
-      q(e.part91 ? '' : 'True'),
+      q(e.restStart || ''), q(e.restEnd || ''),
+      q('No'), q(''), q(e.part91 ? '' : 'True'),
     ].join(',')
   })
 
@@ -286,6 +283,97 @@ export function exportCSV(entries: Entry[], tz?: string): void {
   a.href     = URL.createObjectURL(blob)
   a.download = `far135_log_${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
+}
+
+function parseCSVRow(line: string): string[] {
+  const fields: string[] = []
+  let i = 0
+  while (i < line.length) {
+    if (line[i] === '"') {
+      let val = ''
+      i++ // skip opening quote
+      while (i < line.length) {
+        if (line[i] === '"' && line[i + 1] === '"') { val += '"'; i += 2 }
+        else if (line[i] === '"') { i++; break }
+        else { val += line[i++] }
+      }
+      fields.push(val)
+      if (line[i] === ',') i++
+    } else {
+      const end = line.indexOf(',', i)
+      if (end === -1) { fields.push(line.slice(i)); break }
+      fields.push(line.slice(i, end))
+      i = end + 1
+    }
+  }
+  return fields
+}
+
+export function importCSV(text: string): Entry[] | { error: string } {
+  const lines = text.split(/\r?\n/).filter(l => l.trim())
+  if (lines.length < 2) return { error: 'File is empty or has no data rows.' }
+
+  const headers = parseCSVRow(lines[0])
+  const idx = (name: string) => headers.indexOf(name)
+
+  const showIdx    = idx('Show Time')
+  const crewIdx    = idx('Crew Config')
+  if (showIdx === -1) return { error: 'Missing required column: "Show Time".' }
+  if (crewIdx === -1) return { error: 'Missing required column: "Crew Config".' }
+
+  const releaseIdx  = idx('Release Time')
+  const pilotIdx    = idx('Pilot')
+  const depIdx      = idx('Route')
+  const offIdx      = idx('Off Blocks')
+  const onIdx       = idx('On Blocks')
+  const reasonIdx   = idx('Exceedance Reason')
+  const restStartIdx = idx('Rest Start')
+  const restEndIdx  = idx('Rest End')
+  const restDayIdx  = idx('24-hr Rest Day')
+  const restDayEndIdx = idx('Rest Day End')
+  const part135Idx  = idx('Part 135')
+
+  const get = (row: string[], i: number) => (i === -1 ? '' : (row[i] ?? ''))
+
+  const entries: Entry[] = []
+  for (let li = 1; li < lines.length; li++) {
+    const row = parseCSVRow(lines[li])
+    if (row.every(c => !c.trim())) continue
+
+    const showTime = get(row, showIdx).trim()
+    if (!showTime) continue
+
+    const isRestDay = get(row, restDayIdx).trim() === 'Yes'
+    const routeVal  = get(row, depIdx).trim()
+    const dashIdx   = routeVal.indexOf('-')
+    const dep       = dashIdx !== -1 ? routeVal.slice(0, dashIdx) : routeVal
+    const arr       = dashIdx !== -1 ? routeVal.slice(dashIdx + 1) : ''
+
+    const part91 = isRestDay
+      ? false
+      : get(row, part135Idx).trim() !== 'True'
+
+    entries.push({
+      id:          uid(),
+      pilot:       get(row, pilotIdx).trim(),
+      crew:        get(row, crewIdx).trim() === 'Dual' ? 'D' : 'S',
+      showTime,
+      releaseTime: get(row, releaseIdx).trim() || '',
+      dep,
+      arr,
+      offBlocks:   get(row, offIdx).trim(),
+      onBlocks:    get(row, onIdx).trim(),
+      restStart:   get(row, restStartIdx).trim(),
+      restEnd:     get(row, restEndIdx).trim(),
+      reason:      get(row, reasonIdx).trim(),
+      part91,
+      restDay:     isRestDay,
+      restDayEnd:  get(row, restDayEndIdx).trim() || undefined,
+    })
+  }
+
+  if (!entries.length) return { error: 'No valid entries found in file.' }
+  return entries
 }
 
 export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: number, tz?: string, dark = false): string {

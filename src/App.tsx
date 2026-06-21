@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { loadEntries, saveEntries } from '@/lib/storage'
-import { ms, exportCSV } from '@/lib/calculations'
+import { ms, exportCSV, importCSV } from '@/lib/calculations'
 import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 import Header from '@/components/Header'
@@ -20,6 +20,23 @@ export default function App() {
   const [entries, setEntries] = useState<Entry[]>(loadEntries)
   const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
   const [showRunReport, setShowRunReport] = useState(false)
+  const [pendingImport, setPendingImport] = useState<Entry[] | null>(null)
+  const [importError, setImportError]     = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      const result = importCSV(text)
+      if ('error' in result) { setImportError(result.error); return }
+      setPendingImport(result)
+    }
+    reader.readAsText(file)
+  }
   const [dark, setDark]                   = useState(() => localStorage.getItem('far135_theme') === 'dark')
   const [tz, setTz]                       = useState(loadTz)
   const [showMigration, setShowMigration] = useState(() => {
@@ -77,6 +94,19 @@ export default function App() {
             Export CSV
           </button>
           <button
+            onClick={() => fileInputRef.current?.click()}
+            className="text-green-700 border border-green-200 bg-green-50 hover:bg-green-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
+          >
+            Import CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
             onClick={() => setShowRunReport(true)}
             className="text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
           >
@@ -101,6 +131,57 @@ export default function App() {
       </div>
 
       <UpdateBanner />
+
+      {/* Import confirmation */}
+      {pendingImport && (() => {
+        const flights  = pendingImport.filter(e => !e.restDay).length
+        const restDays = pendingImport.filter(e => e.restDay).length
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4">
+              <h2 className="text-base font-semibold">Import CSV?</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Found <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'} and <strong>{restDays}</strong> rest day {restDays === 1 ? 'row' : 'rows'}.
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                This will <strong>replace all existing data</strong>. Export your current log first if you want to keep it.
+              </p>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setPendingImport(null)}
+                  className="text-sm h-8 px-3 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { updateEntries(pendingImport); setPendingImport(null) }}
+                  className="text-sm h-8 px-3 rounded-md bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
+                >
+                  Replace &amp; Import
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Import error */}
+      {importError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4">
+            <h2 className="text-base font-semibold text-red-600">Import Failed</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">{importError}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setImportError(null)}
+                className="text-sm h-8 px-3 rounded-md bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <RunReportDialog
         open={showRunReport}
