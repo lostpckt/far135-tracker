@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import LegRow, { type LegData } from '@/components/LegRow'
-import { uid, ms, parseHobbs, exportCSV, generateQuarterlyReport } from '@/lib/calculations'
+import { uid, ms, parseHobbs } from '@/lib/calculations'
 import { localToUtcIso, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -37,7 +37,6 @@ interface Props {
   entries: Entry[]
   onAdd: (updated: Entry[]) => void
   tz: string
-  dark: boolean
 }
 
 function emptyLeg(): LegData {
@@ -58,7 +57,7 @@ function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string
   return <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>
 }
 
-export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
+export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const d = readDraft()
 
   const [pilot, setPilot]           = useState(d?.pilot ?? '')
@@ -76,9 +75,6 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
   const [restDayEnd, setRestDayEnd]     = useState(d?.restDayEnd ?? '')
   const [legs, setLegs]             = useState<LegData[]>(d?.legs ?? [emptyLeg()])
   const [err, setErr]               = useState('')
-
-  const [rptQ, setRptQ] = useState(Math.floor(new Date().getMonth() / 3).toString())
-  const [rptY, setRptY] = useState(new Date().getFullYear().toString())
 
   useEffect(() => {
     try {
@@ -135,21 +131,6 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
 
     onAdd([...entries, ...newEntries])
     resetForm()
-  }
-
-  function handleQuarterlyReport() {
-    const q = parseInt(rptQ, 10)
-    const y = parseInt(rptY, 10)
-    if (isNaN(y) || y < 2000) { alert('Enter a valid year.'); return }
-    const html = generateQuarterlyReport(entries, q, y, tz, dark)
-    if (!html) {
-      const labels = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)']
-      alert(`No entries found for ${labels[q]} ${y}.`)
-      return
-    }
-    const w = window.open('', '_blank')
-    w?.document.write(html)
-    w?.document.close()
   }
 
   const abbr = tzAbbr(tz)
@@ -294,43 +275,6 @@ export default function AddEntryForm({ entries, onAdd, tz, dark }: Props) {
         <div className="flex flex-wrap gap-2.5 mt-2 items-center">
           <Button onClick={handleAdd} className="bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm h-8">
             Add Entry
-          </Button>
-
-          <Button variant="outline" onClick={() => exportCSV(entries, tz)} className="text-green-700 border-green-200 bg-green-50 hover:bg-green-600 hover:text-white text-sm h-8">
-            Export CSV
-          </Button>
-
-          <div className="flex items-center gap-2 ml-1">
-            <Select value={rptQ} onValueChange={setRptQ}>
-              <SelectTrigger className="text-sm h-8 w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">Q1 (Jan–Mar)</SelectItem>
-                <SelectItem value="1">Q2 (Apr–Jun)</SelectItem>
-                <SelectItem value="2">Q3 (Jul–Sep)</SelectItem>
-                <SelectItem value="3">Q4 (Oct–Dec)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              type="number"
-              value={rptY}
-              onChange={e => setRptY(e.target.value)}
-              min={2000}
-              max={2099}
-              className="text-sm h-8 w-[80px]"
-            />
-            <Button variant="outline" onClick={handleQuarterlyReport} className="text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-600 hover:text-white text-sm h-8">
-              Quarterly Report
-            </Button>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={() => { if (confirm('Delete ALL flight log entries? This cannot be undone.')) onAdd([]) }}
-            className="text-red-600 border-red-200 bg-red-50 hover:bg-red-600 hover:text-white text-sm h-8"
-          >
-            Clear All Data
           </Button>
         </div>
       </CardContent>

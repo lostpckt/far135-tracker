@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-20
+
+### Added
+- **Monthly compliance reports** — "Run Report" button (below the Flight Log) opens a dialog to choose Monthly or Quarterly, then select the period and year. Monthly reports show all the same violation detail as quarterly reports (rolling 24-hr, duty, rest, exceedances, full flight log) with an informational scorecard row showing rest days and Part 135 hours for the month.
+
+### Changed
+- **Export CSV and Run Report moved below the Flight Log** — the action buttons now sit directly under the log table where they're contextually relevant.
+- **"Clear All Data" moved to a Danger Zone section** at the bottom of the page, below Quick Reference, to reduce the risk of accidental deletion.
+
 ## 2026-06-11
 
 ### Changed

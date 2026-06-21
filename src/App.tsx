@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { loadEntries, saveEntries } from '@/lib/storage'
-import { ms } from '@/lib/calculations'
+import { ms, exportCSV } from '@/lib/calculations'
 import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 import Header from '@/components/Header'
@@ -14,10 +14,12 @@ import HowToUse from '@/components/HowToUse'
 import UpdateBanner from '@/components/UpdateBanner'
 import InstallBanner from '@/components/InstallBanner'
 import TzMigrationDialog from '@/components/TzMigrationDialog'
+import RunReportDialog from '@/components/RunReportDialog'
 
 export default function App() {
   const [entries, setEntries] = useState<Entry[]>(loadEntries)
   const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
+  const [showRunReport, setShowRunReport] = useState(false)
   const [dark, setDark]                   = useState(() => localStorage.getItem('far135_theme') === 'dark')
   const [tz, setTz]                       = useState(loadTz)
   const [showMigration, setShowMigration] = useState(() => {
@@ -60,17 +62,53 @@ export default function App() {
         <RegNote />
         <HowToUse />
         <Dashboard entries={entries} tz={tz} />
-        <AddEntryForm entries={entries} onAdd={updateEntries} tz={tz} dark={dark} />
+        <AddEntryForm entries={entries} onAdd={updateEntries} tz={tz} />
         <FlightLog
           entries={entries}
           tz={tz}
           onEdit={setEditingEntry}
           onDelete={id => updateEntries(entries.filter(e => e.id !== id))}
         />
+        <div className="flex flex-wrap gap-2.5 items-center px-1">
+          <button
+            onClick={() => exportCSV(entries, tz)}
+            className="text-green-700 border border-green-200 bg-green-50 hover:bg-green-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={() => setShowRunReport(true)}
+            className="text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
+          >
+            Run Report
+          </button>
+        </div>
         <QuickReference />
+        <div className="rounded-xl border border-red-200 dark:border-red-900 bg-white dark:bg-slate-900 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-red-700 dark:text-red-400">Danger Zone</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Permanently deletes all flight log entries. This cannot be undone.</p>
+            </div>
+            <button
+              onClick={() => { if (confirm('Delete ALL flight log entries? This cannot be undone.')) updateEntries([]) }}
+              className="text-red-600 border border-red-200 bg-red-50 hover:bg-red-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors whitespace-nowrap"
+            >
+              Clear All Data
+            </button>
+          </div>
+        </div>
       </div>
 
       <UpdateBanner />
+
+      <RunReportDialog
+        open={showRunReport}
+        onClose={() => setShowRunReport(false)}
+        entries={entries}
+        tz={tz}
+        dark={dark}
+      />
 
       {showMigration && (
         <TzMigrationDialog entries={entries} onComplete={handleMigrationComplete} />
