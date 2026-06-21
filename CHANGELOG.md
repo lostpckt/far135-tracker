@@ -3,7 +3,7 @@
 ## 2026-06-20 (7)
 
 ### Fixed
-- **Arrival ICAO is now required** — submitting a leg without an Arr ICAO now shows a validation error instead of saving a blank arrival airport.
+- **Departure and Arrival ICAO are now required** — submitting a leg without Dep or Arr ICAO now shows a validation error instead of saving a blank airport.
 
 ## 2026-06-20 (6)
 
