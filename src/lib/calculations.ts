@@ -5,6 +5,10 @@ export function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 export function ms(dtStr: string | undefined | null): number | null {
   if (!dtStr) return null
   const t = new Date(dtStr).getTime()
@@ -407,18 +411,18 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
 
     if (c.flightOk === false) {
       flightFailCount++
-      violations.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` })
+      violations.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: esc(e.pilot), type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` })
     }
     if (c.dutyOk === false) {
       dutyFailCount++
-      violations.push({ date: fmtDT(e.showTime), pilot: e.pilot, type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
+      violations.push({ date: fmtDT(e.showTime), pilot: esc(e.pilot), type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
     }
     if (c.restOk === false) {
       restFailCount++
-      violations.push({ date: fmtDT(e.restStart), pilot: e.pilot, type: 'Rest Deficient', detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` })
+      violations.push({ date: fmtDT(e.restStart), pilot: esc(e.pilot), type: 'Rest Deficient', detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` })
     }
     if (c.excAmt > 0)
-      exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, route: `${(e.dep || '?').toUpperCase()}→${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest })
+      exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: esc(e.pilot), route: `${esc((e.dep || '?').toUpperCase())}→${esc((e.arr || '?').toUpperCase())}`, over: fmtHrs(c.excAmt), reason: esc(e.reason || '—'), reqRest: c.reqRest })
   })
 
   const totalViolations = flightFailCount + dutyFailCount + restFailCount
@@ -487,7 +491,7 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
     if (!dk) continue
     if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, pilots: new Set(), hasViolation: false })
     const d = dayMap.get(dk)!
-    if (e.pilot) d.pilots.add(e.pilot)
+    if (e.pilot) d.pilots.add(esc(e.pilot))
     const ft = hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0
     if (e.part91) {
       d.p91 += ft
@@ -532,14 +536,14 @@ export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: nu
       const label  = endStr && endStr !== startStr
         ? `● 24-HOUR REST DAYS: ${startStr} – ${endStr} (${days} days)`
         : `● 24-HOUR REST DAY`
-      return `<tr style="background:${col.greenBg}"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:${col.green};font-weight:600">${label}</td></tr>`
+      return `<tr style="background:${col.greenBg}"><td>${fmtDT(e.showTime)}</td><td>${esc(e.pilot) || '—'}</td><td colspan="12" style="color:${col.green};font-weight:600">${label}</td></tr>`
     }
     const c = compute(e, entries, tz)
-    if (e.part91) return `<tr style="background:${col.amberBg}"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:${col.amber};font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
-    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?col.red:'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?col.red:'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?col.red:'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
+    if (e.part91) return `<tr style="background:${col.amberBg}"><td>${fmtDT(e.showTime)}</td><td>${esc(e.pilot) || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${esc((e.dep || '—').toUpperCase())}→${esc((e.arr || '—').toUpperCase())}</td><td>${esc(e.offBlocks) || '—'}</td><td>${esc(e.onBlocks) || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:${col.amber};font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
+    return `<tr><td>${fmtDT(e.showTime)}</td><td>${esc(e.pilot) || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${esc((e.dep || '—').toUpperCase())}→${esc((e.arr || '—').toUpperCase())}</td><td>${esc(e.offBlocks) || '—'}</td><td>${esc(e.onBlocks) || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?col.red:'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?col.red:'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?col.red:'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
   }).join('')
 
-  const pilots    = [...new Set(flightLegs.map(e => e.pilot).filter(Boolean))].join(', ') || 'All Pilots'
+  const pilots    = [...new Set(flightLegs.map(e => esc(e.pilot)).filter(Boolean))].join(', ') || 'All Pilots'
   const generated = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })
 
   return `<!DOCTYPE html><html lang="en"><head>
@@ -637,18 +641,18 @@ export function generateMonthlyReport(entries: Entry[], monthIdx: number, year: 
 
     if (c.flightOk === false) {
       flightFailCount++
-      violations.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` })
+      violations.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: esc(e.pilot), type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` })
     }
     if (c.dutyOk === false) {
       dutyFailCount++
-      violations.push({ date: fmtDT(e.showTime), pilot: e.pilot, type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
+      violations.push({ date: fmtDT(e.showTime), pilot: esc(e.pilot), type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
     }
     if (c.restOk === false) {
       restFailCount++
-      violations.push({ date: fmtDT(e.restStart), pilot: e.pilot, type: 'Rest Deficient', detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` })
+      violations.push({ date: fmtDT(e.restStart), pilot: esc(e.pilot), type: 'Rest Deficient', detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` })
     }
     if (c.excAmt > 0)
-      exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: e.pilot, route: `${(e.dep || '?').toUpperCase()}→${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest })
+      exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), pilot: esc(e.pilot), route: `${esc((e.dep || '?').toUpperCase())}→${esc((e.arr || '?').toUpperCase())}`, over: fmtHrs(c.excAmt), reason: esc(e.reason || '—'), reqRest: c.reqRest })
   })
 
   const totalViolations = flightFailCount + dutyFailCount + restFailCount
@@ -711,7 +715,7 @@ export function generateMonthlyReport(entries: Entry[], monthIdx: number, year: 
     if (!dk) continue
     if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, pilots: new Set(), hasViolation: false })
     const d = dayMap.get(dk)!
-    if (e.pilot) d.pilots.add(e.pilot)
+    if (e.pilot) d.pilots.add(esc(e.pilot))
     const ft = hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0
     if (e.part91) {
       d.p91 += ft
@@ -754,14 +758,14 @@ export function generateMonthlyReport(entries: Entry[], monthIdx: number, year: 
       const label  = endStr && endStr !== startStr
         ? `● 24-HOUR REST DAYS: ${startStr} – ${endStr} (${days} days)`
         : `● 24-HOUR REST DAY`
-      return `<tr style="background:${col.greenBg}"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td colspan="12" style="color:${col.green};font-weight:600">${label}</td></tr>`
+      return `<tr style="background:${col.greenBg}"><td>${fmtDT(e.showTime)}</td><td>${esc(e.pilot) || '—'}</td><td colspan="12" style="color:${col.green};font-weight:600">${label}</td></tr>`
     }
     const c = compute(e, entries, tz)
-    if (e.part91) return `<tr style="background:${col.amberBg}"><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:${col.amber};font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
-    return `<tr><td>${fmtDT(e.showTime)}</td><td>${e.pilot || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${(e.dep || '—').toUpperCase()}→${(e.arr || '—').toUpperCase()}</td><td>${e.offBlocks || '—'}</td><td>${e.onBlocks || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?col.red:'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?col.red:'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?col.red:'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
+    if (e.part91) return `<tr style="background:${col.amberBg}"><td>${fmtDT(e.showTime)}</td><td>${esc(e.pilot) || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${esc((e.dep || '—').toUpperCase())}→${esc((e.arr || '—').toUpperCase())}</td><td>${esc(e.offBlocks) || '—'}</td><td>${esc(e.onBlocks) || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td colspan="7" style="color:${col.amber};font-weight:600">▶ Part 91 — Excluded from §135.267 limits</td></tr>`
+    return `<tr><td>${fmtDT(e.showTime)}</td><td>${esc(e.pilot) || '—'}</td><td>${e.crew === 'D' ? 'Dual' : 'Single'}</td><td>${esc((e.dep || '—').toUpperCase())}→${esc((e.arr || '—').toUpperCase())}</td><td>${esc(e.offBlocks) || '—'}</td><td>${esc(e.onBlocks) || '—'}</td><td>${fmtHrs(c.legFlight)}</td><td style="color:${c.flightOk===false?col.red:'inherit'}">${c.rolling24!==null?fmtHrs(c.rolling24):'—'} / ${c.maxFlight}h</td><td>${flag(c.flightOk)}</td><td style="color:${c.dutyOk===false?col.red:'inherit'}">${fmtHrs(c.dutyPeriod)}</td><td>${flag(c.dutyOk)}</td><td style="color:${c.restOk===false?col.red:'inherit'}">${fmtHrs(c.consRest)} / ${c.reqRest}h</td><td>${flag(c.restOk)}</td><td>${c.excAmt > 0 ? fmtHrs(c.excAmt) : '—'}</td></tr>`
   }).join('')
 
-  const pilots    = [...new Set(flightLegs.map(e => e.pilot).filter(Boolean))].join(', ') || 'All Pilots'
+  const pilots    = [...new Set(flightLegs.map(e => esc(e.pilot)).filter(Boolean))].join(', ') || 'All Pilots'
   const generated = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })
 
   return `<!DOCTYPE html><html lang="en"><head>

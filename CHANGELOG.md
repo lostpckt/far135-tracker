@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-20 (6)
+
+### Fixed
+- **XSS hardening in generated reports** — pilot name, route (dep/arr), Hobbs readings, and exceedance reason are now HTML-escaped before being interpolated into the quarterly and monthly report HTML strings. A malicious CSV with fields containing `<script>` or similar markup could previously execute JavaScript when the user opened a report; this is no longer possible.
+
 ## 2026-06-20 (5)
 
 ### Added
