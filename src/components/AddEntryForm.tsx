@@ -152,8 +152,8 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       <CardContent>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5">
 
-          <div className="flex gap-2 items-start">
-            <div className="flex flex-col gap-1 shrink-0">
+          <div className="col-span-full grid grid-cols-[8rem_1fr_auto] gap-2 items-start">
+            <div className="flex flex-col gap-1">
               <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number <span className="text-red-500">*</span></Label>
               <Input
                 value={tailNumber}
@@ -163,7 +163,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
                 className="text-sm h-8 uppercase w-32"
               />
             </div>
-            <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <div className="flex flex-col gap-1">
               <Label className="text-xs font-semibold text-slate-500">Entity <span className="text-red-500">*</span></Label>
               <Input
                 value={entity}
@@ -172,19 +172,18 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
                 className="text-sm h-8"
               />
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1 w-fit">
-            <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>
-            <Select value={crew} onValueChange={v => setCrew(v as 'S' | 'D')}>
-              <SelectTrigger className="text-sm h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="S">Single Pilot — 8 hr limit</SelectItem>
-                <SelectItem value="D">Dual Pilot — 10 hr limit</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>
+              <Select value={crew} onValueChange={v => setCrew(v as 'S' | 'D')}>
+                <SelectTrigger className="text-sm h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value="S">Single Pilot — 8 hr limit</SelectItem>
+                  <SelectItem value="D">Dual Pilot — 10 hr limit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <SectionLabel>Special Entries</SectionLabel>

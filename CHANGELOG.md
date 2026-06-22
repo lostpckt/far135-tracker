@@ -3,8 +3,7 @@
 ## 2026-06-22 (6)
 
 ### Changed
-- **Tail Number and Entity sit flush with no dead space** — the two fields share a single flex container (one grid item); Tail Number is `w-32` and Entity expands to fill the rest. Crew Configuration remains its own grid item on the same row.
-- **Crew Configuration cell now matches dropdown width** — the containing div uses `w-fit` so it shrinks to wrap the trigger rather than expanding to fill the grid column.
+- **Tail Number, Entity, and Crew Configuration share an explicit 3-column row** — `grid-cols-[8rem_1fr_auto]` gives Tail Number a fixed `8rem` column, Entity the remaining `1fr`, and Crew Configuration only as wide as its content. Eliminates the dead space between Tail Number and Entity while keeping all three on one line.
 
 ## 2026-06-22 (5)
 
