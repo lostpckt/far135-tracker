@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-22 (4)
+
+### Fixed
+- **Report dialog Entity dropdown no longer overflows the dialog** — switched to `position="popper"` on all three Select dropdowns in the Run Report dialog so the dropdown is anchored to and sized by its trigger; the Entity trigger also now fills its full container width.
+
 ## 2026-06-22 (3)
 
 ### Changed

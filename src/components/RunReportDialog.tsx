@@ -63,10 +63,10 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">No entities found. Add an entity to flight entries first.</p>
             ) : (
               <Select value={entity} onValueChange={setEntity}>
-                <SelectTrigger className="text-sm h-8">
+                <SelectTrigger className="text-sm h-8 w-full">
                   <SelectValue placeholder="Select entity…" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   {entities.map(e => (
                     <SelectItem key={e} value={e}>{e}</SelectItem>
                   ))}
@@ -98,7 +98,7 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
                 <SelectTrigger className="text-sm h-8 flex-1">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   <SelectItem value="0">Q1 (Jan–Mar)</SelectItem>
                   <SelectItem value="1">Q2 (Apr–Jun)</SelectItem>
                   <SelectItem value="2">Q3 (Jul–Sep)</SelectItem>
@@ -110,7 +110,7 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
                 <SelectTrigger className="text-sm h-8 flex-1">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   {MONTHS.map((m, i) => (
                     <SelectItem key={i} value={i.toString()}>{m}</SelectItem>
                   ))}
