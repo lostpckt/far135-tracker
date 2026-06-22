@@ -140,7 +140,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 py-2">
 
           <SectionLabel>Identification</SectionLabel>
-          <div className="col-span-full grid grid-cols-[8rem_1fr_auto] gap-2 items-start">
+          <div className="col-span-full grid grid-cols-[10rem_1fr_auto] gap-2 items-start">
             <div className="flex flex-col gap-1">
               <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number {!restDay && <span className="text-red-500">*</span>}</Label>
               <Input value={tailNumber} onChange={e => setTailNumber(e.target.value.toUpperCase())} placeholder="N123AB" maxLength={8} className="text-sm h-8 uppercase w-32" />
