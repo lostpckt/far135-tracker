@@ -3,7 +3,8 @@
 ## 2026-06-22 (6)
 
 ### Changed
-- **Tail Number, Entity, and Crew Configuration share an explicit 3-column row** — `grid-cols-[8rem_1fr_auto]` gives Tail Number a fixed `8rem` column, Entity the remaining `1fr`, and Crew Configuration only as wide as its content. Eliminates the dead space between Tail Number and Entity while keeping all three on one line.
+- **Tail Number, Entity, and Crew Configuration share an explicit 3-column row** — `grid-cols-[8rem_1fr_auto]` gives Tail Number a fixed `8rem` column, Entity the remaining `1fr`, and Crew Configuration only as wide as its content. Eliminates dead space between fields.
+- **Tail Number label shortened to "Tail Number"** — removes wrapping on narrow columns; input is `w-full` to fill the column flush with the Entity field.
 
 ## 2026-06-22 (5)
 
