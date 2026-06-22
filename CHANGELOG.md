@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-22 (2)
+
+### Changed
+- **Required field markers** — all validated-required fields now show a red `*` next to their label for consistency across the Add Entry form, Edit modal, and Duty Period Edit modal.
+
 ## 2026-06-22
 
 ### Added
