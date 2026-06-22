@@ -152,26 +152,25 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       <CardContent>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5">
 
-          <div className="col-span-full flex gap-2 items-start">
-            <div className="flex flex-col gap-1 w-36 shrink-0">
-              <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number <span className="text-red-500">*</span></Label>
-              <Input
-                value={tailNumber}
-                onChange={e => setTailNumber(e.target.value.toUpperCase())}
-                placeholder="N123AB"
-                maxLength={8}
-                className="text-sm h-8 uppercase w-full"
-              />
-            </div>
-            <div className="flex flex-col gap-1 flex-1 min-w-0">
-              <Label className="text-xs font-semibold text-slate-500">Entity <span className="text-red-500">*</span></Label>
-              <Input
-                value={entity}
-                onChange={e => setEntity(e.target.value)}
-                placeholder="e.g. Acme Air LLC"
-                className="text-sm h-8"
-              />
-            </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number <span className="text-red-500">*</span></Label>
+            <Input
+              value={tailNumber}
+              onChange={e => setTailNumber(e.target.value.toUpperCase())}
+              placeholder="N123AB"
+              maxLength={8}
+              className="text-sm h-8 uppercase w-28"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Entity <span className="text-red-500">*</span></Label>
+            <Input
+              value={entity}
+              onChange={e => setEntity(e.target.value)}
+              placeholder="e.g. Acme Air LLC"
+              className="text-sm h-8"
+            />
           </div>
 
           <div className="flex flex-col gap-1">

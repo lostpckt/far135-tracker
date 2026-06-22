@@ -3,7 +3,7 @@
 ## 2026-06-22 (5)
 
 ### Changed
-- **Tail Number field is now narrow** — Tail Number and Entity are placed in a shared flex row; Tail Number has a fixed `w-36` width and Entity expands to fill the rest of the line, matching the visual weight of each field.
+- **Tail Number field is now narrow** — input width set to `w-28`; Tail Number, Entity, and Crew Configuration remain as individual auto-fill grid items and flow side by side.
 
 ## 2026-06-22 (4)
 
