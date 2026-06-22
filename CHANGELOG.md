@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-22 (3)
+
+### Changed
+- **Tail Number is now required** — validated on submit in both the Add Entry form and Edit modal for flight legs; `*` marker added to the label.
+
 ## 2026-06-22 (2)
 
 ### Changed

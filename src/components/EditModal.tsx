@@ -92,6 +92,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
     if (restDay) {
       if (!restDayDate) { setErr('Enter the date of the rest day.'); return }
     } else {
+      if (!tailNumber.trim()) { setErr('Aircraft tail number is required.'); return }
       if (!entity.trim()) { setErr('Entity is required for Part 135 flights.'); return }
       const offN = parseHobbs(offHobbs)
       const onN  = parseHobbs(onHobbs)
@@ -140,7 +141,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
 
           <SectionLabel>Identification</SectionLabel>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number</Label>
+            <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number {!restDay && <span className="text-red-500">*</span>}</Label>
             <Input value={tailNumber} onChange={e => setTailNumber(e.target.value.toUpperCase())} placeholder="N123AB" maxLength={8} className="text-sm h-8 uppercase" />
           </div>
           <div className="flex flex-col gap-1">
