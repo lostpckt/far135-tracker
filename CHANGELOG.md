@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-22 (8)
+
+### Changed
+- **Remove legacy no-Z branches** — dead code handling pre-migration no-Z timestamps removed from `compute()` lookback and `countRestDaysInWindow()`; all data is now UTC (Z-suffix) after the one-time migration
+- **`computeDutyPeriod` extracted to `calculations.ts`** — the 23-line multi-leg duty period aggregation in `FlightLog` is replaced by a call to the new exported `computeDutyPeriod(legs, all, tz)` function; `DutyComputed` interface exported alongside it
+
+## 2026-06-22 (7)
+
+### Changed
+- **Simplification pass** — removed ~265 lines of duplication across the codebase with no behavior change:
+  - `generateQuarterlyReport` and `generateMonthlyReport` now share a single `buildReport` core (~400 lines of duplication collapsed); `compute()` is now called once per leg in reports instead of up to 3×
+  - `SectionLabel`, `DTField`, and `splitForEdit` extracted to `FormHelpers.tsx`; removed from `EditModal`, `DutyEditModal`, and `AddEntryForm`
+  - Dead exports `parseDTPair` and `splitDT` removed from `calculations.ts`
+  - `quarterFlightHours` and `annualFlightHours` share a `flightHoursInWindow` helper
+  - Redundant `entries.sort()` in `FlightLog` removed (entries arrive pre-sorted from `updateEntries`)
+  - Import confirmation and error dialogs in `App.tsx` converted from hand-rolled `fixed inset-0` divs to the `Dialog` component (gains focus trap and Escape key handling)
+
 ## 2026-06-22 (6)
 
 ### Changed

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
-import { compute, fmtDT, fmtHrs } from '@/lib/calculations'
+import { compute, computeDutyPeriod, fmtDT, fmtHrs } from '@/lib/calculations'
 import { utcToLocalParts } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -105,14 +105,8 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
   const [exceedanceReason, setExceedanceReason] = useState<string | null>(null)
   const [expandedDuty, setExpandedDuty] = useState<Set<string>>(new Set())
 
-  const sorted = [...entries].sort((a, b) => {
-    const aMs = a.showTime ? new Date(a.showTime).getTime() : 0
-    const bMs = b.showTime ? new Date(b.showTime).getTime() : 0
-    return aMs - bMs
-  })
-
   const groups: { key: string; entries: Entry[] }[] = []
-  for (const e of sorted) {
+  for (const e of entries) {
     const key = entryMonthKey(e, tz)
     const last = groups[groups.length - 1]
     if (last && last.key === key) last.entries.push(e)
@@ -121,7 +115,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
 
   // Rest day entries with restDayEnd spanning into later months must appear in
   // each spanned month group so those months are visible in the log.
-  for (const e of sorted) {
+  for (const e of entries) {
     if (!e.restDay || !e.restDayEnd) continue
     const startKey = entryMonthKey(e, tz)
     const endKey = e.restDayEnd.slice(0, 7)
@@ -313,29 +307,9 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                     }
 
                     // ── Multi-leg duty period ─────────────────────────────────
-                    const computedLegs = legs.map(l => compute(l, entries, tz))
-                    const p135Idx = legs.reduce<number[]>((acc, l, i) => { if (!l.part91) acc.push(i); return acc }, [])
-                    const allPart91 = p135Idx.length === 0
-                    const lastP135C = allPart91 ? computedLegs[computedLegs.length - 1] : computedLegs[p135Idx[p135Idx.length - 1]]
-                    const lastC = computedLegs[computedLegs.length - 1]
-
-                    const totalFlight = computedLegs.reduce((s, c) => s + (c.legFlight ?? 0), 0)
-                    const rolling24   = lastP135C?.rolling24 ?? null
-                    const maxFlight   = lastP135C?.maxFlight ?? 8
-                    const flightOk    = allPart91 ? null : p135Idx.some(i => computedLegs[i].flightOk === false) ? false : true
-                    const dutyPeriod  = lastC?.dutyPeriod ?? null
-                    const dutyOk      = allPart91 ? null : lastC?.dutyOk ?? null
-                    const reqRest     = lastP135C?.reqRest ?? 10
-                    const lookbackOk  = allPart91 ? null
-                      : p135Idx.some(i => computedLegs[i].lookbackOk === false) ? false
-                      : p135Idx.every(i => computedLegs[i].lookbackOk === true) ? true : null
-                    const consRest    = lastC?.consRest ?? null
-                    const restOk      = allPart91 ? null
-                      : p135Idx.some(i => computedLegs[i].restOk === false) ? false
-                      : p135Idx.every(i => computedLegs[i].restOk === true) ? true : null
-                    const excAmt      = allPart91 ? 0 : Math.max(...p135Idx.map(i => computedLegs[i].excAmt), 0)
-                    const excLegIdx   = excAmt > 0 ? p135Idx.slice().reverse().find(i => computedLegs[i].excAmt === excAmt) ?? -1 : -1
-                    const excReason   = excLegIdx >= 0 ? (legs[excLegIdx].reason || '(no reason recorded)') : ''
+                    const { computedLegs, allPart91, totalFlight, rolling24, maxFlight, flightOk,
+                            dutyPeriod, dutyOk, reqRest, lookbackOk, consRest, restOk, excAmt, excReason } =
+                      computeDutyPeriod(legs, entries, tz)
 
                     const p91Count = legs.filter(l => l.part91).length
                     const p91Badge = p91Count > 0

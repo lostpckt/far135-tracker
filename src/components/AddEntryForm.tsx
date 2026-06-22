@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import LegRow, { type LegData } from '@/components/LegRow'
+import { SectionLabel } from '@/components/FormHelpers'
 import { uid, ms, parseHobbs } from '@/lib/calculations'
 import { localToUtcIso, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
@@ -42,14 +43,6 @@ interface Props {
 
 function emptyLeg(): LegData {
   return { dep: '', arr: '', offHobbs: '', onHobbs: '', reason: '', part91: false }
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="col-span-full text-[0.68rem] font-bold uppercase tracking-widest text-slate-400 mt-2">
-      {children}
-    </div>
-  )
 }
 
 function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string; tz: string }) {

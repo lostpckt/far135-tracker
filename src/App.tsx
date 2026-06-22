@@ -3,6 +3,7 @@ import { loadEntries, saveEntries } from '@/lib/storage'
 import { ms, exportCSV, importCSV } from '@/lib/calculations'
 import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import Header from '@/components/Header'
 import RegNote from '@/components/RegNote'
 import Dashboard from '@/components/Dashboard'
@@ -136,55 +137,55 @@ export default function App() {
       <UpdateBanner />
 
       {/* Import confirmation */}
-      {pendingImport && (() => {
-        const flights  = pendingImport.filter(e => !e.restDay).length
-        const restDays = pendingImport.filter(e => e.restDay).length
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4">
-              <h2 className="text-base font-semibold">Import CSV?</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Found <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'} and <strong>{restDays}</strong> rest day {restDays === 1 ? 'row' : 'rows'}.
-              </p>
-              <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-                This will <strong>replace all existing data</strong>. Export your current log first if you want to keep it.
-              </p>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  onClick={() => setPendingImport(null)}
-                  className="text-sm h-8 px-3 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => { updateEntries(pendingImport); setPendingImport(null) }}
-                  className="text-sm h-8 px-3 rounded-md bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
-                >
-                  Replace &amp; Import
-                </button>
+      <Dialog open={!!pendingImport} onOpenChange={open => { if (!open) setPendingImport(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Import CSV?</DialogTitle></DialogHeader>
+          {pendingImport && (() => {
+            const flights  = pendingImport.filter(e => !e.restDay).length
+            const restDays = pendingImport.filter(e => e.restDay).length
+            return (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Found <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'} and <strong>{restDays}</strong> rest day {restDays === 1 ? 'row' : 'rows'}.
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  This will <strong>replace all existing data</strong>. Export your current log first if you want to keep it.
+                </p>
               </div>
-            </div>
-          </div>
-        )
-      })()}
+            )
+          })()}
+          <DialogFooter className="gap-2">
+            <button
+              onClick={() => setPendingImport(null)}
+              className="text-sm h-8 px-3 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { if (pendingImport) { updateEntries(pendingImport); setPendingImport(null) } }}
+              className="text-sm h-8 px-3 rounded-md bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
+            >
+              Replace &amp; Import
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Import error */}
-      {importError && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4">
-            <h2 className="text-base font-semibold text-red-600">Import Failed</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">{importError}</p>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setImportError(null)}
-                className="text-sm h-8 px-3 rounded-md bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!importError} onOpenChange={open => { if (!open) setImportError(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="text-red-600">Import Failed</DialogTitle></DialogHeader>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{importError}</p>
+          <DialogFooter>
+            <button
+              onClick={() => setImportError(null)}
+              className="text-sm h-8 px-3 rounded-md bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors"
+            >
+              OK
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <RunReportDialog
         open={showRunReport}
