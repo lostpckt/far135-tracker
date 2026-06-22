@@ -22,15 +22,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function DTField({ label, date, time, onDate, onTime, tz }: {
+function DTField({ label, date, time, onDate, onTime, tz, required }: {
   label: string; date: string; time: string
   onDate: (v: string) => void; onTime: (v: string) => void
-  tz: string
+  tz: string; required?: boolean
 }) {
   const utc = localToUtcIso(date, time, tz)
   return (
     <div className="flex flex-col gap-1">
-      <Label className="text-xs font-semibold text-slate-500">{label}</Label>
+      <Label className="text-xs font-semibold text-slate-500">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</Label>
       <div className="flex gap-1.5">
         <Input type="date" value={date} onChange={e => onDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
         <Input type="time" value={time} onChange={e => onTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
@@ -101,16 +101,16 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
 
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 py-2">
           <SectionLabel>Duty Period — times in {abbr}</SectionLabel>
-          <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} />
-          <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} />
+          <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} required />
+          <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} required />
 
           <SectionLabel>Hobbs Readings</SectionLabel>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Hobbs Start — Leg 1 Off Blocks</Label>
+            <Label className="text-xs font-semibold text-slate-500">Hobbs Start — Leg 1 Off Blocks <span className="text-red-500">*</span></Label>
             <Input type="number" value={offHobbs} onChange={e => setOffHobbs(e.target.value)} placeholder="12345.6" step="0.1" min="0" className="text-sm h-8" />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Hobbs End — Leg {legs.length} On Blocks</Label>
+            <Label className="text-xs font-semibold text-slate-500">Hobbs End — Leg {legs.length} On Blocks <span className="text-red-500">*</span></Label>
             <Input type="number" value={onHobbs} onChange={e => setOnHobbs(e.target.value)} placeholder="12349.0" step="0.1" min="0" className="text-sm h-8" />
           </div>
         </div>

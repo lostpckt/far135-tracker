@@ -197,7 +197,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             {restDay && (
               <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 ml-6 mt-1">
                 <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-semibold text-slate-500">Rest Day Date</Label>
+                  <Label className="text-xs font-semibold text-slate-500">Rest Day Date <span className="text-red-500">*</span></Label>
                   <Input type="date" value={restDayStart} onChange={e => setRestDayStart(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -213,7 +213,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
 
             <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr})</Label>
+              <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr}) <span className="text-red-500">*</span></Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
                 <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
@@ -223,7 +223,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr})</Label>
+              <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr}) <span className="text-red-500">*</span></Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
                 <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />

@@ -32,7 +32,7 @@ export default function LegRow({ index, data, onChange, onRemove, showRemove }: 
 
       <div className="flex flex-wrap gap-2.5 flex-1">
         <div className="flex flex-col gap-1">
-          <Label className="text-[0.7rem]">Dep ICAO</Label>
+          <Label className="text-[0.7rem]">Dep ICAO <span className="text-red-500">*</span></Label>
           <Input
             value={data.dep}
             onChange={e => set('dep', e.target.value.toUpperCase())}
@@ -43,7 +43,7 @@ export default function LegRow({ index, data, onChange, onRemove, showRemove }: 
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-[0.7rem]">Arr ICAO</Label>
+          <Label className="text-[0.7rem]">Arr ICAO <span className="text-red-500">*</span></Label>
           <Input
             value={data.arr}
             onChange={e => set('arr', e.target.value.toUpperCase())}
@@ -54,7 +54,7 @@ export default function LegRow({ index, data, onChange, onRemove, showRemove }: 
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-[0.7rem]">Off Blocks (Hobbs)</Label>
+          <Label className="text-[0.7rem]">Off Blocks (Hobbs) <span className="text-red-500">*</span></Label>
           <Input
             type="number"
             value={data.offHobbs}
@@ -67,7 +67,7 @@ export default function LegRow({ index, data, onChange, onRemove, showRemove }: 
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-[0.7rem]">On Blocks (Hobbs)</Label>
+          <Label className="text-[0.7rem]">On Blocks (Hobbs) <span className="text-red-500">*</span></Label>
           <Input
             type="number"
             value={data.onHobbs}
