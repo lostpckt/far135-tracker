@@ -152,7 +152,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
             <Label className="text-xs font-semibold text-slate-500">Pilot Name / ID</Label>
             <Input value={pilot} onChange={e => setPilot(e.target.value)} className="text-sm h-8" />
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 w-fit">
             <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>
             <Select value={crew} onValueChange={v => setCrew(v as 'S' | 'D')}>
               <SelectTrigger className="text-sm h-8"><SelectValue /></SelectTrigger>

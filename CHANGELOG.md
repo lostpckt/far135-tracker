@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-22 (6)
+
+### Fixed
+- **Crew Configuration cell now matches dropdown width** — the containing div uses `w-fit` so it shrinks to wrap the trigger rather than expanding to fill the grid column.
+
 ## 2026-06-22 (5)
 
 ### Changed

@@ -173,7 +173,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             />
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 w-fit">
             <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>
             <Select value={crew} onValueChange={v => setCrew(v as 'S' | 'D')}>
               <SelectTrigger className="text-sm h-8">
