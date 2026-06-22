@@ -2,6 +2,8 @@ export interface Entry {
   id: string
   pilot: string
   crew: 'S' | 'D'
+  tailNumber?: string   // Aircraft registration, e.g. "N123AB"
+  entity?: string       // Operating certificate holder / air carrier name
   showTime: string      // "YYYY-MM-DDTHH:MM"
   releaseTime: string
   dep: string

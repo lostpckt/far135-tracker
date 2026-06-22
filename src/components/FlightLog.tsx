@@ -11,6 +11,7 @@ interface Props {
   entries: Entry[]
   tz: string
   onEdit: (entry: Entry) => void
+  onEditDuty: (legs: Entry[]) => void
   onDelete: (id: string) => void
 }
 
@@ -100,7 +101,7 @@ function buildMonthItems(groupEntries: Entry[]): MonthItem[] {
 
 const COLS = 16
 
-export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
+export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }: Props) {
   const [exceedanceReason, setExceedanceReason] = useState<string | null>(null)
   const [expandedDuty, setExpandedDuty] = useState<Set<string>>(new Set())
 
@@ -275,7 +276,10 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtDT(e.showTime)}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtDT(e.releaseTime) : <span className="text-slate-400">—</span>}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.crew === 'D' ? 'Dual' : 'Single'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}{p91Badge}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}{p91Badge}
+                            {e.tailNumber && <div className="text-[0.65rem] text-slate-400">{e.tailNumber}</div>}
+                          </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
@@ -369,6 +373,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                             {routeChain}
                             <span className="text-slate-400 text-[0.65rem] ml-1">({legs.length} legs)</span>
                             {p91Badge}
+                            {legs[0].tailNumber && <div className="text-[0.65rem] text-slate-400">{legs[0].tailNumber}</div>}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[0].offBlocks || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[legs.length - 1].onBlocks || '—'}</td>
@@ -397,6 +402,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                             {allPart91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : summaryExcBadge}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            <button onClick={() => onEditDuty(legs)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
                             <button
                               onClick={() => toggleDuty(dutyKey)}
                               className="text-slate-400 hover:text-blue-500 rounded p-1"
@@ -421,6 +427,7 @@ export default function FlightLog({ entries, tz, onEdit, onDelete }: Props) {
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                                 {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}
                                 {e.part91 && <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>}
+                                {e.tailNumber && <div className="text-[0.65rem] text-slate-400">{e.tailNumber}</div>}
                               </td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>

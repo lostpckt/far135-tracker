@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-22
+
+### Added
+- **Aircraft tail number field** — free-form tail number input (e.g. N123AB) added to the Add Entry form above Crew Configuration and to the Edit modal under Identification. Stored per entry; displayed as a sub-line in the Route column. Included in CSV export/import as a "Tail Number" column.
+- **Entity field** — required field for all Part 135 flight entries identifying the operating certificate holder. Shown next to Tail Number in the Add Entry form and Edit modal. Validated on submit (cannot be blank for flight legs). Included in CSV export/import as an "Entity" column.
+- **Report entity filter** — the Run Report dialog now asks which entity to generate the report for. Only flight entries matching the selected entity are included; rest day entries are always included. The entity name appears in the report header.
+- **Edit button on collapsed multi-leg duty period rows** — pencil icon on the summary row opens a Duty Period Edit dialog to update Show Time, Release Time, Hobbs Start (first leg Off Blocks), and Hobbs End (last leg On Blocks) for the entire duty period without expanding individual legs.
+
 ## 2026-06-20 (7)
 
 ### Fixed

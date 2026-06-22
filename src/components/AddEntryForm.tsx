@@ -13,6 +13,8 @@ import type { Entry } from '@/types/entry'
 const DRAFT_KEY = 'far135_v1_form_draft'
 
 interface DraftState {
+  tailNumber: string
+  entity: string
   crew: 'S' | 'D'
   showDate: string
   showTime: string
@@ -59,6 +61,8 @@ function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string
 export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const d = readDraft()
 
+  const [tailNumber, setTailNumber] = useState(d?.tailNumber ?? '')
+  const [entity, setEntity]         = useState(d?.entity ?? '')
   const [crew, setCrew]             = useState<'S' | 'D'>(d?.crew ?? 'S')
   const [showDate, setShowDate]     = useState(d?.showDate ?? new Date().toLocaleDateString('en-CA'))
   const [showTime, setShowTime]     = useState(d?.showTime ?? '')
@@ -76,12 +80,12 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs }))
     } catch { /* localStorage unavailable */ }
-  }, [crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs])
+  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs])
 
   function resetForm() {
-    setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
+    setTailNumber(''); setEntity(''); setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
     setRsDate(''); setRsTime(''); setReDate(''); setReTime('')
     setRestDay(false); setRestDayStart(''); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
     try { localStorage.removeItem(DRAFT_KEY) } catch { /* localStorage unavailable */ }
@@ -97,6 +101,8 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       resetForm()
       return
     }
+
+    if (!entity.trim()) { setErr('Entity is required for Part 135 flights.'); return }
 
     const show    = localToUtcIso(showDate, showTime, tz)
     const release = localToUtcIso(relDate, relTime, tz)
@@ -122,6 +128,8 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
 
     const newEntries: Entry[] = legData.map(leg => ({
       id: uid(), pilot: '', crew,
+      tailNumber: tailNumber.trim() || undefined,
+      entity: entity.trim() || undefined,
       showTime: show, releaseTime: release,
       dep: leg.dep, arr: leg.arr,
       offBlocks: leg.off, onBlocks: leg.on,
@@ -142,6 +150,27 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5">
+
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number</Label>
+            <Input
+              value={tailNumber}
+              onChange={e => setTailNumber(e.target.value.toUpperCase())}
+              placeholder="N123AB"
+              maxLength={8}
+              className="text-sm h-8 uppercase"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Entity <span className="text-red-500">*</span></Label>
+            <Input
+              value={entity}
+              onChange={e => setEntity(e.target.value)}
+              placeholder="e.g. Acme Air LLC"
+              className="text-sm h-8"
+            />
+          </div>
 
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>

@@ -9,6 +9,7 @@ import Dashboard from '@/components/Dashboard'
 import AddEntryForm from '@/components/AddEntryForm'
 import FlightLog from '@/components/FlightLog'
 import EditModal from '@/components/EditModal'
+import DutyEditModal from '@/components/DutyEditModal'
 import QuickReference from '@/components/QuickReference'
 import HowToUse from '@/components/HowToUse'
 import UpdateBanner from '@/components/UpdateBanner'
@@ -19,6 +20,7 @@ import RunReportDialog from '@/components/RunReportDialog'
 export default function App() {
   const [entries, setEntries] = useState<Entry[]>(loadEntries)
   const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
+  const [editingDuty, setEditingDuty]     = useState<Entry[] | null>(null)
   const [showRunReport, setShowRunReport] = useState(false)
   const [pendingImport, setPendingImport] = useState<Entry[] | null>(null)
   const [importError, setImportError]     = useState<string | null>(null)
@@ -84,6 +86,7 @@ export default function App() {
           entries={entries}
           tz={tz}
           onEdit={setEditingEntry}
+          onEditDuty={setEditingDuty}
           onDelete={id => updateEntries(entries.filter(e => e.id !== id))}
         />
         <div className="flex flex-wrap gap-2.5 items-center px-1">
@@ -193,6 +196,19 @@ export default function App() {
 
       {showMigration && (
         <TzMigrationDialog entries={entries} onComplete={handleMigrationComplete} />
+      )}
+
+      {editingDuty && (
+        <DutyEditModal
+          legs={editingDuty}
+          tz={tz}
+          onSave={updatedLegs => {
+            const updatedMap = new Map(updatedLegs.map(e => [e.id, e]))
+            updateEntries(entries.map(e => updatedMap.get(e.id) ?? e))
+            setEditingDuty(null)
+          }}
+          onClose={() => setEditingDuty(null)}
+        />
       )}
 
       {editingEntry && (

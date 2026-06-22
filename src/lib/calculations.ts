@@ -241,7 +241,7 @@ export function exportCSV(entries: Entry[], tz?: string): void {
   if (!entries.length) { alert('No data to export.'); return }
 
   const hdr = [
-    'Show Time', 'Release Time', 'Pilot', 'Crew Config', 'Route',
+    'Show Time', 'Release Time', 'Pilot', 'Crew Config', 'Tail Number', 'Entity', 'Route',
     'Off Blocks', 'On Blocks', 'Leg Flight (h)', 'Rolling 24-hr (h)',
     'Max Allowed (h)', 'Flight Time OK', 'Duty Period (h)', 'Duty OK',
     '10-hr Lookback OK', 'Consecutive Rest (h)', 'Required Rest (h)',
@@ -254,7 +254,7 @@ export function exportCSV(entries: Entry[], tz?: string): void {
   const rows = entries.map(e => {
     if (e.restDay) {
       return [
-        q(e.showTime), q(''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
+        q(e.showTime), q(''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'), q(''), q(''),
         q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''),
         q(''), q(''), q('Yes'), q(e.restDayEnd || ''), q(''),
       ].join(',')
@@ -262,6 +262,8 @@ export function exportCSV(entries: Entry[], tz?: string): void {
     const c = compute(e, entries, tz)
     return [
       q(e.showTime), q(e.releaseTime || ''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
+      q(e.tailNumber || ''),
+      q(e.entity || ''),
       q(`${(e.dep || '').toUpperCase()}-${(e.arr || '').toUpperCase()}`),
       q(e.offBlocks), q(e.onBlocks),
       q(c.legFlight !== null ? c.legFlight.toFixed(2) : ''),
@@ -327,6 +329,8 @@ export function importCSV(text: string): Entry[] | { error: string } {
 
   const releaseIdx  = idx('Release Time')
   const pilotIdx    = idx('Pilot')
+  const tailIdx     = idx('Tail Number')
+  const entityIdx   = idx('Entity')
   const depIdx      = idx('Route')
   const offIdx      = idx('Off Blocks')
   const onIdx       = idx('On Blocks')
@@ -370,6 +374,8 @@ export function importCSV(text: string): Entry[] | { error: string } {
       id:          uid(),
       pilot:       get(row, pilotIdx).trim(),
       crew:        get(row, crewIdx).trim() === 'Dual' ? 'D' : 'S',
+      tailNumber:  get(row, tailIdx).trim() || undefined,
+      entity:      get(row, entityIdx).trim() || undefined,
       showTime,
       releaseTime: get(row, releaseIdx).trim() || '',
       dep,
@@ -389,12 +395,13 @@ export function importCSV(text: string): Entry[] | { error: string } {
   return entries
 }
 
-export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: number, tz?: string, dark = false): string {
+export function generateQuarterlyReport(entries: Entry[], qIdx: number, year: number, tz?: string, dark = false, entity?: string): string {
   const qStart = new Date(year, qIdx * 3, 1).getTime()
   const qEnd   = new Date(year, qIdx * 3 + 3, 1).getTime()
   const qLabel = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'][qIdx]
 
-  const qEntries = entries.filter(e => {
+  const scopedEntries = entity ? entries.filter(e => e.restDay || e.entity === entity) : entries
+  const qEntries = scopedEntries.filter(e => {
     const anchor = ms(e.releaseTime) ?? ms(e.showTime)
     return anchor !== null && anchor >= qStart && anchor < qEnd
   })
@@ -596,7 +603,7 @@ function toggleLog() {
   <button class="btn btn-tog" id="toggleBtn" onclick="toggleLog()">Show Full Log</button>
 </div>
 <h1>FAR 135.267 Quarterly Compliance Report</h1>
-<div class="meta">Period: <strong>${qLabel} ${year}</strong> &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
+<div class="meta">Period: <strong>${qLabel} ${year}</strong>${entity ? ` &nbsp;|&nbsp; Entity: <strong>${esc(entity)}</strong>` : ''} &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
 <div class="status-banner">${overallOk ? '✓' : '⚠'} Overall Status: ${statusText}${!overallOk ? ` — ${totalViolations} violation(s) and/or rest day shortfall detected` : ''}</div>
 <div style="margin-bottom:20px">
   <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs</div><div class="sub">${part91Legs.length ? `<span style="color:${col.amber}">+${part91Legs.length} Part 91</span>` : ''}</div></div>
@@ -618,13 +625,14 @@ function toggleLog() {
 </body></html>`
 }
 
-export function generateMonthlyReport(entries: Entry[], monthIdx: number, year: number, tz?: string, dark = false): string {
+export function generateMonthlyReport(entries: Entry[], monthIdx: number, year: number, tz?: string, dark = false, entity?: string): string {
   const mStart = new Date(year, monthIdx, 1).getTime()
   const mEnd   = new Date(year, monthIdx + 1, 1).getTime()
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
   const mLabel = `${MONTHS[monthIdx]} ${year}`
 
-  const mEntries = entries.filter(e => {
+  const scopedEntries = entity ? entries.filter(e => e.restDay || e.entity === entity) : entries
+  const mEntries = scopedEntries.filter(e => {
     const anchor = ms(e.releaseTime) ?? ms(e.showTime)
     return anchor !== null && anchor >= mStart && anchor < mEnd
   })
@@ -818,7 +826,7 @@ function toggleLog() {
   <button class="btn btn-tog" id="toggleBtn" onclick="toggleLog()">Show Full Log</button>
 </div>
 <h1>FAR 135.267 Monthly Compliance Report</h1>
-<div class="meta">Period: <strong>${mLabel}</strong> &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
+<div class="meta">Period: <strong>${mLabel}</strong>${entity ? ` &nbsp;|&nbsp; Entity: <strong>${esc(entity)}</strong>` : ''} &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
 <div class="status-banner">${overallOk ? '✓' : '⚠'} Overall Status: ${statusText}${!overallOk ? ` — ${totalViolations} violation(s) detected` : ''}</div>
 <div style="margin-bottom:20px">
   <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs</div><div class="sub">${part91Legs.length ? `<span style="color:${col.amber}">+${part91Legs.length} Part 91</span>` : ''}</div></div>

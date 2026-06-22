@@ -63,6 +63,8 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
     ? (utcToLocalParts(entry.showTime, tz)?.date ?? entry.showTime.slice(0, 10))
     : (entry.showTime ? entry.showTime.slice(0, 10) : '')
 
+  const [tailNumber, setTailNumber]   = useState(entry.tailNumber || '')
+  const [entity, setEntity]           = useState(entry.entity || '')
   const [pilot, setPilot]             = useState(entry.pilot || '')
   const [crew, setCrew]               = useState<'S' | 'D'>(entry.crew || 'S')
   const [showDate, setShowDate]       = useState(s.d)
@@ -90,6 +92,7 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
     if (restDay) {
       if (!restDayDate) { setErr('Enter the date of the rest day.'); return }
     } else {
+      if (!entity.trim()) { setErr('Entity is required for Part 135 flights.'); return }
       const offN = parseHobbs(offHobbs)
       const onN  = parseHobbs(onHobbs)
       if (!dep.trim()) { setErr('Departure ICAO is required.'); return }
@@ -107,6 +110,8 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
       ...entry,
       pilot,
       crew,
+      tailNumber: tailNumber.trim() || undefined,
+      entity: entity.trim() || undefined,
       showTime:    restDay ? (localToUtcIso(restDayDate, '00:00', tz) || `${restDayDate}T00:00`) : localToUtcIso(showDate, showTime, tz),
       releaseTime: restDay ? '' : localToUtcIso(relDate, relTime, tz),
       dep:         dep.toUpperCase().trim(),
@@ -134,6 +139,14 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 py-2">
 
           <SectionLabel>Identification</SectionLabel>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Aircraft Tail Number</Label>
+            <Input value={tailNumber} onChange={e => setTailNumber(e.target.value.toUpperCase())} placeholder="N123AB" maxLength={8} className="text-sm h-8 uppercase" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Entity {!restDay && <span className="text-red-500">*</span>}</Label>
+            <Input value={entity} onChange={e => setEntity(e.target.value)} placeholder="e.g. Acme Air LLC" className="text-sm h-8" />
+          </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-semibold text-slate-500">Pilot Name / ID</Label>
             <Input value={pilot} onChange={e => setPilot(e.target.value)} className="text-sm h-8" />

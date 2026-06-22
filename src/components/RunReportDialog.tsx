@@ -17,7 +17,12 @@ interface Props {
 }
 
 export default function RunReportDialog({ open, onClose, entries, tz, dark }: Props) {
-  const [type, setType]   = useState<'quarterly' | 'monthly'>('quarterly')
+  const entities = [...new Set(
+    entries.filter(e => !e.restDay && e.entity).map(e => e.entity!)
+  )].sort()
+
+  const [type, setType]       = useState<'quarterly' | 'monthly'>('quarterly')
+  const [entity, setEntity]   = useState(() => entities.length === 1 ? entities[0] : '')
   const [quarter, setQuarter] = useState(() => Math.floor(new Date().getMonth() / 3).toString())
   const [month, setMonth]     = useState(() => new Date().getMonth().toString())
   const [year, setYear]       = useState(() => new Date().getFullYear().toString())
@@ -25,16 +30,17 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
   function handleGenerate() {
     const y = parseInt(year, 10)
     if (isNaN(y) || y < 2000) { alert('Enter a valid year.'); return }
+    if (!entity) { alert('Select an entity to generate the report for.'); return }
 
     let html: string
     if (type === 'quarterly') {
       const q = parseInt(quarter, 10)
-      html = generateQuarterlyReport(entries, q, y, tz, dark)
-      if (!html) { alert(`No entries found for ${['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][q]} ${y}.`); return }
+      html = generateQuarterlyReport(entries, q, y, tz, dark, entity)
+      if (!html) { alert(`No entries found for ${['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][q]} ${y} — ${entity}.`); return }
     } else {
       const m = parseInt(month, 10)
-      html = generateMonthlyReport(entries, m, y, tz, dark)
-      if (!html) { alert(`No entries found for ${MONTHS[m]} ${y}.`); return }
+      html = generateMonthlyReport(entries, m, y, tz, dark, entity)
+      if (!html) { alert(`No entries found for ${MONTHS[m]} ${y} — ${entity}.`); return }
     }
 
     const w = window.open('', '_blank')
@@ -51,6 +57,24 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500">Entity</label>
+            {entities.length === 0 ? (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">No entities found. Add an entity to flight entries first.</p>
+            ) : (
+              <Select value={entity} onValueChange={setEntity}>
+                <SelectTrigger className="text-sm h-8">
+                  <SelectValue placeholder="Select entity…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {entities.map(e => (
+                    <SelectItem key={e} value={e}>{e}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
           <div className="flex gap-2">
             <Button
               variant={type === 'quarterly' ? 'default' : 'outline'}
