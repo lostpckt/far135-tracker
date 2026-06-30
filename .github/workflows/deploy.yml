@@ -29,7 +29,14 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - uses: actions/cache@v4
+        id: cache-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node24-modules-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.cache-modules.outputs.cache-hit != 'true'
         run: npm ci --legacy-peer-deps
 
       - name: Build
