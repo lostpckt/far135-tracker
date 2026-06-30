@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-30
+
+### Fixed
+- **Rest Start/End now editable on duty period summary row** — the Edit Duty Period modal (pencil icon on collapsed multi-leg duty rows) now includes a Rest Period section. Values are stored on the last leg, which is what drives the "Rest After" column and compliance check.
+
 ## 2026-06-22 (8)
 
 ### Changed

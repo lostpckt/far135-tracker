@@ -19,8 +19,10 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
   const firstLeg = legs[0]
   const lastLeg = legs[legs.length - 1]
 
-  const s = splitForEdit(firstLeg.showTime, tz)
-  const r = splitForEdit(firstLeg.releaseTime, tz)
+  const s  = splitForEdit(firstLeg.showTime,    tz)
+  const r  = splitForEdit(firstLeg.releaseTime, tz)
+  const rs = splitForEdit(lastLeg.restStart,    tz)
+  const re = splitForEdit(lastLeg.restEnd,      tz)
 
   const [showDate, setShowDate] = useState(s.d)
   const [showTime, setShowTime] = useState(s.t)
@@ -28,6 +30,10 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
   const [relTime, setRelTime]   = useState(r.t)
   const [offHobbs, setOffHobbs] = useState(firstLeg.offBlocks || '')
   const [onHobbs, setOnHobbs]   = useState(lastLeg.onBlocks || '')
+  const [rsDate, setRsDate]     = useState(rs.d)
+  const [rsTime, setRsTime]     = useState(rs.t)
+  const [reDate, setReDate]     = useState(re.d)
+  const [reTime, setReTime]     = useState(re.t)
   const [err, setErr]           = useState('')
 
   function handleSave() {
@@ -48,6 +54,8 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
       releaseTime: release,
       offBlocks:   i === 0               ? offHobbs.trim() : leg.offBlocks,
       onBlocks:    i === legs.length - 1 ? onHobbs.trim()  : leg.onBlocks,
+      restStart:   i === legs.length - 1 ? (localToUtcIso(rsDate, rsTime, tz) ?? leg.restStart) : leg.restStart,
+      restEnd:     i === legs.length - 1 ? (localToUtcIso(reDate, reTime, tz) ?? leg.restEnd)   : leg.restEnd,
     })))
   }
 
@@ -78,6 +86,10 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
             <Label className="text-xs font-semibold text-slate-500">Hobbs End — Leg {legs.length} On Blocks <span className="text-red-500">*</span></Label>
             <Input type="number" value={onHobbs} onChange={e => setOnHobbs(e.target.value)} placeholder="12349.0" step="0.1" min="0" className="text-sm h-8" />
           </div>
+
+          <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
+          <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} tz={tz} />
+          <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} tz={tz} />
         </div>
 
         {err && <p className="text-red-600 text-xs mt-1">{err}</p>}
