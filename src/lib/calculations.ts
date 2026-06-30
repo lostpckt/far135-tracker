@@ -59,7 +59,7 @@ export function checkRestOverlapForEntry(entry: Entry, all: Entry[]): boolean {
   if (rsMs !== null && anchor !== null && rsMs < anchor) return false
   if (reMs !== null && anchor !== null) {
     for (const e of all) {
-      if (e.restDay || e.id === entry.id) continue
+      if (e.restDay || e.part91 || e.id === entry.id) continue
       const eShowMs = ms(e.showTime)
       if (eShowMs !== null && eShowMs > anchor) {
         if (reMs > eShowMs) return false

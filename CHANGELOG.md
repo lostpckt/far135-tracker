@@ -2,6 +2,9 @@
 
 ## 2026-06-30
 
+### Fixed
+- **Rest overlap check no longer flags Part 91 flights as the next duty period** — `checkRestOverlapForEntry` now skips Part 91 entries when searching for the next show time, since Part 91 operations do not affect Part 135 rest requirements. `VALIDATION_RESET_EPOCH` bumped to 2 to force a full re-scan of all previously validated entries on next load.
+
 ### Added
 - **"All Entities" option in Run Report dialog** — generates a report covering flights across all entities; report header shows "Entity: All Entities". Defaults to All when more than one entity exists.
 - **Rest overlap validation** — detects when Rest Start is before Release Time, or Rest End extends past the next duty period's Show Time. Flagged entries show "⚠ rest overlap" in the Rest After column and an amber ⚠ button in the actions column. The warning also appears live in the edit modals as you type.

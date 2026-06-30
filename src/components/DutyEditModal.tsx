@@ -73,7 +73,7 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
     restWarnings.push('Rest Start is before Release Time')
   if (reMs !== null && releaseMs !== null) {
     for (const e of entries) {
-      if (e.restDay || legIds.has(e.id)) continue
+      if (e.restDay || e.part91 || legIds.has(e.id)) continue
       const eShowMs = ms(e.showTime)
       if (eShowMs !== null && eShowMs > releaseMs) {
         if (reMs > eShowMs) restWarnings.push('Rest End overlaps the next duty period\'s Show Time')

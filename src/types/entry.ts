@@ -2,7 +2,7 @@
 // fixing a bug in an existing validation rule). Bump ENTRY_VALIDATION_VERSION to
 // add a new incremental validation rule. Both are stored in localStorage as
 // "epoch.version" so either change triggers the appropriate scan behaviour.
-export const VALIDATION_RESET_EPOCH    = 1
+export const VALIDATION_RESET_EPOCH    = 2
 export const ENTRY_VALIDATION_VERSION  = 1
 
 export interface Entry {
