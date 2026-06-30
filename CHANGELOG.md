@@ -2,6 +2,9 @@
 
 ## 2026-06-30
 
+### Changed
+- **Report summary flight log now shows Show Time and Release Time columns** — the daily summary table in generated reports now includes Show Time and Release Time (displayed in the user's local timezone) between Date and Pilot(s), replacing the previous 4-column layout with a 6-column layout.
+
 ### Fixed
 - **Rest overlap check no longer flags Part 91 flights as the next duty period** — `checkRestOverlapForEntry` now skips Part 91 entries when searching for the next show time, since Part 91 operations do not affect Part 135 rest requirements. `VALIDATION_RESET_EPOCH` bumped to 2 to force a full re-scan of all previously validated entries on next load.
 

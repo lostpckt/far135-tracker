@@ -523,14 +523,21 @@ function buildReport(
     return e.showTime.split('T')[0] ?? ''
   }
 
-  type DaySummary = { p135: number; p91: number; pilots: Set<string>; hasViolation: boolean }
+  function fmtTime(dt: string): string {
+    if (!dt) return '—'
+    if (dt.endsWith('Z') && tz) return utcToLocalParts(dt, tz)?.time ?? dt.slice(11, 16)
+    return dt.slice(11, 16) || '—'
+  }
+
+  type DaySummary = { p135: number; p91: number; pilots: Set<string>; hasViolation: boolean; showTime: string; releaseTime: string }
   const dayMap = new Map<string, DaySummary>()
   for (const e of periodEntries) {
     if (e.restDay) continue
     const dk = entryLocalDate(e)
     if (!dk) continue
-    if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, pilots: new Set(), hasViolation: false })
+    if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, pilots: new Set(), hasViolation: false, showTime: e.showTime ?? '', releaseTime: e.releaseTime ?? '' })
     const d = dayMap.get(dk)!
+    if (e.releaseTime && e.releaseTime > d.releaseTime) d.releaseTime = e.releaseTime
     if (e.pilot) d.pilots.add(esc(e.pilot))
     const ft = hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0
     if (e.part91) { d.p91 += ft } else {
@@ -546,14 +553,14 @@ function buildReport(
       const startStr = e.showTime?.endsWith('Z') && tz ? (utcToLocalParts(e.showTime, tz)?.date ?? e.showTime.slice(0, 10)) : (e.showTime ? e.showTime.split('T')[0] : '')
       const endStr = e.restDayEnd || startStr
       const days   = countRestDaysInWindow(e, periodStart, periodEnd, tz)
-      return `<tr style="background:${col.greenBg}"><td>${endStr && endStr !== startStr ? `${startStr} – ${endStr}` : startStr}</td><td colspan="3" style="color:${col.green};font-weight:700">● REST DAY${days > 1 ? `S (${days} days)` : ''}</td></tr>`
+      return `<tr style="background:${col.greenBg}"><td>${endStr && endStr !== startStr ? `${startStr} – ${endStr}` : startStr}</td><td colspan="5" style="color:${col.green};font-weight:700">● REST DAY${days > 1 ? `S (${days} days)` : ''}</td></tr>`
     }
     const dk = entryLocalDate(e)
     if (!dk || seenDates.has(dk)) return ''
     seenDates.add(dk)
     const d = dayMap.get(dk)
     if (!d) return ''
-    return `<tr${d.hasViolation ? ` style="background:${col.redBg}"` : ''}><td>${dk}</td><td>${[...d.pilots].join(', ') || '—'}</td><td>${d.p135 > 0 ? fmtHrs(d.p135) : '—'}</td><td style="color:${d.p91 > 0 ? col.amber : col.muted}">${d.p91 > 0 ? fmtHrs(d.p91) : '—'}</td></tr>`
+    return `<tr${d.hasViolation ? ` style="background:${col.redBg}"` : ''}><td>${dk}</td><td>${fmtTime(d.showTime)}</td><td>${fmtTime(d.releaseTime)}</td><td>${[...d.pilots].join(', ') || '—'}</td><td>${d.p135 > 0 ? fmtHrs(d.p135) : '—'}</td><td style="color:${d.p91 > 0 ? col.amber : col.muted}">${d.p91 > 0 ? fmtHrs(d.p91) : '—'}</td></tr>`
   }).filter(Boolean).join('')
 
   const logRows = sorted.map(e => {
@@ -626,7 +633,7 @@ function toggleLog() {
 <h2>Exceedances</h2><table><thead><tr><th>Date</th><th>Pilot</th><th>Route</th><th>Over Limit</th><th>Reason</th><th>Req Rest</th></tr></thead><tbody>${exRows}</tbody></table>
 <h2>Flight Log</h2>
 <div id="summaryLog">
-<table><thead><tr><th>Date</th><th>Pilot(s)</th><th>Part 135 Time</th><th>Part 91 Time</th></tr></thead><tbody>${summaryRows}</tbody></table>
+<table><thead><tr><th>Date</th><th>Show Time</th><th>Release Time</th><th>Pilot(s)</th><th>Part 135 Time</th><th>Part 91 Time</th></tr></thead><tbody>${summaryRows}</tbody></table>
 </div>
 <div id="fullLog" style="display:none">
 <table><thead><tr><th>Show Time</th><th>Pilot</th><th>Crew</th><th>Route</th><th>Off Blocks</th><th>On Blocks</th><th>Leg Time</th><th>Rolling 24-hr</th><th>Flt✓</th><th>Duty</th><th>Duty✓</th><th>Rest After</th><th>Rest✓</th><th>Exc</th></tr></thead><tbody>${logRows}</tbody></table>
