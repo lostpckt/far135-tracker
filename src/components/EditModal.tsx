@@ -174,8 +174,8 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
             </div>
 
             <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
-            <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} tz={tz} />
-            <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} tz={tz} />
+            <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} tz={tz} onClear={() => { setRsDate(''); setRsTime('') }} />
+            <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} tz={tz} onClear={() => { setReDate(''); setReTime('') }} />
 
             <SectionLabel>Other</SectionLabel>
             <div className="flex flex-col gap-1">
