@@ -3,6 +3,7 @@
 ## 2026-06-30
 
 ### Fixed
+- **Date picker no longer opens automatically on modal open (iOS)** — Edit Flight Entry and Edit Duty Period modals now suppress Radix Dialog's auto-focus behavior, preventing the native date picker from covering the form on tap.
 - **Rest Start/End now editable on duty period summary row** — the Edit Duty Period modal (pencil icon on collapsed multi-leg duty rows) now includes a Rest Period section. Values are stored on the last leg, which is what drives the "Rest After" column and compliance check.
 
 ## 2026-06-22 (8)

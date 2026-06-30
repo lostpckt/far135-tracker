@@ -63,7 +63,7 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" onOpenAutoFocus={e => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-sm font-bold">Edit Duty Period</DialogTitle>
         </DialogHeader>
