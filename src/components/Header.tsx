@@ -43,6 +43,12 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
   const checkLabel = checking ? 'Checking…' : checked ? 'Up to date' : 'Check for update'
 
   return (
+    <>
+    {checked && (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-3 shadow-lg text-white text-sm font-medium pointer-events-none select-none">
+        <span className="text-green-400">✓</span> Up to date
+      </div>
+    )}
     <header className="bg-slate-900 text-white px-6 py-3.5 flex items-center gap-3">
       <div className="flex-1 min-w-0">
         <h1 className="text-lg font-bold whitespace-nowrap">✈ FAR 135.267 Duty &amp; Flight Time Tracker</h1>
@@ -145,5 +151,6 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
         />
       </div>
     </header>
+    </>
   )
 }

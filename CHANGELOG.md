@@ -3,6 +3,7 @@
 ## 2026-06-30
 
 ### Fixed
+- **"Up to date" toast after checking for updates** — a brief toast now appears at the bottom of the screen when a manual update check completes with no new version, giving clear confirmation the check ran (previously the menu just closed silently on mobile).
 - **Clear button on Rest Start / Rest End fields** — a "Clear" link appears next to the label when the field has a value, allowing rest period entries to be removed (e.g. for Part 91 legs where rest is not tracked).
 - **Date picker no longer opens automatically on modal open (iOS)** — Edit Flight Entry and Edit Duty Period modals now suppress Radix Dialog's auto-focus behavior, preventing the native date picker from covering the form on tap.
 - **Rest Start/End now editable on duty period summary row** — the Edit Duty Period modal (pencil icon on collapsed multi-leg duty rows) now includes a Rest Period section. Values are stored on the last leg, which is what drives the "Rest After" column and compliance check.
