@@ -22,7 +22,7 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
   )].sort()
 
   const [type, setType]       = useState<'quarterly' | 'monthly'>('quarterly')
-  const [entity, setEntity]   = useState(() => entities.length === 1 ? entities[0] : '')
+  const [entity, setEntity]   = useState(() => entities.length === 1 ? entities[0] : '__all__')
   const [quarter, setQuarter] = useState(() => Math.floor(new Date().getMonth() / 3).toString())
   const [month, setMonth]     = useState(() => new Date().getMonth().toString())
   const [year, setYear]       = useState(() => new Date().getFullYear().toString())
@@ -30,17 +30,19 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
   function handleGenerate() {
     const y = parseInt(year, 10)
     if (isNaN(y) || y < 2000) { alert('Enter a valid year.'); return }
-    if (!entity) { alert('Select an entity to generate the report for.'); return }
+
+    const entityFilter = entity === '__all__' ? undefined : entity
+    const entityLabel  = entity === '__all__' ? 'all entities' : entity
 
     let html: string
     if (type === 'quarterly') {
       const q = parseInt(quarter, 10)
-      html = generateQuarterlyReport(entries, q, y, tz, dark, entity)
-      if (!html) { alert(`No entries found for ${['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][q]} ${y} — ${entity}.`); return }
+      html = generateQuarterlyReport(entries, q, y, tz, dark, entityFilter)
+      if (!html) { alert(`No entries found for ${['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][q]} ${y} — ${entityLabel}.`); return }
     } else {
       const m = parseInt(month, 10)
-      html = generateMonthlyReport(entries, m, y, tz, dark, entity)
-      if (!html) { alert(`No entries found for ${MONTHS[m]} ${y} — ${entity}.`); return }
+      html = generateMonthlyReport(entries, m, y, tz, dark, entityFilter)
+      if (!html) { alert(`No entries found for ${MONTHS[m]} ${y} — ${entityLabel}.`); return }
     }
 
     const w = window.open('', '_blank')
@@ -67,6 +69,7 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
                   <SelectValue placeholder="Select entity…" />
                 </SelectTrigger>
                 <SelectContent position="popper">
+                  <SelectItem value="__all__">All Entities</SelectItem>
                   {entities.map(e => (
                     <SelectItem key={e} value={e}>{e}</SelectItem>
                   ))}

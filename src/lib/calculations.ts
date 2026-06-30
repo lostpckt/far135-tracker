@@ -613,7 +613,7 @@ function toggleLog() {
   <button class="btn btn-tog" id="toggleBtn" onclick="toggleLog()">Show Full Log</button>
 </div>
 <h1>FAR 135.267 ${heading}</h1>
-<div class="meta">Period: <strong>${periodLabel}</strong>${entity ? ` &nbsp;|&nbsp; Entity: <strong>${esc(entity)}</strong>` : ''} &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
+<div class="meta">Period: <strong>${periodLabel}</strong> &nbsp;|&nbsp; Entity: <strong>${entity ? esc(entity) : 'All Entities'}</strong> &nbsp;|&nbsp; Pilot(s): <strong>${pilots}</strong> &nbsp;|&nbsp; Generated: ${generated}</div>
 <div class="status-banner">${overallOk ? '✓' : '⚠'} Overall Status: ${statusText}${failDetail}</div>
 <div style="margin-bottom:20px">
   <div class="stat-box"><div class="val">${part135Legs.length}</div><div class="lbl">Part 135 Legs</div><div class="sub">${part91Legs.length ? `<span style="color:${col.amber}">+${part91Legs.length} Part 91</span>` : ''}</div></div>

@@ -3,6 +3,7 @@
 ## 2026-06-30
 
 ### Added
+- **"All Entities" option in Run Report dialog** — generates a report covering flights across all entities; report header shows "Entity: All Entities". Defaults to All when more than one entity exists.
 - **Rest overlap validation** — detects when Rest Start is before Release Time, or Rest End extends past the next duty period's Show Time. Flagged entries show "⚠ rest overlap" in the Rest After column and an amber ⚠ button in the actions column. The warning also appears live in the edit modals as you type.
 - **Validation versioning** (`validationVersion` on each entry, `VALIDATION_RESET_EPOCH` + `ENTRY_VALIDATION_VERSION` constants) — on first load after this update, all existing entries are scanned once and stamped if they pass. A `far135_bulk_validated` localStorage key prevents re-scanning on subsequent loads (O(1) check). Bumping `ENTRY_VALIDATION_VERSION` triggers an incremental re-scan on next load; bumping `VALIDATION_RESET_EPOCH` forces a full reset of all entry versions before re-scanning.
 
