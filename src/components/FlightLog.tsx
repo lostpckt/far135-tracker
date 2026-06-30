@@ -6,6 +6,7 @@ import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { compute, computeDutyPeriod, fmtDT, fmtHrs } from '@/lib/calculations'
 import { utcToLocalParts } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
+import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
 
 interface Props {
   entries: Entry[]
@@ -295,10 +296,14 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {fmtHrs(c.consRest)}<br />
                             {!e.part91 && <span className="text-[0.68rem] text-slate-400">Req: {c.reqRest}h</span>}
+                            {c.restOverlapOk === false && <div className="text-[0.65rem] text-red-600 mt-0.5">⚠ rest overlap</div>}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {(e.validationVersion ?? 0) < ENTRY_VALIDATION_VERSION && (
+                              <button onClick={() => onEdit(e)} title="Needs review — open and save to validate" className="text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900 rounded p-1 mr-0.5">⚠</button>
+                            )}
                             <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
                             <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>
                           </td>
@@ -308,7 +313,8 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
 
                     // ── Multi-leg duty period ─────────────────────────────────
                     const { computedLegs, allPart91, totalFlight, rolling24, maxFlight, flightOk,
-                            dutyPeriod, dutyOk, reqRest, lookbackOk, consRest, restOk, excAmt, excReason } =
+                            dutyPeriod, dutyOk, reqRest, lookbackOk, consRest, restOk, restOverlapOk,
+                            excAmt, excReason } =
                       computeDutyPeriod(legs, entries, tz)
 
                     const p91Count = legs.filter(l => l.part91).length
@@ -370,12 +376,16 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {fmtHrs(consRest)}<br />
                             {!allPart91 && <span className="text-[0.68rem] text-slate-400">Req: {reqRest}h</span>}
+                            {restOverlapOk === false && <div className="text-[0.65rem] text-red-600 mt-0.5">⚠ rest overlap</div>}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={restOk} okText="OK" warnText="DEFICIENT" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
                             {allPart91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : summaryExcBadge}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            {legs.some(l => (l.validationVersion ?? 0) < ENTRY_VALIDATION_VERSION) && (
+                              <button onClick={() => onEditDuty(legs)} title="Needs review — open and save to validate" className="text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900 rounded p-1 mr-0.5">⚠</button>
+                            )}
                             <button onClick={() => onEditDuty(legs)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
                             <button
                               onClick={() => toggleDuty(dutyKey)}

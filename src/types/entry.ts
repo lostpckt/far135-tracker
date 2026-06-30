@@ -1,3 +1,10 @@
+// Bump VALIDATION_RESET_EPOCH to force a full re-scan of all entries (e.g. after
+// fixing a bug in an existing validation rule). Bump ENTRY_VALIDATION_VERSION to
+// add a new incremental validation rule. Both are stored in localStorage as
+// "epoch.version" so either change triggers the appropriate scan behaviour.
+export const VALIDATION_RESET_EPOCH    = 1
+export const ENTRY_VALIDATION_VERSION  = 1
+
 export interface Entry {
   id: string
   pilot: string
@@ -16,6 +23,7 @@ export interface Entry {
   part91: boolean
   restDay: boolean
   restDayEnd?: string    // YYYY-MM-DD, set when a rest day entry spans multiple days
+  validationVersion?: number
 }
 
 export interface Computed {
@@ -30,4 +38,5 @@ export interface Computed {
   flightOk: boolean | null
   dutyOk: boolean | null
   restOk: boolean | null
+  restOverlapOk: boolean | null
 }

@@ -6,18 +6,20 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ms, parseHobbs } from '@/lib/calculations'
+import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
 import { localToUtcIso, utcToLocalParts, tzAbbr } from '@/lib/timezone'
 import { SectionLabel, DTField, splitForEdit } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
 interface Props {
   entry: Entry
+  entries: Entry[]
   tz: string
   onSave: (updated: Entry) => void
   onClose: () => void
 }
 
-export default function EditModal({ entry, tz, onSave, onClose }: Props) {
+export default function EditModal({ entry, entries, tz, onSave, onClose }: Props) {
   // State initialized from props on mount. Parent uses key={entry.id} to remount on entry change.
   const s  = splitForEdit(entry.showTime,    tz)
   const r  = splitForEdit(entry.releaseTime, tz)
@@ -89,10 +91,31 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
       part91,
       restDay,
       restDayEnd: restDay && restDayEnd ? restDayEnd : undefined,
+      validationVersion: ENTRY_VALIDATION_VERSION,
     })
   }
 
   const abbr = tzAbbr(tz)
+
+  // Derived rest overlap warnings — recalculated on every render from form state
+  const restWarnings: string[] = []
+  if (!restDay) {
+    const releaseMs = ms(localToUtcIso(relDate, relTime, tz))
+    const rsMs = rsDate && rsTime ? ms(localToUtcIso(rsDate, rsTime, tz)) : null
+    const reMs = reDate && reTime ? ms(localToUtcIso(reDate, reTime, tz)) : null
+    if (rsMs !== null && releaseMs !== null && rsMs < releaseMs)
+      restWarnings.push('Rest Start is before Release Time')
+    if (reMs !== null && releaseMs !== null) {
+      for (const e of entries) {
+        if (e.restDay || e.id === entry.id) continue
+        const eShowMs = ms(e.showTime)
+        if (eShowMs !== null && eShowMs > releaseMs) {
+          if (reMs > eShowMs) restWarnings.push('Rest End overlaps the next duty period\'s Show Time')
+          break
+        }
+      }
+    }
+  }
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
@@ -176,6 +199,11 @@ export default function EditModal({ entry, tz, onSave, onClose }: Props) {
             <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
             <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} tz={tz} onClear={() => { setRsDate(''); setRsTime('') }} />
             <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} tz={tz} onClear={() => { setReDate(''); setReTime('') }} />
+            {restWarnings.length > 0 && (
+              <div className="col-span-full rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1">
+                {restWarnings.map(w => <p key={w} className="text-xs text-amber-700 dark:text-amber-400">⚠ {w}</p>)}
+              </div>
+            )}
 
             <SectionLabel>Other</SectionLabel>
             <div className="flex flex-col gap-1">

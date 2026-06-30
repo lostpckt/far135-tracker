@@ -5,17 +5,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ms, parseHobbs } from '@/lib/calculations'
 import { localToUtcIso, tzAbbr } from '@/lib/timezone'
+import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
 import { SectionLabel, DTField, splitForEdit } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
 interface Props {
   legs: Entry[]
+  entries: Entry[]
   tz: string
   onSave: (updated: Entry[]) => void
   onClose: () => void
 }
 
-export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
+export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Props) {
   const firstLeg = legs[0]
   const lastLeg = legs[legs.length - 1]
 
@@ -54,12 +56,31 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
       releaseTime: release,
       offBlocks:   i === 0               ? offHobbs.trim() : leg.offBlocks,
       onBlocks:    i === legs.length - 1 ? onHobbs.trim()  : leg.onBlocks,
-      restStart:   i === legs.length - 1 ? (localToUtcIso(rsDate, rsTime, tz) ?? leg.restStart) : leg.restStart,
-      restEnd:     i === legs.length - 1 ? (localToUtcIso(reDate, reTime, tz) ?? leg.restEnd)   : leg.restEnd,
+      restStart:        i === legs.length - 1 ? (localToUtcIso(rsDate, rsTime, tz) ?? leg.restStart) : leg.restStart,
+      restEnd:          i === legs.length - 1 ? (localToUtcIso(reDate, reTime, tz) ?? leg.restEnd)   : leg.restEnd,
+      validationVersion: ENTRY_VALIDATION_VERSION,
     })))
   }
 
   const abbr = tzAbbr(tz)
+
+  const restWarnings: string[] = []
+  const releaseMs = ms(localToUtcIso(relDate, relTime, tz))
+  const rsMs = rsDate && rsTime ? ms(localToUtcIso(rsDate, rsTime, tz)) : null
+  const reMs = reDate && reTime ? ms(localToUtcIso(reDate, reTime, tz)) : null
+  const legIds = new Set(legs.map(l => l.id))
+  if (rsMs !== null && releaseMs !== null && rsMs < releaseMs)
+    restWarnings.push('Rest Start is before Release Time')
+  if (reMs !== null && releaseMs !== null) {
+    for (const e of entries) {
+      if (e.restDay || legIds.has(e.id)) continue
+      const eShowMs = ms(e.showTime)
+      if (eShowMs !== null && eShowMs > releaseMs) {
+        if (reMs > eShowMs) restWarnings.push('Rest End overlaps the next duty period\'s Show Time')
+        break
+      }
+    }
+  }
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
@@ -90,6 +111,11 @@ export default function DutyEditModal({ legs, tz, onSave, onClose }: Props) {
           <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
           <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} tz={tz} onClear={() => { setRsDate(''); setRsTime('') }} />
           <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} tz={tz} onClear={() => { setReDate(''); setReTime('') }} />
+          {restWarnings.length > 0 && (
+            <div className="col-span-full rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1">
+              {restWarnings.map(w => <p key={w} className="text-xs text-amber-700 dark:text-amber-400">⚠ {w}</p>)}
+            </div>
+          )}
         </div>
 
         {err && <p className="text-red-600 text-xs mt-1">{err}</p>}

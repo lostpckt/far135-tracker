@@ -2,6 +2,10 @@
 
 ## 2026-06-30
 
+### Added
+- **Rest overlap validation** — detects when Rest Start is before Release Time, or Rest End extends past the next duty period's Show Time. Flagged entries show "⚠ rest overlap" in the Rest After column and an amber ⚠ button in the actions column. The warning also appears live in the edit modals as you type.
+- **Validation versioning** (`validationVersion` on each entry, `VALIDATION_RESET_EPOCH` + `ENTRY_VALIDATION_VERSION` constants) — on first load after this update, all existing entries are scanned once and stamped if they pass. A `far135_bulk_validated` localStorage key prevents re-scanning on subsequent loads (O(1) check). Bumping `ENTRY_VALIDATION_VERSION` triggers an incremental re-scan on next load; bumping `VALIDATION_RESET_EPOCH` forces a full reset of all entry versions before re-scanning.
+
 ### Fixed
 - **"Up to date" toast after checking for updates** — a brief toast now appears at the bottom of the screen when a manual update check completes with no new version, giving clear confirmation the check ran (previously the menu just closed silently on mobile).
 - **Clear button on Rest Start / Rest End fields** — a "Clear" link appears next to the label when the field has a value, allowing rest period entries to be removed (e.g. for Part 91 legs where rest is not tracked).

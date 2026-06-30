@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { loadEntries, saveEntries } from '@/lib/storage'
+import { loadEntries, saveEntries, runBulkValidationIfNeeded } from '@/lib/storage'
 import { ms, exportCSV, importCSV } from '@/lib/calculations'
 import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
@@ -19,7 +19,10 @@ import TzMigrationDialog from '@/components/TzMigrationDialog'
 import RunReportDialog from '@/components/RunReportDialog'
 
 export default function App() {
-  const [entries, setEntries] = useState<Entry[]>(loadEntries)
+  const [entries, setEntries] = useState<Entry[]>(() => {
+    const loaded = loadEntries()
+    return runBulkValidationIfNeeded(loaded) ?? loaded
+  })
   const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
   const [editingDuty, setEditingDuty]     = useState<Entry[] | null>(null)
   const [showRunReport, setShowRunReport] = useState(false)
@@ -202,6 +205,7 @@ export default function App() {
       {editingDuty && (
         <DutyEditModal
           legs={editingDuty}
+          entries={entries}
           tz={tz}
           onSave={updatedLegs => {
             const updatedMap = new Map(updatedLegs.map(e => [e.id, e]))
@@ -216,6 +220,7 @@ export default function App() {
         <EditModal
           key={editingEntry.id}
           entry={editingEntry}
+          entries={entries}
           tz={tz}
           onSave={updated => {
             updateEntries(entries.map(e => e.id === updated.id ? updated : e))

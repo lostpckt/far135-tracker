@@ -48,6 +48,28 @@ export function parseHobbs(val: string | undefined | null): number | null {
   return isNaN(n) ? null : n
 }
 
+// Returns false if restStart is before releaseTime, or if restEnd extends past
+// the next duty period's showTime. Entries with no rest times always return true.
+export function checkRestOverlapForEntry(entry: Entry, all: Entry[]): boolean {
+  if (entry.restDay || entry.part91) return true
+  const anchor = ms(entry.releaseTime) ?? ms(entry.showTime)
+  const rsMs   = ms(entry.restStart)
+  const reMs   = ms(entry.restEnd)
+  if (rsMs === null && reMs === null) return true
+  if (rsMs !== null && anchor !== null && rsMs < anchor) return false
+  if (reMs !== null && anchor !== null) {
+    for (const e of all) {
+      if (e.restDay || e.id === entry.id) continue
+      const eShowMs = ms(e.showTime)
+      if (eShowMs !== null && eShowMs > anchor) {
+        if (reMs > eShowMs) return false
+        break
+      }
+    }
+  }
+  return true
+}
+
 /** Flight time from Hobbs readings: onHobbs - offHobbs. */
 export function hobbsFlightTime(offHobbs: number | null, onHobbs: number | null): number | null {
   if (offHobbs === null || onHobbs === null) return null
@@ -93,12 +115,13 @@ export function compute(entry: Entry, all: Entry[], tz?: string): Computed {
   }
 
   if (entry.part91) {
-    c.excAmt     = 0
-    c.reqRest    = 10
-    c.lookbackOk = null
-    c.flightOk   = null
-    c.dutyOk     = null
-    c.restOk     = null
+    c.excAmt        = 0
+    c.reqRest       = 10
+    c.lookbackOk    = null
+    c.flightOk      = null
+    c.dutyOk        = null
+    c.restOk        = null
+    c.restOverlapOk = null
     return c
   }
 
@@ -136,9 +159,10 @@ export function compute(entry: Entry, all: Entry[], tz?: string): Computed {
     c.lookbackOk = hasPrior ? found : null
   }
 
-  c.flightOk = c.rolling24 !== null ? c.rolling24 <= c.maxFlight : null
-  c.dutyOk   = c.dutyPeriod !== null ? c.dutyPeriod <= 14 : null
-  c.restOk   = c.consRest !== null ? c.consRest >= c.reqRest : null
+  c.flightOk      = c.rolling24 !== null ? c.rolling24 <= c.maxFlight : null
+  c.dutyOk        = c.dutyPeriod !== null ? c.dutyPeriod <= 14 : null
+  c.restOk        = c.consRest !== null ? c.consRest >= c.reqRest : null
+  c.restOverlapOk = (rsMs !== null || reMs !== null) ? checkRestOverlapForEntry(entry, all) : null
 
   return c
 }
@@ -158,6 +182,7 @@ export interface DutyComputed {
   restOk: boolean | null
   excAmt: number
   excReason: string
+  restOverlapOk: boolean | null
 }
 
 export function computeDutyPeriod(legs: Entry[], all: Entry[], tz?: string): DutyComputed {
@@ -186,7 +211,8 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[], tz?: string): Dut
     consRest:    lastC?.consRest ?? null,
     restOk:      allPart91 ? null : worstBool(p135Idx.map(i => computedLegs[i].restOk)),
     excAmt,
-    excReason: excLegIdx >= 0 ? (legs[excLegIdx].reason || '(no reason recorded)') : '',
+    excReason:    excLegIdx >= 0 ? (legs[excLegIdx].reason || '(no reason recorded)') : '',
+    restOverlapOk: lastC?.restOverlapOk ?? null,
   }
 }
 
