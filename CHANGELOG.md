@@ -2,6 +2,9 @@
 
 ## 2026-07-06
 
+### Changed
+- **Pilot removed from compliance reports** — since pilot name is no longer recorded on new entries, it has been removed from the report meta line, Violations Detail table, Exceedances table, and both Summary and Full Log flight log tables.
+
 ### Fixed
 - **Pilot Name / ID field no longer appears when editing a rest day entry** — the field was visible in the Edit Flight Entry modal for all entry types despite pilot not being recorded on new entries.
 

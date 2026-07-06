@@ -31,7 +31,7 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
 
   const [tailNumber, setTailNumber]   = useState(entry.tailNumber || '')
   const [entity, setEntity]           = useState(entry.entity || '')
-  const [pilot, setPilot]             = useState(entry.pilot || '')
+  const [pilot]                        = useState(entry.pilot || '')
   const [crew, setCrew]               = useState<'S' | 'D'>(entry.crew || 'S')
   const [showDate, setShowDate]       = useState(s.d)
   const [showTime, setShowTime]       = useState(s.t)
