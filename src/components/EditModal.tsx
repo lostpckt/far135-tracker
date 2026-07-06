@@ -147,11 +147,6 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
               </Select>
             </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Pilot Name / ID</Label>
-            <Input value={pilot} onChange={e => setPilot(e.target.value)} className="text-sm h-8" />
-          </div>
-
           <SectionLabel>Rest Day</SectionLabel>
           <div className="col-span-full flex flex-col gap-2">
             <div className="flex items-center gap-2">

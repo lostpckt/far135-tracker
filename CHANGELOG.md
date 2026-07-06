@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-06
+
+### Fixed
+- **Pilot Name / ID field no longer appears when editing a rest day entry** — the field was visible in the Edit Flight Entry modal for all entry types despite pilot not being recorded on new entries.
+
 ## 2026-06-30
 
 ### Changed
