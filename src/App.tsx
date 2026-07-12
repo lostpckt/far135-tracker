@@ -195,7 +195,6 @@ export default function App() {
         onClose={() => setShowRunReport(false)}
         entries={entries}
         tz={tz}
-        dark={dark}
       />
 
       {showMigration && (

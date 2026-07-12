@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-12
+
+### Changed
+- **Compliance reports now generate as B&W PDF downloads instead of styled HTML pages** — the Run Report dialog generates a jsPDF document directly rather than opening an HTML report in a new browser tab for printing. Reports are plain black-text-on-white, matching regulatory record-keeping conventions. Filenames follow `YYYY-QQ-ENTITY.pdf` (quarterly) / `YYYY-MM-ENTITY.pdf` (monthly), with `ALL` used when no entity filter is applied.
+- **Added Log Detail selector to Run Report dialog** — choose Summary (portrait, 6-column daily rollup), Full Detail (landscape, 13-column per-leg log), or Both (summary pages followed by landscape full-detail pages) when generating a report.
+- **Summary Flight Log now flags violation days** — a Status column (OK / VIOLATION) was added to the Summary log table so a violation is visible directly in the daily rollup, without cross-referencing the Violations Detail table by date.
+
+### Fixed
+- **PDF report header now repeats on the landscape Full Detail page** — when Log Detail is set to "Both", the title/period/entity/status header is now redrawn on the landscape continuation page; previously that page had no identifying header if separated from the summary pages.
+- **Section headings in PDF reports no longer land on a different page than their table** — Scorecard, Violations Detail, Exceedances, and Flight Log headings now check remaining page space before drawing, matching the auto-pagination already performed by the table beneath them.
+- **Report meta line no longer risks clipping the "Generated" timestamp** — the Period/Entity/Generated line now wraps instead of being drawn as a single unwrapped line, so a long entity name can no longer push the timestamp past the page edge.
+
 ## 2026-07-06
 
 ### Changed

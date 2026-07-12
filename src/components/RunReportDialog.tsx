@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { generateQuarterlyReport, generateMonthlyReport } from '@/lib/calculations'
+import { generateQuarterlyReportPDF, generateMonthlyReportPDF, type LogDetail } from '@/lib/pdf-report'
 import type { Entry } from '@/types/entry'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -13,19 +13,19 @@ interface Props {
   onClose: () => void
   entries: Entry[]
   tz: string
-  dark: boolean
 }
 
-export default function RunReportDialog({ open, onClose, entries, tz, dark }: Props) {
+export default function RunReportDialog({ open, onClose, entries, tz }: Props) {
   const entities = [...new Set(
     entries.filter(e => !e.restDay && e.entity).map(e => e.entity!)
   )].sort()
 
-  const [type, setType]       = useState<'quarterly' | 'monthly'>('quarterly')
-  const [entity, setEntity]   = useState(() => entities.length === 1 ? entities[0] : '__all__')
-  const [quarter, setQuarter] = useState(() => Math.floor(new Date().getMonth() / 3).toString())
-  const [month, setMonth]     = useState(() => new Date().getMonth().toString())
-  const [year, setYear]       = useState(() => new Date().getFullYear().toString())
+  const [type, setType]           = useState<'quarterly' | 'monthly'>('quarterly')
+  const [entity, setEntity]       = useState(() => entities.length === 1 ? entities[0] : '__all__')
+  const [quarter, setQuarter]     = useState(() => Math.floor(new Date().getMonth() / 3).toString())
+  const [month, setMonth]         = useState(() => new Date().getMonth().toString())
+  const [year, setYear]           = useState(() => new Date().getFullYear().toString())
+  const [logDetail, setLogDetail] = useState<LogDetail>('summary')
 
   function handleGenerate() {
     const y = parseInt(year, 10)
@@ -34,20 +34,17 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
     const entityFilter = entity === '__all__' ? undefined : entity
     const entityLabel  = entity === '__all__' ? 'all entities' : entity
 
-    let html: string
+    let ok: boolean
     if (type === 'quarterly') {
       const q = parseInt(quarter, 10)
-      html = generateQuarterlyReport(entries, q, y, tz, dark, entityFilter)
-      if (!html) { alert(`No entries found for ${['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][q]} ${y} — ${entityLabel}.`); return }
+      ok = generateQuarterlyReportPDF(entries, q, y, tz, entityFilter, logDetail)
+      if (!ok) { alert(`No entries found for ${['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'][q]} ${y} — ${entityLabel}.`); return }
     } else {
       const m = parseInt(month, 10)
-      html = generateMonthlyReport(entries, m, y, tz, dark, entityFilter)
-      if (!html) { alert(`No entries found for ${MONTHS[m]} ${y} — ${entityLabel}.`); return }
+      ok = generateMonthlyReportPDF(entries, m, y, tz, entityFilter, logDetail)
+      if (!ok) { alert(`No entries found for ${MONTHS[m]} ${y} — ${entityLabel}.`); return }
     }
 
-    const w = window.open('', '_blank')
-    w?.document.write(html)
-    w?.document.close()
     onClose()
   }
 
@@ -128,6 +125,33 @@ export default function RunReportDialog({ open, onClose, entries, tz, dark }: Pr
               max={2099}
               className="text-sm h-8 w-[80px]"
             />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500">Log Detail</label>
+            <div className="flex gap-2">
+              <Button
+                variant={logDetail === 'summary' ? 'default' : 'outline'}
+                className="flex-1 text-sm h-9"
+                onClick={() => setLogDetail('summary')}
+              >
+                Summary
+              </Button>
+              <Button
+                variant={logDetail === 'full' ? 'default' : 'outline'}
+                className="flex-1 text-sm h-9"
+                onClick={() => setLogDetail('full')}
+              >
+                Full Detail
+              </Button>
+              <Button
+                variant={logDetail === 'both' ? 'default' : 'outline'}
+                className="flex-1 text-sm h-9"
+                onClick={() => setLogDetail('both')}
+              >
+                Both
+              </Button>
+            </div>
           </div>
         </div>
 
