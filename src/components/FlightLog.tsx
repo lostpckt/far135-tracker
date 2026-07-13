@@ -139,7 +139,9 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
   }
 
   const groupsRef = useRef(groups)
-  groupsRef.current = groups
+  useEffect(() => {
+    groupsRef.current = groups
+  })
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() =>
     computeCollapsed(groups.map(g => g.key))

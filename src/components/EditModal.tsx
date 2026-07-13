@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ms, parseHobbs } from '@/lib/calculations'
+import { ms, parseHobbs, checkRestOverlapForEntry } from '@/lib/calculations'
 import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
-import { localToUtcIso, utcToLocalParts, tzAbbr } from '@/lib/timezone'
-import { SectionLabel, DTField, splitForEdit } from '@/components/FormHelpers'
+import { localToUtcIso, utcToLocalParts, tzAbbr, splitForEdit } from '@/lib/timezone'
+import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
 interface Props {
@@ -73,7 +73,7 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
       if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
     }
 
-    onSave({
+    const updated: Entry = {
       ...entry,
       pilot,
       crew,
@@ -91,7 +91,14 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
       part91,
       restDay,
       restDayEnd: restDay && restDayEnd ? restDayEnd : undefined,
-      validationVersion: ENTRY_VALIDATION_VERSION,
+    }
+
+    // Only clear the "needs review" flag if the saved entry actually passes the
+    // rest-overlap check — matches runBulkValidationIfNeeded's semantics, so Save
+    // can't blindly clear a warning on an entry that's still genuinely broken.
+    onSave({
+      ...updated,
+      validationVersion: checkRestOverlapForEntry(updated, entries) ? ENTRY_VALIDATION_VERSION : undefined,
     })
   }
 

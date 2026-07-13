@@ -112,7 +112,7 @@ export function compute(entry: Entry, all: Entry[], tz?: string): Computed {
 
   if (entry.part91) {
     c.excAmt        = 0
-    c.reqRest       = 10
+    c.reqRest       = null
     c.lookbackOk    = null
     c.flightOk      = null
     c.dutyOk        = null

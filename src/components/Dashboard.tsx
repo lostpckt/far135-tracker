@@ -59,6 +59,12 @@ export default function Dashboard({ entries, tz }: Props) {
   const lastAnchorMs = lastEntry ? (ms(lastEntry.releaseTime) ?? ms(lastEntry.showTime)) : null
   const rollingWindowActive = lastAnchorMs !== null && (now.getTime() - lastAnchorMs) <= 86400000
 
+  // §135.267 rest requirements never attach to Part 91 legs, so "Next Legal Duty"
+  // must anchor on the last actual Part 135 duty period, not a trailing Part 91 leg.
+  const p135Entries    = entries.filter(e => !e.restDay && !e.part91)
+  const lastP135Entry  = p135Entries.length ? p135Entries[p135Entries.length - 1] : null
+  const lastP135Calc   = lastP135Entry ? compute(lastP135Entry, entries, tz) : null
+
   const allWarnings = entries.filter(e => {
     if (e.restDay) return false
     const c = compute(e, entries, tz)
@@ -71,9 +77,9 @@ export default function Dashboard({ entries, tz }: Props) {
   let nextDutySub   = ''
   let nextDutyColor: Color = 'blue'
 
-  if (lastEntry?.releaseTime && lastCalc) {
-    const releaseMs = new Date(lastEntry.releaseTime).getTime()
-    const legalMs   = releaseMs + lastCalc.reqRest * 3600000
+  if (lastP135Entry?.releaseTime && lastP135Calc && lastP135Calc.reqRest !== null) {
+    const releaseMs = new Date(lastP135Entry.releaseTime).getTime()
+    const legalMs   = releaseMs + lastP135Calc.reqRest * 3600000
     const nowMs     = now.getTime()
     const legalIso  = new Date(legalMs).toISOString()
     const abbr      = tzAbbr(tz)

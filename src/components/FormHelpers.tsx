@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { localToUtcIso, utcToLocalParts } from '@/lib/timezone'
+import { localToUtcIso } from '@/lib/timezone'
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -39,14 +39,4 @@ export function DTField({ label, date, time, onDate, onTime, tz, required, onCle
       {utc && <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>}
     </div>
   )
-}
-
-export function splitForEdit(val: string, tz: string): { d: string; t: string } {
-  if (!val) return { d: '', t: '' }
-  if (val.endsWith('Z')) {
-    const parts = utcToLocalParts(val, tz)
-    return parts ? { d: parts.date, t: parts.time } : { d: '', t: '' }
-  }
-  const idx = val.indexOf('T')
-  return idx >= 0 ? { d: val.slice(0, idx), t: val.slice(idx + 1) } : { d: val, t: '' }
 }

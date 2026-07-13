@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -7,9 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import LegRow, { type LegData } from '@/components/LegRow'
 import { SectionLabel } from '@/components/FormHelpers'
-import { uid, ms, parseHobbs } from '@/lib/calculations'
-import { localToUtcIso, tzAbbr } from '@/lib/timezone'
+import { uid, ms, parseHobbs, checkRestOverlapForEntry } from '@/lib/calculations'
+import { localToUtcIso, utcToLocalParts, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
+import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
+
+interface RestEndPrompt {
+  lastEntryId: string
+  newShowTime: string
+  entriesToAdd: Entry[]
+}
 
 const DRAFT_KEY = 'far135_v1_form_draft'
 
@@ -70,6 +78,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const [restDayEnd, setRestDayEnd]     = useState(d?.restDayEnd ?? '')
   const [legs, setLegs]             = useState<LegData[]>(d?.legs ?? [emptyLeg()])
   const [err, setErr]               = useState('')
+  const [restEndPrompt, setRestEndPrompt] = useState<RestEndPrompt | null>(null)
 
   useEffect(() => {
     try {
@@ -90,7 +99,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     if (restDay) {
       if (!restDayStart) { setErr('Enter the date of the rest day.'); return }
       const rdShowTime = localToUtcIso(restDayStart, '00:00', tz) || `${restDayStart}T00:00`
-      onAdd([...entries, { id: uid(), pilot: '', crew, showTime: rdShowTime, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined }])
+      onAdd([...entries, { id: uid(), pilot: '', crew, showTime: rdShowTime, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined, validationVersion: ENTRY_VALIDATION_VERSION }])
       resetForm()
       return
     }
@@ -131,13 +140,59 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       reason: leg.reason, part91: leg.part91, restDay: false,
     }))
 
-    onAdd([...entries, ...newEntries])
+    // Stamp validationVersion immediately for entries that already pass the
+    // rest-overlap check, so a brand-new well-formed entry doesn't show the
+    // "needs review" warning it would otherwise get by default (validationVersion
+    // undefined < ENTRY_VALIDATION_VERSION). Mirrors runBulkValidationIfNeeded's logic.
+    const merged  = [...entries, ...newEntries].sort((a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0))
+    const stamped = newEntries.map(e =>
+      checkRestOverlapForEntry(e, merged) ? { ...e, validationVersion: ENTRY_VALIDATION_VERSION } : e
+    )
+
+    // If the previous duty period never got a Rest End (common when you don't yet
+    // know your next show time), offer to backfill it now that we do.
+    const lastEntry = entries.filter(e => !e.restDay).at(-1)
+    if (lastEntry && !lastEntry.restEnd && !lastEntry.part91) {
+      setRestEndPrompt({ lastEntryId: lastEntry.id, newShowTime: show, entriesToAdd: stamped })
+      return
+    }
+
+    onAdd([...entries, ...stamped])
+    resetForm()
+  }
+
+  function confirmRestEndBackfill() {
+    if (!restEndPrompt) return
+    const { lastEntryId, newShowTime, entriesToAdd } = restEndPrompt
+    const original = entries.find(e => e.id === lastEntryId)
+    if (!original) { setRestEndPrompt(null); return }
+
+    const patched = { ...original, restEnd: newShowTime }
+    const merged  = [...entries.map(e => e.id === lastEntryId ? patched : e), ...entriesToAdd]
+    const revalidated = {
+      ...patched,
+      validationVersion: checkRestOverlapForEntry(patched, merged) ? ENTRY_VALIDATION_VERSION : undefined,
+    }
+
+    onAdd([...entries.map(e => e.id === lastEntryId ? revalidated : e), ...entriesToAdd])
+    setRestEndPrompt(null)
+    resetForm()
+  }
+
+  function skipRestEndBackfill() {
+    if (!restEndPrompt) return
+    onAdd([...entries, ...restEndPrompt.entriesToAdd])
+    setRestEndPrompt(null)
     resetForm()
   }
 
   const abbr = tzAbbr(tz)
 
+  const promptLocal = restEndPrompt ? utcToLocalParts(restEndPrompt.newShowTime, tz) : null
+  const promptTimeStr = promptLocal ? `${promptLocal.date} ${promptLocal.time} ${abbr}` : ''
+
   return (
+    <>
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold">Add Flight Leg</CardTitle>
@@ -295,5 +350,26 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
         </div>
       </CardContent>
     </Card>
+
+    {restEndPrompt && (
+      <Dialog open onOpenChange={open => { if (!open) skipRestEndBackfill() }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">Set Previous Rest End?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            The previous entry's Rest End is blank. Set it to this entry's Show Time
+            {promptTimeStr && <> (<span className="font-semibold">{promptTimeStr}</span>)</>}?
+          </p>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" onClick={skipRestEndBackfill} className="text-sm h-8">Skip</Button>
+            <Button onClick={confirmRestEndBackfill} className="bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm h-8">
+              Set Rest End
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   )
 }

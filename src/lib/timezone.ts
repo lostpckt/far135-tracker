@@ -83,6 +83,18 @@ export function utcToLocalParts(utcStr: string, tz: string): { date: string; tim
   return { date: `${g('year')}-${g('month')}-${g('day')}`, time: `${hour}:${g('minute')}` }
 }
 
+// Split a stored date/time string (UTC ISO with Z, or legacy local "date T time") into
+// local date and time parts for populating an edit form.
+export function splitForEdit(val: string, tz: string): { d: string; t: string } {
+  if (!val) return { d: '', t: '' }
+  if (val.endsWith('Z')) {
+    const parts = utcToLocalParts(val, tz)
+    return parts ? { d: parts.date, t: parts.time } : { d: '', t: '' }
+  }
+  const idx = val.indexOf('T')
+  return idx >= 0 ? { d: val.slice(0, idx), t: val.slice(idx + 1) } : { d: val, t: '' }
+}
+
 // Convert stored entries from local time (no Z suffix) to UTC (Z suffix).
 // Rest-day entries are skipped — their showTime is a calendar date marker, not a timestamp.
 export function migrateEntries(entries: Entry[], tz: string): Entry[] {

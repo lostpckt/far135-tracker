@@ -97,7 +97,7 @@ function buildData(
     if (c.flightOk === false) { flightFailCount++; violations.push({ date: fmtDT(e.releaseTime || e.showTime), type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` }) }
     if (c.dutyOk  === false) { dutyFailCount++;   violations.push({ date: fmtDT(e.showTime),                  type: 'Duty Period Exceeded',   detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` }) }
     if (c.restOk  === false) { restFailCount++;   violations.push({ date: fmtDT(e.restStart),                 type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` }) }
-    if (c.excAmt > 0) exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest })
+    if (c.excAmt > 0) exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
   }
 
   const totalViolations = flightFailCount + dutyFailCount + restFailCount

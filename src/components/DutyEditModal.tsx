@@ -3,10 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ms, parseHobbs } from '@/lib/calculations'
-import { localToUtcIso, tzAbbr } from '@/lib/timezone'
+import { ms, parseHobbs, checkRestOverlapForEntry } from '@/lib/calculations'
+import { localToUtcIso, tzAbbr, splitForEdit } from '@/lib/timezone'
 import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
-import { SectionLabel, DTField, splitForEdit } from '@/components/FormHelpers'
+import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
 interface Props {
@@ -50,7 +50,7 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
     if (!release) { setErr('Release Time is required.'); return }
     if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
 
-    onSave(legs.map((leg, i) => ({
+    const updatedLegs: Entry[] = legs.map((leg, i) => ({
       ...leg,
       showTime:    show,
       releaseTime: release,
@@ -58,7 +58,20 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
       onBlocks:    i === legs.length - 1 ? onHobbs.trim()  : leg.onBlocks,
       restStart:        i === legs.length - 1 ? (localToUtcIso(rsDate, rsTime, tz) ?? leg.restStart) : leg.restStart,
       restEnd:          i === legs.length - 1 ? (localToUtcIso(reDate, reTime, tz) ?? leg.restEnd)   : leg.restEnd,
-      validationVersion: ENTRY_VALIDATION_VERSION,
+    }))
+
+    // Merge the updated legs into the full entry list so the rest-overlap check
+    // sees accurate context (new releaseTime affects every leg's anchor), then
+    // only clear each leg's "needs review" flag if it actually passes — matches
+    // runBulkValidationIfNeeded's semantics rather than blindly stamping on save.
+    const merged = entries.map(e => {
+      const updatedLeg = updatedLegs.find(l => l.id === e.id)
+      return updatedLeg ?? e
+    })
+
+    onSave(updatedLegs.map(leg => ({
+      ...leg,
+      validationVersion: checkRestOverlapForEntry(leg, merged) ? ENTRY_VALIDATION_VERSION : undefined,
     })))
   }
 

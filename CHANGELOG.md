@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-13
+
+### Added
+- **Prompt to backfill previous entry's Rest End when adding a new duty period** — if the last logged entry has a blank Rest End (common when your next show time isn't known yet), adding a new flight entry now offers to set that entry's Rest End to the new entry's Show Time. Skipped automatically if the previous entry is Part 91 or already has a Rest End.
+
+### Fixed
+- **"Next Legal Duty" dashboard card no longer anchors on a trailing Part 91 leg** — since §135.267 rest requirements don't apply to Part 91 flying, the card now anchors on the last actual Part 135 duty period instead of a Part 91 entry that happens to be the most recently logged one. `Computed.reqRest` is now `null` (not a hardcoded `10`) for Part 91 entries, matching the other compliance fields.
+- **New entries no longer show a false-positive "needs review" warning** — entries created via Add Entry now get `validationVersion` stamped immediately based on whether they actually pass the rest-overlap check, instead of always starting flagged. `EditModal` and `DutyEditModal` also no longer unconditionally clear the warning on Save — they only clear it if the saved entry genuinely passes, matching the same check the bulk validator already used. `VALIDATION_RESET_EPOCH` bumped to 3 to re-scan entries that may have been incorrectly stamped "validated" by the old unconditional-save behavior.
+
+### Changed (internal, no user-visible changes)
+- **`FlightLog.tsx` no longer writes to a ref during render** — the month-grouping ref sync moved into a `useEffect`, fixing an ESLint `react-hooks/refs` error with no behavior change.
+- **`splitForEdit` moved from `FormHelpers.tsx` to `lib/timezone.ts`** — resolves a `react-refresh/only-export-components` lint error (a component file was also exporting a plain utility function); `splitForEdit` is a timezone-splitting helper, not a form component, so it belongs alongside `utcToLocalParts`.
+
 ## 2026-07-12
 
 ### Changed

@@ -2,7 +2,7 @@
 // fixing a bug in an existing validation rule). Bump ENTRY_VALIDATION_VERSION to
 // add a new incremental validation rule. Both are stored in localStorage as
 // "epoch.version" so either change triggers the appropriate scan behaviour.
-export const VALIDATION_RESET_EPOCH    = 2
+export const VALIDATION_RESET_EPOCH    = 3
 export const ENTRY_VALIDATION_VERSION  = 1
 
 export interface Entry {
@@ -33,7 +33,7 @@ export interface Computed {
   maxFlight: number
   rolling24: number | null
   excAmt: number
-  reqRest: number
+  reqRest: number | null
   lookbackOk: boolean | null
   flightOk: boolean | null
   dutyOk: boolean | null
