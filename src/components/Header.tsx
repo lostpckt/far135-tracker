@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Moon, Sun, Globe, MoreVertical } from 'lucide-react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ChangelogModal from '@/components/ChangelogModal'
 import { TIMEZONES, tzAbbr } from '@/lib/timezone'
@@ -11,9 +12,17 @@ interface Props {
   onTzChange: (tz: string) => void
 }
 
+// How long to wait, after the update-check request itself resolves, for the
+// service worker to actually finish installing and flip `needRefresh` — before
+// concluding there's genuinely no update. reg.update() resolving only means the
+// check request completed, not that an update wasn't found.
+const UPDATE_SETTLE_MS = 2500
+
+type CheckPhase = 'idle' | 'checking' | 'settling' | 'upToDate'
+
 export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
-  const [checking, setChecking] = useState(false)
-  const [checked, setChecked]   = useState(false)
+  const { needRefresh: [needRefresh] } = useRegisterSW()
+  const [phase, setPhase] = useState<CheckPhase>('idle')
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -27,24 +36,41 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Resolves the "settling" phase once we know whether an update was actually
+  // found: if `needRefresh` flips true, hand off to UpdateBanner immediately;
+  // otherwise wait out the settle window before declaring "Up to date".
+  useEffect(() => {
+    if (needRefresh) { setPhase('idle'); return }
+    if (phase !== 'settling') return
+    const t = setTimeout(() => {
+      setPhase('upToDate')
+      setTimeout(() => setPhase('idle'), 3000)
+    }, UPDATE_SETTLE_MS)
+    return () => clearTimeout(t)
+  }, [phase, needRefresh])
+
   async function checkForUpdate() {
-    setChecking(true)
-    setChecked(false)
+    setPhase('checking')
     try {
       const reg = await navigator.serviceWorker.getRegistration()
       await reg?.update()
     } finally {
-      setChecking(false)
-      setChecked(true)
-      setTimeout(() => setChecked(false), 3000)
+      setPhase('settling')
     }
   }
 
-  const checkLabel = checking ? 'Checking…' : checked ? 'Up to date' : 'Check for update'
+  const checking    = phase === 'checking' || phase === 'settling'
+  const checked     = phase === 'upToDate'
+  const checkLabel  = checking ? 'Checking…' : checked ? 'Up to date' : 'Check for update'
 
   return (
     <>
-    {checked && (
+    {checking && (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-3 shadow-lg text-white text-sm font-medium pointer-events-none select-none">
+        Checking for update…
+      </div>
+    )}
+    {checked && !needRefresh && (
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-3 shadow-lg text-white text-sm font-medium pointer-events-none select-none">
         <span className="text-green-400">✓</span> Up to date
       </div>
