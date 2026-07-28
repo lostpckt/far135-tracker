@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-27 (2)
+
+### Reverted
+- **5-minute time picker step reverted** — `step={300}` on the time inputs (added earlier today) doesn't reliably work: confirmed live on an iPad Mini (iPadOS 26.5.2) that Safari's time-wheel picker ignores `step` for minute-wheel granularity, so the attribute had no effect while adding dead code. Reliably enforcing 5-minute increments would require replacing the native `<input type="time">` with a custom hour/minute dropdown control, which wasn't worth the UX tradeoff for now.
+
 ## 2026-07-27
 
 ### Changed
