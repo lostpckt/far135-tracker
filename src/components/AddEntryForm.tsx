@@ -31,8 +31,6 @@ interface DraftState {
   relTime: string
   rsDate: string
   rsTime: string
-  reDate: string
-  reTime: string
   restDay: boolean
   restDayStart: string
   restDayEnd: string
@@ -71,8 +69,6 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const [relTime, setRelTime]       = useState(d?.relTime ?? '')
   const [rsDate, setRsDate]         = useState(d?.rsDate ?? '')
   const [rsTime, setRsTime]         = useState(d?.rsTime ?? '')
-  const [reDate, setReDate]         = useState(d?.reDate ?? '')
-  const [reTime, setReTime]         = useState(d?.reTime ?? '')
   const [restDay, setRestDay]           = useState(d?.restDay ?? false)
   const [restDayStart, setRestDayStart] = useState(d?.restDayStart ?? '')
   const [restDayEnd, setRestDayEnd]     = useState(d?.restDayEnd ?? '')
@@ -82,13 +78,13 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, restDay, restDayStart, restDayEnd, legs }))
     } catch { /* localStorage unavailable */ }
-  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, reDate, reTime, restDay, restDayStart, restDayEnd, legs])
+  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, restDay, restDayStart, restDayEnd, legs])
 
   function resetForm() {
     setTailNumber(''); setEntity(''); setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
-    setRsDate(''); setRsTime(''); setReDate(''); setReTime('')
+    setRsDate(''); setRsTime('')
     setRestDay(false); setRestDayStart(''); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
     try { localStorage.removeItem(DRAFT_KEY) } catch { /* localStorage unavailable */ }
   }
@@ -127,7 +123,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     }
 
     const restStart = localToUtcIso(rsDate, rsTime, tz)
-    const restEnd   = localToUtcIso(reDate, reTime, tz)
+    if (!restStart) { setErr('Rest Start is required.'); return }
 
     const newEntries: Entry[] = legData.map(leg => ({
       id: uid(), pilot: '', crew,
@@ -136,7 +132,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       showTime: show, releaseTime: release,
       dep: leg.dep, arr: leg.arr,
       offBlocks: leg.off, onBlocks: leg.on,
-      restStart, restEnd,
+      restStart, restEnd: '',
       reason: leg.reason, part91: leg.part91, restDay: false,
     }))
 
@@ -152,7 +148,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     // If the previous duty period never got a Rest End (common when you don't yet
     // know your next show time), offer to backfill it now that we do.
     const lastEntry = entries.filter(e => !e.restDay).at(-1)
-    if (lastEntry && !lastEntry.restEnd && !lastEntry.part91) {
+    if (lastEntry && !lastEntry.restEnd) {
       setRestEndPrompt({ lastEntryId: lastEntry.id, newShowTime: show, entriesToAdd: stamped })
       return
     }
@@ -265,7 +261,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
               <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr}) <span className="text-red-500">*</span></Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
+                <Input type="time" step={300} value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
               </div>
               <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
               <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
@@ -275,7 +271,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
               <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr}) <span className="text-red-500">*</span></Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
+                <Input type="time" step={300} value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
               </div>
               <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
               <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr)</span>
@@ -309,22 +305,13 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
 
             <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Rest Start ({abbr})</Label>
+              <Label className="text-xs font-semibold text-slate-500">Rest Start ({abbr}) <span className="text-red-500">*</span></Label>
               <div className="flex gap-1.5">
                 <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={rsTime} onChange={e => setRsTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
+                <Input type="time" step={300} value={rsTime} onChange={e => setRsTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
               </div>
               <UtcPreview dateStr={rsDate} timeStr={rsTime} tz={tz} />
               <span className="text-[0.68rem] text-slate-400">When rest began after release (24-hr)</span>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Rest End ({abbr})</Label>
-              <div className="flex gap-1.5">
-                <Input type="date" value={reDate} onChange={e => setReDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={reTime} onChange={e => setReTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
-              </div>
-              <UtcPreview dateStr={reDate} timeStr={reTime} tz={tz} />
             </div>
           </>}
 

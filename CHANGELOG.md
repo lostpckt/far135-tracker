@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-07-27
+
+### Changed
+- **Rest End removed from the Add Flight Leg form; Rest Start is now required** — you often don't know your next Show Time when logging the current duty period, so Rest End is no longer collected at creation time. Rest Start is now a mandatory field instead, since the compliance checks need an actual, non-inferred rest window to evaluate the §135.267 10-hr lookback — Part 91 duty is still duty (not rest) per the "free from all restraint imposed by the operator" definition, so it can't be assumed away.
+- **Rest End backfill prompt no longer skips Part 91 entries** — adding a new entry now always offers to backfill the previous entry's Rest End (to the new entry's Show Time) when it's blank, regardless of whether that previous entry was Part 91. Previously this was skipped for Part 91 entries, which meant a Part 91 leg's Rest End could go uncaptured indefinitely even though later Part 135 legs' 10-hr lookback checks still depend on it — this was the actual cause of unexplained "CHECK REST" flags on legs following Part 91 flying. Editing an existing entry (`EditModal` / `DutyEditModal`) is unaffected — both Rest Start and Rest End remain editable there.
+- **Time pickers now step in 5-minute increments** — Show Time, Release Time, and Rest Start/End fields (`DTField` and the Add Flight Leg form) all use `step={300}` on their `<input type="time">` elements, so the native picker's spinner/scroll-wheel snaps to 5-minute stops instead of every minute. Speeds up entry on mobile, where this app is primarily used. Manual keyboard entry is unaffected — the browser doesn't enforce `step` on typed values, only on the picker UI.
+
 ## 2026-07-13
 
 ### Added
