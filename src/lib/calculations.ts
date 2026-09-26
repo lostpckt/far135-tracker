@@ -1,5 +1,5 @@
 import type { Entry, Computed } from '@/types/entry'
-import { localToUtcIso } from '@/lib/timezone'
+import { localToUtcIso, utcToLocalParts } from '@/lib/timezone'
 
 export function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -214,16 +214,22 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[], tz?: string): Dut
 
 export function countRestDaysInWindow(e: Entry, winStart: number, winEnd: number, tz?: string): number {
   if (!e.restDay) return 0
-  const start = ms(e.showTime) ?? NaN
-  if (isNaN(start)) return 0
-  const endMs = e.restDayEnd
-    ? (tz ? ms(localToUtcIso(e.restDayEnd, '00:00', tz)) : ms(e.restDayEnd + 'T00:00'))
-    : null
-  const end = endMs ?? start
-  if (isNaN(end) || end < start) return 1
+  const start = ms(e.showTime)
+  if (start === null) return 0
+  // Walk local calendar dates (not 24-hr ms steps, which drift across DST)
+  // and test each date's local midnight against the window.
+  const p = (n: number) => String(n).padStart(2, '0')
+  const sd = new Date(start)
+  const startDate = tz
+    ? (utcToLocalParts(e.showTime, tz)?.date ?? e.showTime.slice(0, 10))
+    : `${sd.getFullYear()}-${p(sd.getMonth() + 1)}-${p(sd.getDate())}`
+  const endDate = e.restDayEnd && e.restDayEnd > startDate ? e.restDayEnd : startDate
+  const d = new Date(startDate + 'T00:00:00Z')
   let count = 0
-  for (let d = start; d <= end; d += 86400000) {
-    if (d >= winStart && d < winEnd) count++
+  for (let date = startDate; date <= endDate; date = d.toISOString().slice(0, 10)) {
+    const dayMs = tz ? ms(localToUtcIso(date, '00:00', tz)) : ms(date + 'T00:00')
+    if (dayMs !== null && dayMs >= winStart && dayMs < winEnd) count++
+    d.setUTCDate(d.getUTCDate() + 1)
   }
   return count
 }

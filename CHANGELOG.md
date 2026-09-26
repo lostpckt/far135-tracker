@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-26
+
+### Fixed
+- **Flight Log month headers now count rest *days*, not rest-day entries** — a multi-day "24-HOUR REST DAYS" entry spanning several months was counted as "1 rest day" in every month it touched (e.g. a 2026-07-28 – 2026-09-16 entry showed "1 rest day" for August). Each month header now counts only the calendar days of each rest entry that fall within that month (4 / 31 / 16 for that example). Counting walks local calendar dates rather than 24-hr millisecond steps, so DST transitions can't shift a day into the wrong month.
+- **PDF report / dashboard rest-day counts no longer drift across DST** — `countRestDaysInWindow()` stepped through multi-day rest spans in fixed 24-hr increments, so after a fall-back DST transition each day landed at 23:00 of the previous date. Totals stayed right, but a day could be credited to the wrong month/quarter (e.g. 2026-10-25 – 2026-12-03 counted Nov 31 / Dec 2 instead of Nov 30 / Dec 3). It now walks local calendar dates in the selected timezone and tests each date's DST-aware local midnight against the report window. Also, a rest entry with an end date before its start no longer counts as 1 day in every report window regardless of its date.
+
 ## 2026-07-27 (2)
 
 ### Reverted

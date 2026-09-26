@@ -71,6 +71,27 @@ function entryMonthKey(entry: Entry, tz: string): string {
   return anchor.slice(0, 7)
 }
 
+function restDayLocalDate(e: Entry, tz: string): string {
+  const anchor = e.showTime || ''
+  return anchor.endsWith('Z')
+    ? (utcToLocalParts(anchor, tz)?.date ?? anchor.slice(0, 10))
+    : anchor.slice(0, 10)
+}
+
+// Number of calendar days of a rest-day entry (start through restDayEnd,
+// inclusive) that fall in the given YYYY-MM month.
+function restDaysInMonth(e: Entry, monthKey: string, tz: string): number {
+  const start = restDayLocalDate(e, tz)
+  const end = e.restDayEnd && e.restDayEnd > start ? e.restDayEnd : start
+  const d = new Date(start + 'T00:00:00Z')
+  let count = 0
+  for (let date = start; date <= end; date = d.toISOString().slice(0, 10)) {
+    if (date.startsWith(monthKey)) count++
+    d.setUTCDate(d.getUTCDate() + 1)
+  }
+  return count
+}
+
 function monthLabel(key: string): string {
   if (key === 'unknown') return 'Unknown Date'
   return new Date(key + '-02T12:00:00').toLocaleString('en-US', { month: 'long', year: 'numeric' })
@@ -203,7 +224,9 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
             {groups.map(({ key, entries: groupEntries }) => {
               const isMonthCollapsed = collapsed.has(key)
               const legCount  = groupEntries.filter(e => !e.restDay).length
-              const restCount = groupEntries.filter(e => !!e.restDay).length
+              const restCount = groupEntries
+                .filter(e => !!e.restDay)
+                .reduce((sum, e) => sum + restDaysInMonth(e, key, tz), 0)
               const summary = [
                 legCount  > 0 && `${legCount} leg${legCount !== 1 ? 's' : ''}`,
                 restCount > 0 && `${restCount} rest day${restCount !== 1 ? 's' : ''}`,
@@ -232,10 +255,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                     // ── Rest day row ──────────────────────────────────────────
                     if (item.type === 'rest') {
                       const e = item.entry
-                      const anchor = e.showTime || ''
-                      const localDate = anchor.endsWith('Z')
-                        ? (utcToLocalParts(anchor, tz)?.date ?? anchor.slice(0, 10))
-                        : anchor.slice(0, 10)
+                      const localDate = restDayLocalDate(e, tz)
                       const localDateFmt = localDate.slice(5).replace('-', '/')
                       return (
                         <tr key={e.id} className="bg-green-50 dark:bg-green-950">
