@@ -4,7 +4,7 @@ import type { Entry } from '@/types/entry'
 import {
   ms, fmtHrs, fmtDT, hobbsFlightTime, parseHobbs, compute, countRestDaysInWindow,
 } from '@/lib/calculations'
-import { utcToLocalParts } from '@/lib/timezone'
+import { utcToLocalParts, monthStartMs } from '@/lib/timezone'
 
 export type LogDetail = 'summary' | 'full' | 'both'
 
@@ -336,8 +336,8 @@ function filenameFor(label: string, entity: string | undefined): string {
 export function generateQuarterlyReportPDF(
   entries: Entry[], qIdx: number, year: number, tz?: string, entity?: string, logDetail: LogDetail = 'summary',
 ): boolean {
-  const qStart = new Date(year, qIdx * 3, 1).getTime()
-  const qEnd   = new Date(year, qIdx * 3 + 3, 1).getTime()
+  const qStart = monthStartMs(year, qIdx * 3, tz)
+  const qEnd   = monthStartMs(year, qIdx * 3 + 3, tz)
   const qLabel = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'][qIdx]
   const scoped = entity ? entries.filter(e => e.restDay || e.entity === entity) : entries
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= qStart && a < qEnd })
@@ -365,8 +365,8 @@ export function generateQuarterlyReportPDF(
 export function generateMonthlyReportPDF(
   entries: Entry[], monthIdx: number, year: number, tz?: string, entity?: string, logDetail: LogDetail = 'summary',
 ): boolean {
-  const mStart = new Date(year, monthIdx, 1).getTime()
-  const mEnd   = new Date(year, monthIdx + 1, 1).getTime()
+  const mStart = monthStartMs(year, monthIdx, tz)
+  const mEnd   = monthStartMs(year, monthIdx + 1, tz)
   const mLabel = `${'January February March April May June July August September October November December'.split(' ')[monthIdx]} ${year}`
   const scoped = entity ? entries.filter(e => e.restDay || e.entity === entity) : entries
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= mStart && a < mEnd })

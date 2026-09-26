@@ -1,5 +1,5 @@
 import type { Entry, Computed } from '@/types/entry'
-import { localToUtcIso, utcToLocalParts } from '@/lib/timezone'
+import { localToUtcIso, utcToLocalParts, monthStartMs } from '@/lib/timezone'
 
 export function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -243,25 +243,23 @@ function flightHoursInWindow(entries: Entry[], start: number, end: number): numb
   }, 0)
 }
 
-export function quarterFlightHours(entries: Entry[], qIdx: number, year: number): number {
-  return flightHoursInWindow(entries, new Date(year, qIdx * 3, 1).getTime(), new Date(year, qIdx * 3 + 3, 1).getTime())
+export function quarterFlightHours(entries: Entry[], qIdx: number, year: number, tz?: string): number {
+  return flightHoursInWindow(entries, monthStartMs(year, qIdx * 3, tz), monthStartMs(year, qIdx * 3 + 3, tz))
 }
 
-export function twoQuarterFlightHours(entries: Entry[], qIdx: number, year: number): number {
+export function twoQuarterFlightHours(entries: Entry[], qIdx: number, year: number, tz?: string): number {
   const prevQ    = qIdx === 0 ? 3 : qIdx - 1
   const prevYear = qIdx === 0 ? year - 1 : year
-  return quarterFlightHours(entries, qIdx, year) + quarterFlightHours(entries, prevQ, prevYear)
+  return quarterFlightHours(entries, qIdx, year, tz) + quarterFlightHours(entries, prevQ, prevYear, tz)
 }
 
-export function annualFlightHours(entries: Entry[], year: number): number {
-  return flightHoursInWindow(entries, new Date(year, 0, 1).getTime(), new Date(year + 1, 0, 1).getTime())
+export function annualFlightHours(entries: Entry[], year: number, tz?: string): number {
+  return flightHoursInWindow(entries, monthStartMs(year, 0, tz), monthStartMs(year, 12, tz))
 }
 
-export function quarterRestCount(entries: Entry[], tz?: string): number {
-  const now    = new Date()
-  const qMonth = Math.floor(now.getMonth() / 3) * 3
-  const qStart = new Date(now.getFullYear(), qMonth, 1).getTime()
-  const qEnd   = new Date(now.getFullYear(), qMonth + 3, 1).getTime()
+export function quarterRestCount(entries: Entry[], qIdx: number, year: number, tz?: string): number {
+  const qStart = monthStartMs(year, qIdx * 3, tz)
+  const qEnd   = monthStartMs(year, qIdx * 3 + 3, tz)
   return entries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd, tz), 0)
 }
 

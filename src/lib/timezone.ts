@@ -83,6 +83,25 @@ export function utcToLocalParts(utcStr: string, tz: string): { date: string; tim
   return { date: `${g('year')}-${g('month')}-${g('day')}`, time: `${hour}:${g('minute')}` }
 }
 
+// Calendar period boundaries (months, quarters, years) are defined in the
+// user's selected timezone. This is the single source of truth for them —
+// to switch the whole app to Zulu-calendar periods, change it here.
+// Returns local midnight on the 1st of the month as UTC ms. monthIdx is
+// 0-based and may overflow (12 → January of the next year). Without tz,
+// falls back to the device's local timezone.
+export function monthStartMs(year: number, monthIdx: number, tz?: string): number {
+  const y = year + Math.floor(monthIdx / 12)
+  const m = ((monthIdx % 12) + 12) % 12
+  if (!tz) return new Date(y, m, 1).getTime()
+  return Date.parse(localToUtcIso(`${y}-${String(m + 1).padStart(2, '0')}-01`, '00:00', tz))
+}
+
+// Current year and 0-based month in the selected timezone.
+export function localYearMonth(tz: string, now: Date = new Date()): { year: number; monthIdx: number } {
+  const date = utcToLocalParts(now.toISOString(), tz)?.date ?? now.toISOString().slice(0, 10)
+  return { year: Number(date.slice(0, 4)), monthIdx: Number(date.slice(5, 7)) - 1 }
+}
+
 // Split a stored date/time string (UTC ISO with Z, or legacy local "date T time") into
 // local date and time parts for populating an edit form.
 export function splitForEdit(val: string, tz: string): { d: string; t: string } {

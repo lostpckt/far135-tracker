@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { compute, computeDutyPeriod, fmtDT, fmtHrs } from '@/lib/calculations'
-import { utcToLocalParts } from '@/lib/timezone'
+import { utcToLocalParts, localYearMonth } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
 
@@ -49,8 +49,9 @@ function saveChoices(choices: Record<string, MonthChoice>) {
   } catch { /* ignore */ }
 }
 
-function computeCollapsed(monthKeys: string[]): Set<string> {
-  const currentKey = new Date().toISOString().slice(0, 7)
+function computeCollapsed(monthKeys: string[], tz: string): Set<string> {
+  const { year, monthIdx } = localYearMonth(tz)
+  const currentKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}`
   const choices = readChoices()
   return new Set(
     monthKeys.filter(key => {
@@ -165,13 +166,13 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
   })
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() =>
-    computeCollapsed(groups.map(g => g.key))
+    computeCollapsed(groups.map(g => g.key), tz)
   )
 
   const isFirstRender = useRef(true)
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
-    setCollapsed(computeCollapsed(groupsRef.current.map(g => g.key)))
+    setCollapsed(computeCollapsed(groupsRef.current.map(g => g.key), tz))
   }, [tz])
 
   const toggle = useCallback((key: string) => {

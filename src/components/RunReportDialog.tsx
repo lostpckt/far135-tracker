@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { generateQuarterlyReportPDF, generateMonthlyReportPDF, type LogDetail } from '@/lib/pdf-report'
 import type { Entry } from '@/types/entry'
+import { localYearMonth } from '@/lib/timezone'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -22,9 +23,9 @@ export default function RunReportDialog({ open, onClose, entries, tz }: Props) {
 
   const [type, setType]           = useState<'quarterly' | 'monthly'>('quarterly')
   const [entity, setEntity]       = useState(() => entities.length === 1 ? entities[0] : '__all__')
-  const [quarter, setQuarter]     = useState(() => Math.floor(new Date().getMonth() / 3).toString())
-  const [month, setMonth]         = useState(() => new Date().getMonth().toString())
-  const [year, setYear]           = useState(() => new Date().getFullYear().toString())
+  const [quarter, setQuarter]     = useState(() => Math.floor(localYearMonth(tz).monthIdx / 3).toString())
+  const [month, setMonth]         = useState(() => localYearMonth(tz).monthIdx.toString())
+  const [year, setYear]           = useState(() => localYearMonth(tz).year.toString())
   const [logDetail, setLogDetail] = useState<LogDetail>('summary')
 
   function handleGenerate() {

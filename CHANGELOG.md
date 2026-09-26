@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-26 (2)
+
+### Fixed
+- **Calendar periods now consistently use the selected timezone** — month/quarter/year boundaries for the PDF reports, the dashboard's quarterly / two-quarter / annual flight hours and quarterly rest-day count were built from the *device's* clock (`new Date(year, month, 1)`), while rest days and Flight Log month grouping used the timezone selected in the app. If the two differed, a flight or rest day near a period boundary could be counted in the neighboring month/quarter. All boundaries now come from one helper, `monthStartMs()` in `timezone.ts` (DST-aware local midnight in the selected timezone, as UTC). The dashboard's "current quarter", the Flight Log's auto-expanded current month (previously the *UTC* month, which rolled over early in the evening on the last day of the month for US timezones), and the Run Report dialog's default period also now use the selected timezone. Stored data is unchanged.
+
 ## 2026-09-26
 
 ### Fixed

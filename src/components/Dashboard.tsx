@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { compute, fmtHrs, ms, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
-import { utcToLocalParts, tzAbbr } from '@/lib/timezone'
+import { utcToLocalParts, tzAbbr, localYearMonth } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 interface Props {
@@ -42,15 +42,15 @@ export default function Dashboard({ entries, tz }: Props) {
     return () => clearInterval(id)
   }, [])
 
-  const qIdx   = Math.floor(now.getMonth() / 3)
-  const year   = now.getFullYear()
+  const { year, monthIdx } = localYearMonth(tz, now)
+  const qIdx   = Math.floor(monthIdx / 3)
   const qLabels = ['Q1', 'Q2', 'Q3', 'Q4']
   const prevQLabel = qIdx === 0 ? `Q4 ${year - 1}` : `${qLabels[qIdx - 1]} ${year}`
 
-  const qCount   = quarterRestCount(entries, tz)
-  const qHours   = quarterFlightHours(entries, qIdx, year)
-  const tqHours  = twoQuarterFlightHours(entries, qIdx, year)
-  const annHours = annualFlightHours(entries, year)
+  const qCount   = quarterRestCount(entries, qIdx, year, tz)
+  const qHours   = quarterFlightHours(entries, qIdx, year, tz)
+  const tqHours  = twoQuarterFlightHours(entries, qIdx, year, tz)
+  const annHours = annualFlightHours(entries, year, tz)
 
   const nonRestEntries = entries.filter(e => !e.restDay)
   const lastEntry = nonRestEntries.length ? nonRestEntries[nonRestEntries.length - 1] : null
