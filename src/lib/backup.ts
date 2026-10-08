@@ -111,6 +111,17 @@ export async function downloadBackup(entries: Entry[], tz: string): Promise<bool
   return saved
 }
 
+// After a restore, the file just restored from is itself a backup that exists
+// outside the browser, so count it — but never move the date backwards.
+// Returns the resulting last-backup time.
+export function recordRestoredBackup(exportedAt: string): number | null {
+  const t = Date.parse(exportedAt)
+  const current = lastBackupMs()
+  if (Number.isNaN(t) || (current !== null && current >= t)) return current
+  try { localStorage.setItem(LAST_BACKUP_KEY, new Date(t).toISOString()) } catch { /* localStorage unavailable */ }
+  return t
+}
+
 export function lastBackupMs(): number | null {
   try {
     const v = localStorage.getItem(LAST_BACKUP_KEY)

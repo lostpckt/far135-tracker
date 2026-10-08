@@ -1,13 +1,28 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import fs from 'fs'
+
+// Publish CHANGELOG.md next to the app so ChangelogModal can fetch the *deployed*
+// version. The update banner is rendered by the old, still-running build, whose
+// bundled changelog doesn't include the waiting update's entries. Not matched by
+// the Workbox globPatterns below, so it's never precached.
+function publishChangelog(): Plugin {
+  return {
+    name: 'publish-changelog',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'CHANGELOG.md', source: fs.readFileSync(path.resolve(__dirname, 'CHANGELOG.md'), 'utf8') })
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    publishChangelog(),
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'pwa-192.png', 'pwa-512.png'],

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { loadEntries, saveEntries, runBulkValidationIfNeeded } from '@/lib/storage'
 import { ms, exportCSV, importCSV, type SkippedRow } from '@/lib/calculations'
 import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
-import { downloadBackup, parseBackup, lastBackupMs, requestPersistentStorage, type ParsedBackup } from '@/lib/backup'
+import { downloadBackup, parseBackup, lastBackupMs, recordRestoredBackup, requestPersistentStorage, type ParsedBackup } from '@/lib/backup'
 import type { Entry } from '@/types/entry'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import Header from '@/components/Header'
@@ -73,6 +73,7 @@ export default function App() {
     // Backup entries are already stored in UTC — never offer the legacy tz migration on them.
     setMigrated()
     setShowMigration(false)
+    setLastBackup(recordRestoredBackup(r.exportedAt))
     setPendingRestore(null)
   }
   const [dark, setDark]                   = useState(() => localStorage.getItem('far135_theme') === 'dark')

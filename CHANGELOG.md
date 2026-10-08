@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-08 (2)
+
+### Fixed
+- **"What's new?" on the update banner now shows the waiting update's changes** — the banner is shown by the version you're still running, and its built-in changelog stopped at that version, so it never listed what the update actually contained. The changelog is now fetched from the site when opened, falling back to the built-in copy when offline. The first update banner after this release will still show the older list, since that banner comes from the previous version; it's correct for every update after that.
+- **No "No backup yet" banner right after restoring on a new device** — restoring now counts the backup file you restored from as your latest backup, using the date that file was made, so the 15-day reminder starts from there. Restoring an older backup never moves the date backwards.
+
 ## 2026-10-08
 
 ### Added

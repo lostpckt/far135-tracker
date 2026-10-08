@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import changelogRaw from '../../CHANGELOG.md?raw'
 
@@ -12,16 +13,35 @@ function renderChangelog(raw: string) {
   })
 }
 
+// The bundled copy is from the build that's currently running. When an update is
+// waiting, the deployed CHANGELOG.md is newer, so fetch it on open and fall back
+// to the bundled copy when offline or in dev (where the file isn't served).
+async function fetchDeployedChangelog(): Promise<string | null> {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}CHANGELOG.md`, { cache: 'no-store' })
+    if (!res.ok) return null
+    const text = await res.text()
+    // Guard against an HTML fallback page being served in place of a missing file.
+    return text.startsWith('# Changelog') ? text : null
+  } catch { return null }
+}
+
 export default function ChangelogModal({ children }: { children: React.ReactNode }) {
+  const [text, setText] = useState(changelogRaw)
+
+  function handleOpenChange(open: boolean) {
+    if (open) fetchDeployedChangelog().then(t => { if (t) setText(t) })
+  }
+
   return (
-    <Dialog>
+    <Dialog onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Changelog</DialogTitle>
         </DialogHeader>
         <div className="overflow-y-auto flex-1 pr-1">
-          {renderChangelog(changelogRaw)}
+          {renderChangelog(text)}
         </div>
         <DialogFooter showCloseButton />
       </DialogContent>
