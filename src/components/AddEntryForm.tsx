@@ -1,23 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import LegRow, { type LegData } from '@/components/LegRow'
 import { SectionLabel } from '@/components/FormHelpers'
-import { uid, ms, parseHobbs, checkRestOverlapForEntry } from '@/lib/calculations'
-import { localToUtcIso, utcToLocalParts, tzAbbr } from '@/lib/timezone'
+import { uid, ms, parseHobbs, overlappingDuty } from '@/lib/calculations'
+import { localToUtcIso, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
-import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
-
-interface RestEndPrompt {
-  lastEntryId: string
-  newShowTime: string
-  entriesToAdd: Entry[]
-}
 
 const DRAFT_KEY = 'far135_v1_form_draft'
 
@@ -29,11 +20,6 @@ interface DraftState {
   showTime: string
   relDate: string
   relTime: string
-  rsDate: string
-  rsTime: string
-  restDay: boolean
-  restDayStart: string
-  restDayEnd: string
   legs: LegData[]
 }
 
@@ -67,38 +53,23 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const [showTime, setShowTime]     = useState(d?.showTime ?? '')
   const [relDate, setRelDate]       = useState(d?.relDate ?? '')
   const [relTime, setRelTime]       = useState(d?.relTime ?? '')
-  const [rsDate, setRsDate]         = useState(d?.rsDate ?? '')
-  const [rsTime, setRsTime]         = useState(d?.rsTime ?? '')
-  const [restDay, setRestDay]           = useState(d?.restDay ?? false)
-  const [restDayStart, setRestDayStart] = useState(d?.restDayStart ?? '')
-  const [restDayEnd, setRestDayEnd]     = useState(d?.restDayEnd ?? '')
   const [legs, setLegs]             = useState<LegData[]>(d?.legs ?? [emptyLeg()])
   const [err, setErr]               = useState('')
-  const [restEndPrompt, setRestEndPrompt] = useState<RestEndPrompt | null>(null)
 
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, restDay, restDayStart, restDayEnd, legs }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, legs }))
     } catch { /* localStorage unavailable */ }
-  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, rsDate, rsTime, restDay, restDayStart, restDayEnd, legs])
+  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, legs])
 
   function resetForm() {
     setTailNumber(''); setEntity(''); setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
-    setRsDate(''); setRsTime('')
-    setRestDay(false); setRestDayStart(''); setRestDayEnd(''); setLegs([emptyLeg()]); setErr('')
+    setLegs([emptyLeg()]); setErr('')
     try { localStorage.removeItem(DRAFT_KEY) } catch { /* localStorage unavailable */ }
   }
 
   function handleAdd() {
     setErr('')
-
-    if (restDay) {
-      if (!restDayStart) { setErr('Enter the date of the rest day.'); return }
-      const rdShowTime = localToUtcIso(restDayStart, '00:00', tz) || `${restDayStart}T00:00`
-      onAdd([...entries, { id: uid(), pilot: '', crew, showTime: rdShowTime, releaseTime: '', dep: '', arr: '', offBlocks: '', onBlocks: '', restStart: '', restEnd: '', reason: '', part91: false, restDay: true, restDayEnd: restDayEnd || undefined, validationVersion: ENTRY_VALIDATION_VERSION }])
-      resetForm()
-      return
-    }
 
     if (!tailNumber.trim()) { setErr('Aircraft tail number is required.'); return }
     if (!entity.trim()) { setErr('Entity is required for Part 135 flights.'); return }
@@ -108,6 +79,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     if (!show)    { setErr('Show Time is required.'); return }
     if (!release) { setErr('Release Time is required.'); return }
     if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
+    if (overlappingDuty(entries, show, release, new Set())) { setErr('This duty period overlaps another logged duty period. Check the Show and Release times.'); return }
 
     const legData: { dep: string; arr: string; off: string; on: string; reason: string; part91: boolean }[] = []
     for (let i = 0; i < legs.length; i++) {
@@ -122,9 +94,6 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       legData.push({ dep: leg.dep, arr: leg.arr, off: leg.offHobbs.trim(), on: leg.onHobbs.trim(), reason: leg.reason, part91: leg.part91 })
     }
 
-    const restStart = localToUtcIso(rsDate, rsTime, tz)
-    if (!restStart) { setErr('Rest Start is required.'); return }
-
     const newEntries: Entry[] = legData.map(leg => ({
       id: uid(), pilot: '', crew,
       tailNumber: tailNumber.trim() || undefined,
@@ -132,63 +101,17 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       showTime: show, releaseTime: release,
       dep: leg.dep, arr: leg.arr,
       offBlocks: leg.off, onBlocks: leg.on,
-      restStart, restEnd: '',
+      restStart: '', restEnd: '',
       reason: leg.reason, part91: leg.part91, restDay: false,
     }))
 
-    // Stamp validationVersion immediately for entries that already pass the
-    // rest-overlap check, so a brand-new well-formed entry doesn't show the
-    // "needs review" warning it would otherwise get by default (validationVersion
-    // undefined < ENTRY_VALIDATION_VERSION). Mirrors runBulkValidationIfNeeded's logic.
-    const merged  = [...entries, ...newEntries].sort((a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0))
-    const stamped = newEntries.map(e =>
-      checkRestOverlapForEntry(e, merged) ? { ...e, validationVersion: ENTRY_VALIDATION_VERSION } : e
-    )
-
-    // If the previous duty period never got a Rest End (common when you don't yet
-    // know your next show time), offer to backfill it now that we do.
-    const lastEntry = entries.filter(e => !e.restDay).at(-1)
-    if (lastEntry && !lastEntry.restEnd) {
-      setRestEndPrompt({ lastEntryId: lastEntry.id, newShowTime: show, entriesToAdd: stamped })
-      return
-    }
-
-    onAdd([...entries, ...stamped])
-    resetForm()
-  }
-
-  function confirmRestEndBackfill() {
-    if (!restEndPrompt) return
-    const { lastEntryId, newShowTime, entriesToAdd } = restEndPrompt
-    const original = entries.find(e => e.id === lastEntryId)
-    if (!original) { setRestEndPrompt(null); return }
-
-    const patched = { ...original, restEnd: newShowTime }
-    const merged  = [...entries.map(e => e.id === lastEntryId ? patched : e), ...entriesToAdd]
-    const revalidated = {
-      ...patched,
-      validationVersion: checkRestOverlapForEntry(patched, merged) ? ENTRY_VALIDATION_VERSION : undefined,
-    }
-
-    onAdd([...entries.map(e => e.id === lastEntryId ? revalidated : e), ...entriesToAdd])
-    setRestEndPrompt(null)
-    resetForm()
-  }
-
-  function skipRestEndBackfill() {
-    if (!restEndPrompt) return
-    onAdd([...entries, ...restEndPrompt.entriesToAdd])
-    setRestEndPrompt(null)
+    onAdd([...entries, ...newEntries])
     resetForm()
   }
 
   const abbr = tzAbbr(tz)
 
-  const promptLocal = restEndPrompt ? utcToLocalParts(restEndPrompt.newShowTime, tz) : null
-  const promptTimeStr = promptLocal ? `${promptLocal.date} ${promptLocal.time} ${abbr}` : ''
-
   return (
-    <>
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold">Add Flight Leg</CardTitle>
@@ -230,90 +153,52 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             </div>
           </div>
 
-          <SectionLabel>Special Entries</SectionLabel>
+          <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
 
-          <div className="col-span-full flex flex-col gap-2 mt-1">
-            <div className="flex items-center gap-2">
-              <Checkbox id="f-restday" checked={restDay} onCheckedChange={v => setRestDay(!!v)} />
-              <label htmlFor="f-restday" className="text-sm cursor-pointer">
-                This is an extended rest period (no duty or flights)
-              </label>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr}) <span className="text-red-500">*</span></Label>
+            <div className="flex gap-1.5">
+              <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+              <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
             </div>
-            {restDay && (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 ml-6 mt-1">
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-semibold text-slate-500">Rest Day Date <span className="text-red-500">*</span></Label>
-                  <Input type="date" value={restDayStart} onChange={e => setRestDayStart(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-semibold text-slate-500">End Date (if multi-day)</Label>
-                  <Input type="date" value={restDayEnd} onChange={e => setRestDayEnd(e.target.value)} className="text-sm h-8 w-44 appearance-none" />
-                  <span className="text-[0.68rem] text-slate-400">Leave blank for a single rest day</span>
-                </div>
-              </div>
-            )}
+            <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
+            <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
           </div>
 
-          {!restDay && <>
-            <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
-
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr}) <span className="text-red-500">*</span></Label>
-              <div className="flex gap-1.5">
-                <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
-              </div>
-              <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
-              <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr}) <span className="text-red-500">*</span></Label>
+            <div className="flex gap-1.5">
+              <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
+              <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
             </div>
+            <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
+            <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr). Rest runs from here to your next Show Time.</span>
+          </div>
 
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr}) <span className="text-red-500">*</span></Label>
-              <div className="flex gap-1.5">
-                <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
-              </div>
-              <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
-              <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr)</span>
-            </div>
+          <SectionLabel>Flight Legs</SectionLabel>
 
-            <SectionLabel>Flight Legs</SectionLabel>
-
-            <div className="col-span-full">
-              {legs.map((leg, i) => (
-                <LegRow
-                  key={i}
-                  index={i}
-                  data={leg}
-                  onChange={updated => setLegs(legs.map((l, j) => j === i ? updated : l))}
-                  onRemove={() => setLegs(legs.filter((_, j) => j !== i))}
-                  showRemove={legs.length > 1}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  const prev = legs[legs.length - 1]
-                  setLegs([...legs, { ...emptyLeg(), dep: prev?.arr ?? '', offHobbs: prev?.onHobbs ?? '' }])
-                }}
-                className="w-full border border-dashed border-blue-300 bg-blue-50 hover:bg-blue-600 hover:text-white hover:border-solid text-blue-600 text-sm font-semibold rounded-lg py-2 mt-1 transition-colors"
-              >
-                + Add Another Leg
-              </button>
-            </div>
-
-            <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
-
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Rest Start ({abbr}) <span className="text-red-500">*</span></Label>
-              <div className="flex gap-1.5">
-                <Input type="date" value={rsDate} onChange={e => setRsDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-                <Input type="time" value={rsTime} onChange={e => setRsTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
-              </div>
-              <UtcPreview dateStr={rsDate} timeStr={rsTime} tz={tz} />
-              <span className="text-[0.68rem] text-slate-400">When rest began after release (24-hr)</span>
-            </div>
-          </>}
+          <div className="col-span-full">
+            {legs.map((leg, i) => (
+              <LegRow
+                key={i}
+                index={i}
+                data={leg}
+                onChange={updated => setLegs(legs.map((l, j) => j === i ? updated : l))}
+                onRemove={() => setLegs(legs.filter((_, j) => j !== i))}
+                showRemove={legs.length > 1}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const prev = legs[legs.length - 1]
+                setLegs([...legs, { ...emptyLeg(), dep: prev?.arr ?? '', offHobbs: prev?.onHobbs ?? '' }])
+              }}
+              className="w-full border border-dashed border-blue-300 bg-blue-50 hover:bg-blue-600 hover:text-white hover:border-solid text-blue-600 text-sm font-semibold rounded-lg py-2 mt-1 transition-colors"
+            >
+              + Add Another Leg
+            </button>
+          </div>
 
         </div>
 
@@ -337,26 +222,5 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
         </div>
       </CardContent>
     </Card>
-
-    {restEndPrompt && (
-      <Dialog open onOpenChange={open => { if (!open) skipRestEndBackfill() }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold">Set Previous Rest End?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            The previous entry's Rest End is blank. Set it to this entry's Show Time
-            {promptTimeStr && <> (<span className="font-semibold">{promptTimeStr}</span>)</>}?
-          </p>
-          <DialogFooter className="gap-2 mt-2">
-            <Button variant="outline" onClick={skipRestEndBackfill} className="text-sm h-8">Skip</Button>
-            <Button onClick={confirmRestEndBackfill} className="bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm h-8">
-              Set Rest End
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    )}
-    </>
   )
 }

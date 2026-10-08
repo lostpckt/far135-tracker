@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
-import { compute, computeDutyPeriod, fmtDT, fmtHrs } from '@/lib/calculations'
-import { utcToLocalParts, localYearMonth } from '@/lib/timezone'
+import { compute, computeDutyPeriod, fmtDT, fmtHrs, restPeriodsInWindow } from '@/lib/calculations'
+import { utcToLocalParts, localYearMonth, monthStartMs } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
-import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
 
 interface Props {
   entries: Entry[]
@@ -72,54 +71,40 @@ function entryMonthKey(entry: Entry, tz: string): string {
   return anchor.slice(0, 7)
 }
 
-function restDayLocalDate(e: Entry, tz: string): string {
-  const anchor = e.showTime || ''
-  return anchor.endsWith('Z')
-    ? (utcToLocalParts(anchor, tz)?.date ?? anchor.slice(0, 10))
-    : anchor.slice(0, 10)
-}
-
-// Number of calendar days of a rest-day entry (start through restDayEnd,
-// inclusive) that fall in the given YYYY-MM month.
-function restDaysInMonth(e: Entry, monthKey: string, tz: string): number {
-  const start = restDayLocalDate(e, tz)
-  const end = e.restDayEnd && e.restDayEnd > start ? e.restDayEnd : start
-  const d = new Date(start + 'T00:00:00Z')
-  let count = 0
-  for (let date = start; date <= end; date = d.toISOString().slice(0, 10)) {
-    if (date.startsWith(monthKey)) count++
-    d.setUTCDate(d.getUTCDate() + 1)
-  }
-  return count
-}
-
 function monthLabel(key: string): string {
   if (key === 'unknown') return 'Unknown Date'
   return new Date(key + '-02T12:00:00').toLocaleString('en-US', { month: 'long', year: 'numeric' })
 }
 
-// Groups entries within a month into duty periods and rest days.
-type DutyItem = { type: 'duty'; key: string; legs: Entry[] }
-type RestItem  = { type: 'rest';  entry: Entry }
-type MonthItem = DutyItem | RestItem
+// §135.267(f) rest periods (each full 24 h of rest) within a YYYY-MM month.
+function restPeriodsInMonth(entries: Entry[], monthKey: string, tz: string, now: number): number {
+  if (monthKey === 'unknown') return 0
+  const [y, m] = monthKey.split('-').map(Number)
+  return restPeriodsInWindow(entries, monthStartMs(y, m - 1, tz), monthStartMs(y, m, tz), now)
+}
 
-function buildMonthItems(groupEntries: Entry[]): MonthItem[] {
-  const items: MonthItem[] = []
+// Groups a month's legs into duty periods (legs sharing show and release).
+function buildDutyPeriods(groupEntries: Entry[]): { key: string; legs: Entry[] }[] {
+  const items: { key: string; legs: Entry[] }[] = []
   const seen = new Map<string, Entry[]>()
   for (const e of groupEntries) {
-    if (e.restDay) {
-      items.push({ type: 'rest', entry: e })
-    } else {
-      const key = `${e.showTime}|${e.releaseTime ?? ''}`
-      if (!seen.has(key)) {
-        const legs: Entry[] = []
-        seen.set(key, legs)
-        items.push({ type: 'duty', key, legs })
-      }
-      seen.get(key)!.push(e)
+    const key = `${e.showTime}|${e.releaseTime ?? ''}`
+    if (!seen.has(key)) {
+      const legs: Entry[] = []
+      seen.set(key, legs)
+      items.push({ key, legs })
     }
+    seen.get(key)!.push(e)
   }
   return items
+}
+
+// Flight time vs. its limit: under §135.267(c) the duty period's own flight
+// time is limited; otherwise the (b) rolling 24-hour total.
+function FlightLimitCell({ cQualifies, dutyFlight, rolling24, maxFlight }: { cQualifies: boolean | null; dutyFlight: number | null; rolling24: number | null; maxFlight: number }) {
+  return cQualifies
+    ? <><span className="font-semibold">{fmtHrs(dutyFlight)}</span><br /><span className="text-[0.68rem] text-slate-400">Duty period (c) · limit {maxFlight}h</span></>
+    : <><span className="font-semibold">{rolling24 !== null ? fmtHrs(rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">24-hr window · limit {maxFlight}h</span></>
 }
 
 const COLS = 16
@@ -127,37 +112,16 @@ const COLS = 16
 export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }: Props) {
   const [exceedanceReason, setExceedanceReason] = useState<string | null>(null)
   const [expandedDuty, setExpandedDuty] = useState<Set<string>>(new Set())
+  const [now] = useState(Date.now)
 
+  // Legacy rest-day entries are kept in storage but no longer shown.
+  const legs = entries.filter(e => !e.restDay)
   const groups: { key: string; entries: Entry[] }[] = []
-  for (const e of entries) {
+  for (const e of legs) {
     const key = entryMonthKey(e, tz)
     const last = groups[groups.length - 1]
     if (last && last.key === key) last.entries.push(e)
     else groups.push({ key, entries: [e] })
-  }
-
-  // Rest day entries with restDayEnd spanning into later months must appear in
-  // each spanned month group so those months are visible in the log.
-  for (const e of entries) {
-    if (!e.restDay || !e.restDayEnd) continue
-    const startKey = entryMonthKey(e, tz)
-    const endKey = e.restDayEnd.slice(0, 7)
-    if (endKey <= startKey) continue
-    let [year, month] = startKey.split('-').map(Number)
-    while (true) {
-      month++
-      if (month > 12) { month = 1; year++ }
-      const key = `${year}-${String(month).padStart(2, '0')}`
-      if (key > endKey) break
-      const existing = groups.find(g => g.key === key)
-      if (existing) {
-        if (!existing.entries.includes(e)) existing.entries.unshift(e)
-      } else {
-        const insertIdx = groups.findIndex(g => g.key > key)
-        if (insertIdx === -1) groups.push({ key, entries: [e] })
-        else groups.splice(insertIdx, 0, { key, entries: [e] })
-      }
-    }
   }
 
   const groupsRef = useRef(groups)
@@ -197,7 +161,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
     })
   }, [])
 
-  if (!entries.length) {
+  if (!legs.length) {
     return (
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Flight Log</CardTitle></CardHeader>
@@ -216,7 +180,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                {['Show Time','Release Time','Crew','Route','Off Blocks','On Blocks','Leg Time','Rolling 24-hr','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance',''].map(h => (
+                {['Show Time','Release Time','Crew','Route','Off Blocks','On Blocks','Leg Time','Flight Time Limit','Flt OK?','Duty Period','Duty OK?','10-hr Lookback','Rest After','Rest OK?','Exceedance',''].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 border-b-2 border-slate-200 dark:border-slate-700 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -224,13 +188,11 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
 
             {groups.map(({ key, entries: groupEntries }) => {
               const isMonthCollapsed = collapsed.has(key)
-              const legCount  = groupEntries.filter(e => !e.restDay).length
-              const restCount = groupEntries
-                .filter(e => !!e.restDay)
-                .reduce((sum, e) => sum + restDaysInMonth(e, key, tz), 0)
+              const legCount  = groupEntries.length
+              const restCount = restPeriodsInMonth(entries, key, tz, now)
               const summary = [
-                legCount  > 0 && `${legCount} leg${legCount !== 1 ? 's' : ''}`,
-                restCount > 0 && `${restCount} rest day${restCount !== 1 ? 's' : ''}`,
+                `${legCount} leg${legCount !== 1 ? 's' : ''}`,
+                restCount > 0 && `${restCount} rest period${restCount !== 1 ? 's' : ''} (24 h)`,
               ].filter(Boolean).join(' · ')
 
               return (
@@ -252,29 +214,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                     </td>
                   </tr>
 
-                  {!isMonthCollapsed && buildMonthItems(groupEntries).map(item => {
-                    // ── Rest day row ──────────────────────────────────────────
-                    if (item.type === 'rest') {
-                      const e = item.entry
-                      const localDate = restDayLocalDate(e, tz)
-                      const localDateFmt = localDate.slice(5).replace('-', '/')
-                      return (
-                        <tr key={e.id} className="bg-green-50 dark:bg-green-950">
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{localDateFmt}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">—</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-green-700 dark:text-green-400 font-semibold" colSpan={13}>
-                            {e.restDayEnd && e.restDayEnd !== localDate
-                              ? `🟢 24-HOUR REST DAYS: ${localDate} – ${e.restDayEnd}`
-                              : '🟢 24-HOUR REST DAY — No flight duty'}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
-                            <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>
-                          </td>
-                        </tr>
-                      )
-                    }
-
+                  {!isMonthCollapsed && buildDutyPeriods(groupEntries).map(item => {
                     // ── Duty period ───────────────────────────────────────────
                     const { key: dutyKey, legs } = item
                     const isDutyExpanded = expandedDuty.has(dutyKey)
@@ -282,7 +222,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                     if (legs.length === 1) {
                       // Single-leg duty: render as a plain row (no toggle)
                       const e = legs[0]
-                      const c = compute(e, entries, tz)
+                      const c = compute(e, entries)
                       const excBadge = c.excAmt > 0
                         ? <button onClick={() => setExceedanceReason(e.reason || '(no reason recorded)')}><Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(c.excAmt)}</Badge></button>
                         : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
@@ -304,7 +244,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {e.part91
                               ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
-                              : <><span className="font-semibold">{c.rolling24 !== null ? fmtHrs(c.rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {c.maxFlight}h</span></>
+                              : <FlightLimitCell cQualifies={c.cQualifies} dutyFlight={c.dutyFlight} rolling24={c.rolling24} maxFlight={c.maxFlight} />
                             }
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>
@@ -317,16 +257,12 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {fmtHrs(c.consRest)}<br />
+                            {c.consRest !== null ? fmtHrs(c.consRest) : <span className="text-slate-400">In progress</span>}<br />
                             {!e.part91 && <span className="text-[0.68rem] text-slate-400">Req: {c.reqRest}h</span>}
-                            {c.restOverlapOk === false && <div className="text-[0.65rem] text-red-600 mt-0.5">⚠ rest overlap</div>}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {(e.validationVersion ?? 0) < ENTRY_VALIDATION_VERSION && (
-                              <button onClick={() => onEdit(e)} title="Needs review — open and save to validate" className="text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900 rounded p-1 mr-0.5">⚠</button>
-                            )}
                             <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
                             <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>
                           </td>
@@ -336,9 +272,9 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
 
                     // ── Multi-leg duty period ─────────────────────────────────
                     const { computedLegs, allPart91, totalFlight, rolling24, maxFlight, flightOk,
-                            dutyPeriod, dutyOk, reqRest, lookbackOk, consRest, restOk, restOverlapOk,
-                            excAmt, excReason } =
-                      computeDutyPeriod(legs, entries, tz)
+                            dutyPeriod, dutyOk, reqRest, lookbackOk, consRest, restOk,
+                            excAmt, excReason, cQualifies, dutyFlight } =
+                      computeDutyPeriod(legs, entries)
 
                     const p91Count = legs.filter(l => l.part91).length
                     const p91Badge = p91Count > 0
@@ -384,7 +320,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {allPart91
                               ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
-                              : <><span className="font-semibold">{rolling24 !== null ? fmtHrs(rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {maxFlight}h</span></>
+                              : <FlightLimitCell cQualifies={cQualifies} dutyFlight={dutyFlight} rolling24={rolling24} maxFlight={maxFlight} />
                             }
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={flightOk} okText="OK" warnText="EXCEEDED" /></td>
@@ -397,18 +333,14 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {fmtHrs(consRest)}<br />
+                            {consRest !== null ? fmtHrs(consRest) : <span className="text-slate-400">In progress</span>}<br />
                             {!allPart91 && <span className="text-[0.68rem] text-slate-400">Req: {reqRest}h</span>}
-                            {restOverlapOk === false && <div className="text-[0.65rem] text-red-600 mt-0.5">⚠ rest overlap</div>}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={restOk} okText="OK" warnText="DEFICIENT" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
                             {allPart91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : summaryExcBadge}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {legs.some(l => (l.validationVersion ?? 0) < ENTRY_VALIDATION_VERSION) && (
-                              <button onClick={() => onEditDuty(legs)} title="Needs review — open and save to validate" className="text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900 rounded p-1 mr-0.5">⚠</button>
-                            )}
                             <button onClick={() => onEditDuty(legs)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
                             <button
                               onClick={() => toggleDuty(dutyKey)}
@@ -442,7 +374,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                                 {e.part91
                                   ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
-                                  : <><span className="font-semibold">{c.rolling24 !== null ? fmtHrs(c.rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">Limit: {c.maxFlight}h</span></>
+                                  : <FlightLimitCell cQualifies={c.cQualifies} dutyFlight={c.dutyFlight} rolling24={c.rolling24} maxFlight={c.maxFlight} />
                                 }
                               </td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>

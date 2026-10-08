@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-08 (3)
+
+### Changed
+- **Rest is now calculated from your duty times: it runs from each Release Time to your next Show Time.** Rest-day entries, the Rest Start / Rest End fields, and the "set previous Rest End?" prompt are gone. Days off need no entry at all. A Part 91 duty ends a rest just like a Part 135 one, because Part 91 duty is still duty. This assumes every duty period is logged, so log Part 91 duty too. Your existing rest-day entries aren't deleted; they're kept in storage and in backups but hidden and ignored. Rest values may read a little longer than before where your recorded Rest Start was after release or your Rest End was before the next show.
+- **Duty periods that meet §135.267(c) are judged on their own flight time** — a duty period of 14 hours or less, with at least 10 hours of rest before and after it and no more than 8 hours of Part 135 flight time (10 hours dual), is now checked against that limit by itself. The rolling 24-hour window no longer applies to it, as (c) allows. This removes false "EXCEEDED" flags on back-to-back duty days whose release times fall less than 24 hours apart. Duty periods that don't qualify, for example after less than 10 hours of rest, are still checked against the rolling 24-hour window. The Flight Log, PDF report and CSV show which basis was used. The latest duty period is treated as followed by enough rest until your next duty is logged.
+- **Quarterly rest periods now count each full 24 hours of rest** — §135.267(f) requires 13 rest periods of at least 24 consecutive hours per calendar quarter. Each rest (release → next show) now earns one rest period per full 24 hours. A rest crossing a quarter boundary is split there, so each one credited lies wholly inside the quarter. The rest in progress since your last release counts too. Rest before your first logged duty can't be measured and isn't counted. Labels now say "rest periods" instead of "rest days."
+- **CSV export** — rest-day rows and their columns are gone. Rest Start / Rest End now show the calculated rest (release → next show), and a new "Flight Limit Basis" column shows (c) or (b). Importing an older CSV still works; its rest-day rows are listed as skipped, and its Rest Start / Rest End columns are ignored.
+- **The "needs review" (⚠) marker and the "rest overlap" warning are removed** — they only existed to catch rest times entered inconsistently with duty times, which can no longer happen. Instead, adding or editing a duty period that overlaps another one is refused.
+
+### Fixed
+- **10-hr look-back now requires the 10 hours of rest to fall *within* the 24 hours before release** — §135.267(d) requires at least 10 consecutive hours of rest during the 24 hours before the duty period ends. The check accepted any rest of 10+ hours that merely *ended* inside that window, even if most of it came before the window. A 13-hour rest with only 7 hours inside the window passed. Now only the hours inside the window count.
+- **Look-back shows N/A, not CHECK, when there's no earlier data** — for the first duty in your log, and whenever the 24-hour window reaches back before it, the rest can't be known. Previously the check also looked at entries *after* the one being checked to decide whether earlier data existed.
+- **No more false EXCEEDED at exactly 8.0 or 10.0 flight hours** — Hobbs subtraction carries tiny rounding errors (2.3 h computed as 2.2999999999992724), so about 1 in 1,000 duty periods totalling exactly the limit summed to 8.000000000000028 and was flagged EXCEEDED with 11 hours of rest required. Flight times and totals are now rounded to 0.01 h.
+- **Exactly 30 minutes over now requires 11 hours of rest, not 12** — §135.267(e) calls for 11 hours when the limit is exceeded by not more than 30 minutes. The Quick Reference wording is updated to match.
+- **Exactly 500 / 800 / 1,400 hours no longer shows EXCEEDED** — the §135.267(a) limits may not be *exceeded*, so reaching exactly the limit is legal. This applies to the dashboard cards and the quarterly PDF report.
+
 ## 2026-10-08 (2)
 
 ### Fixed

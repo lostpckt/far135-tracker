@@ -5,11 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 const sections = [
   {
     title: 'Rolling 24-Hour Flight Time',
-    body: 'Single pilot: max 8 hours in any consecutive 24-hour window. Dual pilot: max 10 hours. The 24-hour window is anchored to Release Time (or Show Time if no release) since Hobbs readings carry no timestamp.',
+    body: 'Single pilot: max 8 hours in any consecutive 24-hour window. Dual pilot: max 10 hours. Under §135.267(c), a duty period of 14 hours or less with at least 10 hours of rest before and after is judged on its own flight time instead (8 / 10 h). Otherwise the 24-hour window applies, anchored to Release Time since Hobbs readings carry no timestamp.',
   },
   {
     title: '10-Hour Look-Back Rest',
-    body: 'Before any flight segment, the pilot must have received at least 10 consecutive hours of rest in the 24 hours preceding the completion of that segment. This tracker checks whether a qualifying rest period ended within the 24-hour lookback window, anchored to Release Time.',
+    body: 'Before any flight segment, the pilot must have received at least 10 consecutive hours of rest in the 24 hours preceding the completion of that segment. This tracker checks that at least 10 consecutive hours of rest (Release to next Show) fall inside the 24 hours before Release Time. With no earlier duty logged, it shows N/A.',
   },
   {
     title: '14-Hour Duty Day',
@@ -17,11 +17,11 @@ const sections = [
   },
   {
     title: 'Quarterly Rest Requirement',
-    body: 'Each pilot must receive at least 13 24-hour rest periods per calendar quarter. Check the "24-hour rest day" box on any day you had no duty. The dashboard shows your running count.',
+    body: 'Each pilot must receive at least 13 rest periods of at least 24 consecutive hours per calendar quarter. Rest runs from Release to your next Show; each full 24 hours counts as one, and a rest crossing a quarter boundary is split there. The dashboard shows your running count.',
   },
   {
     title: 'Exceedance Rest Multiplier',
-    body: 'If flight time is exceeded (e.g., due to weather or an unforeseen delay): < 30 min over → 11 hrs rest required. 30–60 min over → 12 hrs required. > 60 min over → 16 hrs required.',
+    body: 'If flight time is exceeded (e.g., due to weather or an unforeseen delay): Up to 30 min over → 11 hrs rest required. More than 30, up to 60 min over → 12 hrs required. More than 60 min over → 16 hrs required.',
   },
 ]
 

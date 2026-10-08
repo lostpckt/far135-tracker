@@ -1,6 +1,5 @@
 import type { Entry, Computed } from '@/types/entry'
-import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
-import { localToUtcIso, utcToLocalParts, monthStartMs } from '@/lib/timezone'
+import { monthStartMs } from '@/lib/timezone'
 import { saveFile } from '@/lib/backup'
 
 export function uid(): string {
@@ -46,26 +45,15 @@ export function parseHobbs(val: string | undefined | null): number | null {
   return isNaN(n) ? null : n
 }
 
-// Returns false if restStart is before releaseTime, or if restEnd extends past
-// the next duty period's showTime. Entries with no rest times always return true.
-export function checkRestOverlapForEntry(entry: Entry, all: Entry[]): boolean {
-  if (entry.restDay || entry.part91) return true
-  const anchor = ms(entry.releaseTime) ?? ms(entry.showTime)
-  const rsMs   = ms(entry.restStart)
-  const reMs   = ms(entry.restEnd)
-  if (rsMs === null && reMs === null) return true
-  if (rsMs !== null && anchor !== null && rsMs < anchor) return false
-  if (reMs !== null && anchor !== null) {
-    for (const e of all) {
-      if (e.restDay || e.part91 || e.id === entry.id) continue
-      const eShowMs = ms(e.showTime)
-      if (eShowMs !== null && eShowMs > anchor) {
-        if (reMs > eShowMs) return false
-        break
-      }
-    }
-  }
-  return true
+/**
+ * Round an hours value to 0.01 h. Hobbs readings are decimal (tenths), but their
+ * floating-point differences aren't exact (2.3 h computes as 2.2999999999992724),
+ * so sums that are exactly at a limit could land a hair over it (8.000000000000028)
+ * and falsely read as EXCEEDED. Rounding every flight time and every sum keeps
+ * limit comparisons exact.
+ */
+export function roundHrs(h: number): number {
+  return Math.round(h * 100) / 100
 }
 
 /** Flight time from Hobbs readings: onHobbs - offHobbs. */
@@ -73,24 +61,115 @@ export function hobbsFlightTime(offHobbs: number | null, onHobbs: number | null)
   if (offHobbs === null || onHobbs === null) return null
   const diff = onHobbs - offHobbs
   if (diff < 0) return null
-  return diff
+  return roundHrs(diff)
 }
 
-export function compute(entry: Entry, all: Entry[], tz?: string): Computed {
+const HOUR = 3600000
+const DAY  = 86400000
+
+// ── Rest model ───────────────────────────────────────────────────────────────
+// Rest is the time between one duty period's release and the next duty period's
+// show. Part 91 duty is still duty, so a Part 91 show ends a rest too. This
+// assumes the log records all duty (there is no standby or on-call time).
+// Before the first logged duty, rest is unknown. Legacy rest-day entries
+// (restDay) and the legacy restStart/restEnd fields are ignored.
+
+interface DutyPeriodSpan {
+  show: number
+  release: number
+  f135: number    // Part 135 flight time in this duty period, h
+}
+
+interface DutyIndex {
+  periods: DutyPeriodSpan[]          // sorted by show
+  byKey: Map<string, number>         // dutyKey(entry) → index in periods
+}
+
+function dutyKey(e: Entry): string {
+  return `${e.showTime}|${e.releaseTime ?? ''}`
+}
+
+// compute() is called once per entry with the same `all` array, so build the
+// index once per array. App state replaces the array on every change.
+const dutyIndexCache = new WeakMap<Entry[], DutyIndex>()
+
+function dutyIndex(all: Entry[]): DutyIndex {
+  const cached = dutyIndexCache.get(all)
+  if (cached) return cached
+  const map = new Map<string, DutyPeriodSpan>()
+  for (const e of all) {
+    if (e.restDay) continue
+    const show = ms(e.showTime)
+    if (show === null) continue
+    const key = dutyKey(e)
+    let dp = map.get(key)
+    if (!dp) { dp = { show, release: ms(e.releaseTime) ?? show, f135: 0 }; map.set(key, dp) }
+    if (!e.part91) dp.f135 = roundHrs(dp.f135 + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0))
+  }
+  const keys = [...map.keys()].sort((a, b) => map.get(a)!.show - map.get(b)!.show)
+  const idx: DutyIndex = { periods: keys.map(k => map.get(k)!), byKey: new Map(keys.map((k, i) => [k, i])) }
+  dutyIndexCache.set(all, idx)
+  return idx
+}
+
+/**
+ * True if a duty period from `show` to `release` would overlap a different
+ * logged duty period. Legs with the same show and release are the same duty
+ * period, not an overlap. Rest is measured between duty periods, so they must
+ * not overlap.
+ */
+export function overlappingDuty(all: Entry[], show: string, release: string, excludeIds: Set<string>): boolean {
+  const s = ms(show), r = ms(release)
+  if (s === null || r === null) return false
+  return all.some(e => {
+    if (e.restDay || excludeIds.has(e.id) || (e.showTime === show && e.releaseTime === release)) return false
+    const es = ms(e.showTime), er = ms(e.releaseTime) ?? es
+    return es !== null && er !== null && es < r && s < er
+  })
+}
+
+/** The rest gaps between consecutive duty periods, as [release, next show] ms. */
+function restGaps(periods: DutyPeriodSpan[]): [number, number][] {
+  const gaps: [number, number][] = []
+  for (let i = 0; i + 1 < periods.length; i++) gaps.push([periods[i].release, Math.max(periods[i].release, periods[i + 1].show)])
+  return gaps
+}
+
+/**
+ * Number of §135.267(f) rest periods — each full 24 consecutive hours of rest —
+ * that fall within [start, end). A rest crossing the window edge is split there,
+ * so every 24 h credited lies wholly inside the window. Pass `now` to also count
+ * the rest in progress since the last release.
+ */
+export function restPeriodsInWindow(all: Entry[], start: number, end: number, now?: number): number {
+  const { periods } = dutyIndex(all)
+  const gaps = restGaps(periods)
+  const last = periods.at(-1)
+  if (last && now !== undefined && now > last.release) gaps.push([last.release, now])
+  return gaps.reduce((n, [a, b]) => n + Math.max(0, Math.floor((Math.min(b, end) - Math.max(a, start)) / DAY)), 0)
+}
+
+export function compute(entry: Entry, all: Entry[]): Computed {
   const c = {} as Computed
 
   const offHobbs = parseHobbs(entry.offBlocks)
   const onHobbs  = parseHobbs(entry.onBlocks)
   const showMs   = ms(entry.showTime)
   const relMs    = ms(entry.releaseTime)
-  const rsMs     = ms(entry.restStart)
-  const reMs     = ms(entry.restEnd)
 
-  // Flight time from Hobbs; duty/rest from datetime fields
+  // This entry's duty period, and the duty periods either side of it.
+  const { periods, byKey } = dutyIndex(all)
+  const dpIdx = byKey.get(dutyKey(entry)) ?? -1
+  const dp    = dpIdx >= 0 ? periods[dpIdx] : null
+  const prev  = dpIdx > 0 ? periods[dpIdx - 1] : null
+  const next  = dpIdx >= 0 && dpIdx + 1 < periods.length ? periods[dpIdx + 1] : null
+
+  // Flight time from Hobbs; duty from show/release; rest from release to the next show
   c.legFlight  = hobbsFlightTime(offHobbs, onHobbs)
   c.dutyPeriod = hrs(showMs, relMs)
-  c.consRest   = hrs(rsMs, reMs)
+  c.consRest   = dp && next ? Math.max(0, next.show - dp.release) / HOUR : null
   c.maxFlight  = entry.crew === 'D' ? 10 : 8
+  c.dutyFlight = dp ? dp.f135 : null
 
   // Rolling 24-hr window anchored to releaseTime (or showTime fallback) since Hobbs has no timestamp.
   // Computed before the Part 91 check so the dashboard reflects accumulated Part 135 hours
@@ -98,69 +177,75 @@ export function compute(entry: Entry, all: Entry[], tz?: string): Computed {
   const anchorMs = relMs ?? showMs
   if (anchorMs !== null) {
     const windowStart = anchorMs - 86400000
-    c.rolling24 = all.reduce((sum, e) => {
+    c.rolling24 = roundHrs(all.reduce((sum, e) => {
       if (e.part91) return sum
       const eAnchor = ms(e.releaseTime) ?? ms(e.showTime)
-      const eOff    = parseHobbs(e.offBlocks)
-      const eOn     = parseHobbs(e.onBlocks)
-      if (eAnchor === null || eOff === null || eOn === null) return sum
-      if (eAnchor <= anchorMs && eAnchor > windowStart)
-        return sum + hobbsFlightTime(eOff, eOn)!
-      return sum
-    }, 0)
+      if (eAnchor === null || eAnchor > anchorMs || eAnchor <= windowStart) return sum
+      return sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0)
+    }, 0))
   } else {
     c.rolling24 = null
   }
 
   if (entry.part91) {
-    c.excAmt        = 0
-    c.reqRest       = null
-    c.lookbackOk    = null
-    c.flightOk      = null
-    c.dutyOk        = null
-    c.restOk        = null
-    c.restOverlapOk = null
+    c.excAmt     = 0
+    c.reqRest    = null
+    c.lookbackOk = null
+    c.flightOk   = null
+    c.dutyOk     = null
+    c.restOk     = null
+    c.cQualifies = null
     return c
   }
 
-  c.excAmt = c.rolling24 !== null ? Math.max(0, c.rolling24 - c.maxFlight) : 0
+  // §135.267(c): the (b) 24-hour limits may be exceeded when the flight time is
+  // within a regularly assigned duty period of no more than 14 h that is
+  // immediately preceded and followed by at least 10 consecutive hours of rest,
+  // and the duty period's flight time stays within 8 h (1 pilot) / 10 h (2).
+  // (c)(3) "combined duty and rest periods equal 24 hours" is read as the 14/10
+  // structure itself (user's operator reading, 2026-10-08).
+  // A rest in progress after the latest duty counts as "followed by" for now; it
+  // is re-judged as soon as the next duty is logged.
+  const restBefore = dp && prev ? (dp.show - prev.release) / HOUR : null
+  c.cQualifies = dp !== null
+    && c.dutyPeriod !== null && c.dutyPeriod <= 14
+    && restBefore !== null && restBefore >= 10
+    && (c.consRest === null || c.consRest >= 10)
+    && dp.f135 <= c.maxFlight
 
-  if      (c.excAmt === 0) c.reqRest = 10
-  else if (c.excAmt < 0.5) c.reqRest = 11
-  else if (c.excAmt <= 1)  c.reqRest = 12
-  else                     c.reqRest = 16
+  // Under (c) the duty period's own flight time is what's limited; otherwise
+  // the (b) rolling 24-hour total is.
+  c.excAmt = c.cQualifies ? 0
+    : c.rolling24 !== null ? roundHrs(Math.max(0, c.rolling24 - c.maxFlight)) : 0
 
-  // Lookback: anchor to releaseTime/showTime
+  // §135.267(e): exceeded by not more than 30 min → 11 h; by more than 30 but
+  // not more than 60 min → 12 h; by more than 60 min → 16 h.
+  if      (c.excAmt === 0)  c.reqRest = 10
+  else if (c.excAmt <= 0.5) c.reqRest = 11
+  else if (c.excAmt <= 1)   c.reqRest = 12
+  else                      c.reqRest = 16
+
+  // Lookback, §135.267(d): at least 10 consecutive hours of rest must fall WITHIN
+  // the 24 hours before the assignment's completion (release, or show as fallback).
+  // Only the part of each rest inside that window counts. If the window reaches
+  // back before the first logged duty, the rest there is unknown, so a missing
+  // 10 hours can't be judged: N/A rather than CHECK.
   c.lookbackOk = null
-  if (anchorMs !== null) {
-    const lbStart = anchorMs - 86400000
-    const found = all.some(e => {
-      if (e.id === entry.id) return false
-      if (e.restDay) {
-        const dayStart = ms(e.showTime)
-        if (dayStart === null) return false
-        const endMs = e.restDayEnd
-          ? (tz ? ms(localToUtcIso(e.restDayEnd, '00:00', tz)) : ms(e.restDayEnd + 'T00:00'))
-          : null
-        const lastDayEnd = (endMs ?? dayStart) + 86400000
-        return lastDayEnd >= lbStart && lastDayEnd <= anchorMs
-      }
-      const eRe = ms(e.restEnd)
-      const eRs = ms(e.restStart)
-      if (eRe === null || eRs === null) return false
-      const restHrs = (eRe - eRs) / 3600000
-      return eRe >= lbStart && eRe <= anchorMs && restHrs >= 10
-    })
-    const hasPrior = all.some(e =>
-      e.id !== entry.id && (ms(e.restEnd) !== null || e.restDay)
-    )
-    c.lookbackOk = hasPrior ? found : null
+  if (anchorMs !== null && dpIdx >= 0) {
+    const lbStart = anchorMs - DAY
+    let found = false
+    for (let j = dpIdx - 1; j >= 0 && !found; j--) {
+      const gapStart = periods[j].release
+      const gapEnd   = periods[j + 1].show
+      if (gapEnd <= lbStart) break
+      found = Math.min(gapEnd, anchorMs) - Math.max(gapStart, lbStart) >= 10 * HOUR
+    }
+    c.lookbackOk = found ? true : lbStart < periods[0].show ? null : false
   }
 
-  c.flightOk      = c.rolling24 !== null ? c.rolling24 <= c.maxFlight : null
-  c.dutyOk        = c.dutyPeriod !== null ? c.dutyPeriod <= 14 : null
-  c.restOk        = c.consRest !== null ? c.consRest >= c.reqRest : null
-  c.restOverlapOk = (rsMs !== null || reMs !== null) ? checkRestOverlapForEntry(entry, all) : null
+  c.flightOk = c.cQualifies ? true : c.rolling24 !== null ? c.rolling24 <= c.maxFlight : null
+  c.dutyOk   = c.dutyPeriod !== null ? c.dutyPeriod <= 14 : null
+  c.restOk   = c.consRest !== null ? c.consRest >= c.reqRest : null
 
   return c
 }
@@ -180,11 +265,12 @@ export interface DutyComputed {
   restOk: boolean | null
   excAmt: number
   excReason: string
-  restOverlapOk: boolean | null
+  cQualifies: boolean | null
+  dutyFlight: number | null
 }
 
-export function computeDutyPeriod(legs: Entry[], all: Entry[], tz?: string): DutyComputed {
-  const computedLegs = legs.map(l => compute(l, all, tz))
+export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
+  const computedLegs = legs.map(l => compute(l, all))
   const p135Idx = legs.reduce<number[]>((acc, l, i) => { if (!l.part91) acc.push(i); return acc }, [])
   const allPart91 = p135Idx.length === 0
   const worstBool = (flags: (boolean | null)[]): boolean | null =>
@@ -198,7 +284,7 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[], tz?: string): Dut
   return {
     computedLegs,
     allPart91,
-    totalFlight: computedLegs.reduce((s, c) => s + (c.legFlight ?? 0), 0),
+    totalFlight: roundHrs(computedLegs.reduce((s, c) => s + (c.legFlight ?? 0), 0)),
     rolling24:   lastP135C?.rolling24 ?? null,
     maxFlight:   lastP135C?.maxFlight ?? 8,
     flightOk:    allPart91 ? null : p135Idx.some(i => computedLegs[i].flightOk === false) ? false : true,
@@ -209,40 +295,19 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[], tz?: string): Dut
     consRest:    lastC?.consRest ?? null,
     restOk:      allPart91 ? null : worstBool(p135Idx.map(i => computedLegs[i].restOk)),
     excAmt,
-    excReason:    excLegIdx >= 0 ? (legs[excLegIdx].reason || '(no reason recorded)') : '',
-    restOverlapOk: lastC?.restOverlapOk ?? null,
+    excReason:   excLegIdx >= 0 ? (legs[excLegIdx].reason || '(no reason recorded)') : '',
+    cQualifies:  allPart91 ? null : lastP135C?.cQualifies ?? null,
+    dutyFlight:  lastC?.dutyFlight ?? null,
   }
-}
-
-export function countRestDaysInWindow(e: Entry, winStart: number, winEnd: number, tz?: string): number {
-  if (!e.restDay) return 0
-  const start = ms(e.showTime)
-  if (start === null) return 0
-  // Walk local calendar dates (not 24-hr ms steps, which drift across DST)
-  // and test each date's local midnight against the window.
-  const p = (n: number) => String(n).padStart(2, '0')
-  const sd = new Date(start)
-  const startDate = tz
-    ? (utcToLocalParts(e.showTime, tz)?.date ?? e.showTime.slice(0, 10))
-    : `${sd.getFullYear()}-${p(sd.getMonth() + 1)}-${p(sd.getDate())}`
-  const endDate = e.restDayEnd && e.restDayEnd > startDate ? e.restDayEnd : startDate
-  const d = new Date(startDate + 'T00:00:00Z')
-  let count = 0
-  for (let date = startDate; date <= endDate; date = d.toISOString().slice(0, 10)) {
-    const dayMs = tz ? ms(localToUtcIso(date, '00:00', tz)) : ms(date + 'T00:00')
-    if (dayMs !== null && dayMs >= winStart && dayMs < winEnd) count++
-    d.setUTCDate(d.getUTCDate() + 1)
-  }
-  return count
 }
 
 function flightHoursInWindow(entries: Entry[], start: number, end: number): number {
-  return entries.reduce((sum, e) => {
+  return roundHrs(entries.reduce((sum, e) => {
     if (e.restDay || e.part91) return sum
     const anchor = ms(e.releaseTime) ?? ms(e.showTime)
     if (anchor === null || anchor < start || anchor >= end) return sum
     return sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0)
-  }, 0)
+  }, 0))
 }
 
 export function quarterFlightHours(entries: Entry[], qIdx: number, year: number, tz?: string): number {
@@ -252,42 +317,40 @@ export function quarterFlightHours(entries: Entry[], qIdx: number, year: number,
 export function twoQuarterFlightHours(entries: Entry[], qIdx: number, year: number, tz?: string): number {
   const prevQ    = qIdx === 0 ? 3 : qIdx - 1
   const prevYear = qIdx === 0 ? year - 1 : year
-  return quarterFlightHours(entries, qIdx, year, tz) + quarterFlightHours(entries, prevQ, prevYear, tz)
+  return roundHrs(quarterFlightHours(entries, qIdx, year, tz) + quarterFlightHours(entries, prevQ, prevYear, tz))
 }
 
 export function annualFlightHours(entries: Entry[], year: number, tz?: string): number {
   return flightHoursInWindow(entries, monthStartMs(year, 0, tz), monthStartMs(year, 12, tz))
 }
 
-export function quarterRestCount(entries: Entry[], qIdx: number, year: number, tz?: string): number {
-  const qStart = monthStartMs(year, qIdx * 3, tz)
-  const qEnd   = monthStartMs(year, qIdx * 3 + 3, tz)
-  return entries.reduce((sum, e) => sum + countRestDaysInWindow(e, qStart, qEnd, tz), 0)
+/** §135.267(f) rest periods (each full 24 h of rest) in a calendar quarter of the selected timezone. */
+export function quarterRestCount(entries: Entry[], qIdx: number, year: number, tz?: string, now?: number): number {
+  return restPeriodsInWindow(entries, monthStartMs(year, qIdx * 3, tz), monthStartMs(year, qIdx * 3 + 3, tz), now)
 }
 
-export function exportCSV(entries: Entry[], tz?: string): void {
-  if (!entries.length) { alert('No data to export.'); return }
+export function exportCSV(entries: Entry[]): void {
+  const legs = entries.filter(e => !e.restDay)
+  if (!legs.length) { alert('No data to export.'); return }
 
   const hdr = [
     'Show Time', 'Release Time', 'Pilot', 'Crew Config', 'Tail Number', 'Entity', 'Route',
     'Off Blocks', 'On Blocks', 'Leg Flight (h)', 'Rolling 24-hr (h)',
-    'Max Allowed (h)', 'Flight Time OK', 'Duty Period (h)', 'Duty OK',
+    'Max Allowed (h)', 'Flight Limit Basis', 'Flight Time OK', 'Duty Period (h)', 'Duty OK',
     '10-hr Lookback OK', 'Consecutive Rest (h)', 'Required Rest (h)',
     'Rest OK', 'Exceedance (h)', 'Exceedance Reason',
-    'Rest Start', 'Rest End', '24-hr Rest Day', 'Rest Day End', 'Part 135',
+    'Rest Start', 'Rest End', 'Part 135',
   ].join(',')
 
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 16) + 'Z'
 
-  const rows = entries.map(e => {
-    if (e.restDay) {
-      return [
-        q(e.showTime), q(''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'), q(''), q(''),
-        q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''), q(''),
-        q(''), q(''), q('Yes'), q(e.restDayEnd || ''), q(''),
-      ].join(',')
-    }
-    const c = compute(e, entries, tz)
+  const rows = legs.map(e => {
+    const c = compute(e, entries)
+    // Rest runs from release to the next show (derived, not stored).
+    const relMs   = ms(e.releaseTime)
+    const restEnd = relMs !== null && c.consRest !== null ? iso(relMs + c.consRest * HOUR) : ''
+    const basis   = e.part91 ? 'N/A' : c.cQualifies ? 'Sec. 135.267(c) duty period' : 'Sec. 135.267(b) rolling 24-hr'
     return [
       q(e.showTime), q(e.releaseTime || ''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
       q(e.tailNumber || ''),
@@ -297,6 +360,7 @@ export function exportCSV(entries: Entry[], tz?: string): void {
       q(c.legFlight !== null ? c.legFlight.toFixed(2) : ''),
       q(c.rolling24 !== null ? c.rolling24.toFixed(2) : ''),
       q(c.maxFlight),
+      q(basis),
       q(c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED'),
       q(c.dutyPeriod !== null ? c.dutyPeriod.toFixed(2) : ''),
       q(c.dutyOk === null ? 'N/A' : c.dutyOk ? 'OK' : 'EXCEEDED'),
@@ -306,8 +370,8 @@ export function exportCSV(entries: Entry[], tz?: string): void {
       q(c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT'),
       q(c.excAmt.toFixed(2)),
       q(e.reason || ''),
-      q(e.restStart || ''), q(e.restEnd || ''),
-      q('No'), q(''), q(e.part91 ? '' : 'True'),
+      q(restEnd ? e.releaseTime : ''), q(restEnd),
+      q(e.part91 ? '' : 'True'),
     ].join(',')
   })
 
@@ -361,11 +425,10 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
   const offIdx      = idx('Off Blocks')
   const onIdx       = idx('On Blocks')
   const reasonIdx   = idx('Exceedance Reason')
-  const restStartIdx = idx('Rest Start')
-  const restEndIdx  = idx('Rest End')
-  const restDayIdx  = idx('24-hr Rest Day')
-  const restDayEndIdx = idx('Rest Day End')
+  const restDayIdx  = idx('24-hr Rest Day')   // legacy column in older exports
   const part135Idx  = idx('Part 135')
+  // Rest Start / Rest End columns are ignored: rest is derived from release
+  // and the next show time.
 
   const get = (row: string[], i: number) => (i === -1 ? '' : (row[i] ?? ''))
 
@@ -378,7 +441,8 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
     const showTime = get(row, showIdx).trim()
     if (!showTime) { skipped.push({ line: li + 1, reason: 'missing Show Time' }); continue }
 
-    const isRestDay = get(row, restDayIdx).trim() === 'Yes'
+    if (get(row, restDayIdx).trim() === 'Yes') { skipped.push({ line: li + 1, reason: 'rest-day row (no longer used: rest is calculated from release and show times)' }); continue }
+
     const routeVal  = get(row, depIdx).trim()
     const dashIdx   = routeVal.indexOf('-')
     const dep       = dashIdx !== -1 ? routeVal.slice(0, dashIdx) : routeVal
@@ -386,17 +450,13 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
     const offBlocks = get(row, offIdx).trim()
     const onBlocks  = get(row, onIdx).trim()
 
-    if (!isRestDay) {
-      if (!dep || !arr) { skipped.push({ line: li + 1, reason: 'missing departure or arrival' }); continue }
-      const offN = parseHobbs(offBlocks)
-      const onN  = parseHobbs(onBlocks)
-      if (offN === null || onN === null) { skipped.push({ line: li + 1, reason: 'missing or unreadable Hobbs reading' }); continue }
-      if (onN <= offN) { skipped.push({ line: li + 1, reason: 'On Blocks not greater than Off Blocks' }); continue }
-    }
+    if (!dep || !arr) { skipped.push({ line: li + 1, reason: 'missing departure or arrival' }); continue }
+    const offN = parseHobbs(offBlocks)
+    const onN  = parseHobbs(onBlocks)
+    if (offN === null || onN === null) { skipped.push({ line: li + 1, reason: 'missing or unreadable Hobbs reading' }); continue }
+    if (onN <= offN) { skipped.push({ line: li + 1, reason: 'On Blocks not greater than Off Blocks' }); continue }
 
-    const part91 = isRestDay
-      ? false
-      : get(row, part135Idx).trim() !== 'True'
+    const part91 = get(row, part135Idx).trim() !== 'True'
 
     entries.push({
       id:          uid(),
@@ -410,21 +470,15 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
       arr,
       offBlocks,
       onBlocks,
-      restStart:   get(row, restStartIdx).trim(),
-      restEnd:     get(row, restEndIdx).trim(),
+      restStart:   '',
+      restEnd:     '',
       reason:      get(row, reasonIdx).trim(),
       part91,
-      restDay:     isRestDay,
-      restDayEnd:  get(row, restDayEndIdx).trim() || undefined,
+      restDay:     false,
     })
   }
 
   if (!entries.length) return { error: 'No valid entries found in file.' }
-  // CSV doesn't carry validationVersion, so stamp it the same way new entries
-  // are — otherwise every imported entry shows a false "needs review" flag.
-  const validated = entries.map(e =>
-    checkRestOverlapForEntry(e, entries) ? { ...e, validationVersion: ENTRY_VALIDATION_VERSION } : e
-  )
-  return { entries: validated, skipped }
+  return { entries, skipped }
 }
 

@@ -27,7 +27,7 @@ export default function HowToUse() {
       {!collapsed && (
         <CardContent>
           <p className="text-[0.78rem] text-slate-500 dark:text-slate-400 leading-relaxed">
-            Enter one row per flight leg. Off Blocks and On Blocks are Hobbs meter readings (5 digits + 1 decimal, e.g. 12345.6). Flight time is calculated as On Hobbs − Off Hobbs. For a multi-leg day, Show Time and Release Time are the same across legs; Hobbs readings change each leg. Rest fields only need to be filled on the last leg of the day. Mark 24-hr rest days with the checkbox (no flight fields needed).
+            Enter one row per flight leg. Off Blocks and On Blocks are Hobbs meter readings (5 digits + 1 decimal, e.g. 12345.6). Flight time is calculated as On Hobbs − Off Hobbs. For a multi-leg day, Show Time and Release Time are the same across legs; Hobbs readings change each leg. Rest is calculated for you: it runs from each Release Time to your next Show Time, so days off need no entry. Log every duty period, including Part 91, so rest is measured correctly.
           </p>
         </CardContent>
       )}

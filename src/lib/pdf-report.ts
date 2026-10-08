@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Entry } from '@/types/entry'
 import {
-  ms, fmtHrs, fmtDT, hobbsFlightTime, parseHobbs, compute, countRestDaysInWindow,
+  ms, fmtHrs, fmtDT, hobbsFlightTime, parseHobbs, compute, restPeriodsInWindow, roundHrs,
 } from '@/lib/calculations'
 import { utcToLocalParts, monthStartMs } from '@/lib/timezone'
 
@@ -38,11 +38,13 @@ function baseTableOpts(margin: number, fontSize: number) {
   }
 }
 
-function periodStats(period: Entry[], periodStart: number, periodEnd: number, tz?: string) {
-  const restDays = period.reduce((sum, e) => sum + countRestDaysInWindow(e, periodStart, periodEnd, tz), 0)
-  const part135Flight = period
-    .filter(e => !e.restDay && !e.part91)
-    .reduce((sum, e) => sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0), 0)
+// Rest periods come from all logged duty (rest is the pilot's, whichever entity
+// the duty was for); flight hours from the period's (entity-scoped) legs.
+function periodStats(allEntries: Entry[], period: Entry[], periodStart: number, periodEnd: number) {
+  const restDays = restPeriodsInWindow(allEntries, periodStart, periodEnd, Date.now())
+  const part135Flight = roundHrs(period
+    .filter(e => !e.part91)
+    .reduce((sum, e) => sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0), 0))
   return { restDays, part135Flight }
 }
 
@@ -76,14 +78,13 @@ function buildData(
   sorted: Entry[]
   computed: Map<string, ReturnType<typeof compute>>
   dayMap: Map<string, { p135: number; p91: number; showTime: string; releaseTime: string; hasViolation: boolean }>
-  restDayInfo: Map<string, { startStr: string; endStr: string; days: number }>
 } {
-  const { periodEntries, periodStart, periodEnd, restDays } = d
-  const flightLegs  = periodEntries.filter(e => !e.restDay)
+  const { periodEntries, restDays } = d
+  const flightLegs  = periodEntries
   const part135Legs = flightLegs.filter(e => !e.part91)
   const part91Legs  = flightLegs.filter(e => e.part91)
 
-  const computed = new Map(flightLegs.map(e => [e.id, compute(e, allEntries, tz)]))
+  const computed = new Map(flightLegs.map(e => [e.id, compute(e, allEntries)]))
 
   let totalFlight = 0
   let flightFailCount = 0, dutyFailCount = 0, restFailCount = 0
@@ -96,7 +97,7 @@ function buildData(
     if (e.part91) continue
     if (c.flightOk === false) { flightFailCount++; violations.push({ date: fmtDT(e.releaseTime || e.showTime), type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` }) }
     if (c.dutyOk  === false) { dutyFailCount++;   violations.push({ date: fmtDT(e.showTime),                  type: 'Duty Period Exceeded',   detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` }) }
-    if (c.restOk  === false) { restFailCount++;   violations.push({ date: fmtDT(e.restStart),                 type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)}, required ${c.reqRest}h` }) }
+    if (c.restOk  === false) { restFailCount++;   violations.push({ date: fmtDT(e.releaseTime),               type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` }) }
     if (c.excAmt > 0) exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
   }
 
@@ -117,7 +118,6 @@ function buildData(
 
   const dayMap = new Map<string, { p135: number; p91: number; showTime: string; releaseTime: string; hasViolation: boolean }>()
   for (const e of periodEntries) {
-    if (e.restDay) continue
     const dk = entryLocalDate(e, tz)
     if (!dk) continue
     if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, showTime: e.showTime ?? '', releaseTime: e.releaseTime ?? '', hasViolation: false })
@@ -131,18 +131,9 @@ function buildData(
     }
   }
 
-  const restDayInfo = new Map<string, { startStr: string; endStr: string; days: number }>()
-  for (const e of periodEntries) {
-    if (!e.restDay) continue
-    const startStr = entryLocalDate(e, tz)
-    const endStr = e.restDayEnd || startStr
-    const days = countRestDaysInWindow(e, periodStart, periodEnd, tz)
-    restDayInfo.set(e.id, { startStr, endStr, days })
-  }
-
   return {
     statusText, failDetail, part135Legs, part91Legs, totalFlight,
-    totalViolations, scRows, violations, exceedances, sorted, computed, dayMap, restDayInfo,
+    totalViolations, scRows, violations, exceedances, sorted, computed, dayMap,
   }
 }
 
@@ -177,7 +168,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
     const statLine = [
       `Part 135 Legs: ${r.part135Legs.length}${r.part91Legs.length ? ` (+${r.part91Legs.length} Part 91)` : ''}`,
       `Total Flight Time: ${fmtHrs(r.totalFlight)}`,
-      `24-hr Rest Days: ${d.restDayStatLabel(d.restDays)}`,
+      `24-hr Rest Periods: ${d.restDayStatLabel(d.restDays)}`,
       `Total Violations: ${r.totalViolations}`,
     ].join('   |   ')
     wrappedText(statLine, 9)
@@ -232,12 +223,6 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
     const seenDates = new Set<string>()
     const rows: (string | SpanCell)[][] = []
     for (const e of r.sorted) {
-      if (e.restDay) {
-        const { startStr, endStr, days } = r.restDayInfo.get(e.id)!
-        const dateCell = endStr && endStr !== startStr ? `${startStr} - ${endStr}` : startStr
-        rows.push([dateCell, { content: `REST DAY${days > 1 ? `S (${days} days)` : ''}`, colSpan: 5, styles: { halign: 'left' } }])
-        continue
-      }
       const dk = entryLocalDate(e, tz)
       if (!dk || seenDates.has(dk)) continue
       seenDates.add(dk)
@@ -251,12 +236,6 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
   function fullLogBody(): (string | SpanCell)[][] {
     const rows: (string | SpanCell)[][] = []
     for (const e of r.sorted) {
-      if (e.restDay) {
-        const { startStr, endStr, days } = r.restDayInfo.get(e.id)!
-        const label = endStr && endStr !== startStr ? `24-HOUR REST DAYS: ${startStr} - ${endStr} (${days} days)` : '24-HOUR REST DAY'
-        rows.push([fmtDT(e.showTime), { content: label, colSpan: 12, styles: { halign: 'left' } }])
-        continue
-      }
       const c = r.computed.get(e.id)!
       if (e.part91) {
         rows.push([
@@ -271,7 +250,8 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
         fmtDT(e.showTime), e.crew === 'D' ? 'Dual' : 'Single',
         `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
         e.offBlocks || '—', e.onBlocks || '—', fmtHrs(c.legFlight),
-        c.rolling24 !== null ? `${fmtHrs(c.rolling24)} / ${c.maxFlight}h` : '—',
+        c.cQualifies ? `${fmtHrs(c.dutyFlight)} / ${c.maxFlight}h (c)`
+          : c.rolling24 !== null ? `${fmtHrs(c.rolling24)} / ${c.maxFlight}h` : '—',
         c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED',
         fmtHrs(c.dutyPeriod),
         c.dutyOk === null ? 'N/A' : c.dutyOk ? 'OK' : 'EXCEEDED',
@@ -298,7 +278,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
     sectionHeading('Flight Log (Full Detail)')
     autoTable(doc, {
       startY: y,
-      head: [['Show Time', 'Crew', 'Route', 'Off Blocks', 'On Blocks', 'Leg Time', 'Rolling 24-hr', 'Flt', 'Duty', 'Duty OK', 'Rest After', 'Rest OK', 'Exc']],
+      head: [['Show Time', 'Crew', 'Route', 'Off Blocks', 'On Blocks', 'Leg Time', 'Flight / Limit', 'Flt', 'Duty', 'Duty OK', 'Rest After', 'Rest OK', 'Exc']],
       body: fullLogBody(),
       ...baseTableOpts(margin, 7),
     })
@@ -339,19 +319,19 @@ export function generateQuarterlyReportPDF(
   const qStart = monthStartMs(year, qIdx * 3, tz)
   const qEnd   = monthStartMs(year, qIdx * 3 + 3, tz)
   const qLabel = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'][qIdx]
-  const scoped = entity ? entries.filter(e => e.restDay || e.entity === entity) : entries
+  const scoped = entries.filter(e => !e.restDay && (!entity || e.entity === entity))
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= qStart && a < qEnd })
   if (!period.length) return false
 
-  const { restDays, part135Flight } = periodStats(period, qStart, qEnd, tz)
+  const { restDays, part135Flight } = periodStats(entries, period, qStart, qEnd)
 
   const doc = renderPDF(entries, {
     periodEntries: period, periodStart: qStart, periodEnd: qEnd,
     periodLabel: `${qLabel} ${year}`, heading: 'Quarterly Compliance Report', periodNoun: 'quarter',
     restDays,
     extraScorecard: [
-      ['24-hr Rest Days (>=13/qtr)', `${restDays} of 13 required`],
-      ['Quarterly Flight Hours Sec. 135.267(a)', part135Flight < 500 ? `${fmtHrs(part135Flight)} of 500h — OK` : `${fmtHrs(part135Flight)} — EXCEEDED`],
+      ['24-hr Rest Periods (>=13/qtr)', `${restDays} of 13 required`],
+      ['Quarterly Flight Hours Sec. 135.267(a)', part135Flight <= 500 ? `${fmtHrs(part135Flight)} of 500h — OK` : `${fmtHrs(part135Flight)} — EXCEEDED`],
     ],
     restDayStatLabel: rd => `${rd} / 13`,
     isOverallOk: (v, rd) => v === 0 && rd >= 13,
@@ -368,18 +348,18 @@ export function generateMonthlyReportPDF(
   const mStart = monthStartMs(year, monthIdx, tz)
   const mEnd   = monthStartMs(year, monthIdx + 1, tz)
   const mLabel = `${'January February March April May June July August September October November December'.split(' ')[monthIdx]} ${year}`
-  const scoped = entity ? entries.filter(e => e.restDay || e.entity === entity) : entries
+  const scoped = entries.filter(e => !e.restDay && (!entity || e.entity === entity))
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= mStart && a < mEnd })
   if (!period.length) return false
 
-  const { restDays, part135Flight } = periodStats(period, mStart, mEnd, tz)
+  const { restDays, part135Flight } = periodStats(entries, period, mStart, mEnd)
 
   const doc = renderPDF(entries, {
     periodEntries: period, periodStart: mStart, periodEnd: mEnd,
     periodLabel: mLabel, heading: 'Monthly Compliance Report', periodNoun: 'month',
     restDays,
     extraScorecard: [
-      ['24-hr Rest Days This Month', `${restDays} day${restDays !== 1 ? 's' : ''} (>=13/quarter required)`],
+      ['24-hr Rest Periods This Month', `${restDays} (>=13/quarter required)`],
       ['Part 135 Flight Hours (Month)', fmtHrs(part135Flight)],
     ],
     restDayStatLabel: rd => `${rd}`,

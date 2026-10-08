@@ -47,14 +47,14 @@ export default function Dashboard({ entries, tz }: Props) {
   const qLabels = ['Q1', 'Q2', 'Q3', 'Q4']
   const prevQLabel = qIdx === 0 ? `Q4 ${year - 1}` : `${qLabels[qIdx - 1]} ${year}`
 
-  const qCount   = quarterRestCount(entries, qIdx, year, tz)
+  const qCount   = quarterRestCount(entries, qIdx, year, tz, now.getTime())
   const qHours   = quarterFlightHours(entries, qIdx, year, tz)
   const tqHours  = twoQuarterFlightHours(entries, qIdx, year, tz)
   const annHours = annualFlightHours(entries, year, tz)
 
   const nonRestEntries = entries.filter(e => !e.restDay)
   const lastEntry = nonRestEntries.length ? nonRestEntries[nonRestEntries.length - 1] : null
-  const lastCalc  = lastEntry ? compute(lastEntry, entries, tz) : null
+  const lastCalc  = lastEntry ? compute(lastEntry, entries) : null
 
   const lastAnchorMs = lastEntry ? (ms(lastEntry.releaseTime) ?? ms(lastEntry.showTime)) : null
   const rollingWindowActive = lastAnchorMs !== null && (now.getTime() - lastAnchorMs) <= 86400000
@@ -63,11 +63,11 @@ export default function Dashboard({ entries, tz }: Props) {
   // must anchor on the last actual Part 135 duty period, not a trailing Part 91 leg.
   const p135Entries    = entries.filter(e => !e.restDay && !e.part91)
   const lastP135Entry  = p135Entries.length ? p135Entries[p135Entries.length - 1] : null
-  const lastP135Calc   = lastP135Entry ? compute(lastP135Entry, entries, tz) : null
+  const lastP135Calc   = lastP135Entry ? compute(lastP135Entry, entries) : null
 
   const allWarnings = entries.filter(e => {
     if (e.restDay) return false
-    const c = compute(e, entries, tz)
+    const c = compute(e, entries)
     return c.flightOk === false || c.dutyOk === false || c.restOk === false
   }).length
 
@@ -107,14 +107,16 @@ export default function Dashboard({ entries, tz }: Props) {
   const cards: { label: string; value: string | number; sub: string; color: Color }[] = [
     {
       label: 'Total Legs Logged',
-      value: entries.filter(e => !e.restDay).length,
-      sub:   `${entries.filter(e => e.restDay).length} rest-day entries`,
+      value: nonRestEntries.length,
+      sub:   `${new Set(nonRestEntries.map(e => `${e.showTime}|${e.releaseTime}`)).size} duty periods`,
       color: 'blue',
     },
     {
       label: 'Last Rolling 24-hr',
       value: !lastCalc || !rollingWindowActive ? '—' : fmtHrs(lastCalc.rolling24),
-      sub:   !lastCalc ? 'No entries yet' : !rollingWindowActive ? 'Window cleared' : `Limit: ${lastCalc.maxFlight}h`,
+      sub:   !lastCalc ? 'No entries yet' : !rollingWindowActive ? 'Window cleared'
+           : lastCalc.cQualifies ? `Duty period (c): ${fmtHrs(lastCalc.dutyFlight)} of ${lastCalc.maxFlight}h`
+           : `Limit: ${lastCalc.maxFlight}h`,
       color: !lastCalc || !rollingWindowActive ? 'blue' : lastCalc.flightOk === false ? 'red' : 'green',
     },
     {
@@ -130,7 +132,7 @@ export default function Dashboard({ entries, tz }: Props) {
       color: nextDutyColor,
     },
     {
-      label: 'Quarter Rest Days',
+      label: 'Quarter Rest Periods (24 h)',
       value: `${qCount} / 13`,
       sub:   qCount >= 13 ? 'Requirement met' : `Need ${13 - qCount} more`,
       color: qCount >= 13 ? 'green' : qCount >= 8 ? 'amber' : 'red',
@@ -147,20 +149,21 @@ export default function Dashboard({ entries, tz }: Props) {
     {
       label: `§135.267(a) ${qLabels[qIdx]} ${year}`,
       value: fmtHrs(qHours),
-      sub:   qHours >= 500 ? '⚠ 500h quarterly limit EXCEEDED' : `${fmtHrs(500 - qHours)} remaining of 500h`,
-      color: qHours >= 500 ? 'red' : qHours >= 450 ? 'amber' : 'blue',
+      // §135.267(a) limits may not be *exceeded* — exactly at the limit is legal.
+      sub:   qHours > 500 ? '⚠ 500h quarterly limit EXCEEDED' : `${fmtHrs(500 - qHours)} remaining of 500h`,
+      color: qHours > 500 ? 'red' : qHours >= 450 ? 'amber' : 'blue',
     },
     {
       label: `${prevQLabel}–${qLabels[qIdx]} Combined`,
       value: fmtHrs(tqHours),
-      sub:   tqHours >= 800 ? '⚠ 800h two-quarter limit EXCEEDED' : `${fmtHrs(800 - tqHours)} remaining of 800h`,
-      color: tqHours >= 800 ? 'red' : tqHours >= 750 ? 'amber' : 'blue',
+      sub:   tqHours > 800 ? '⚠ 800h two-quarter limit EXCEEDED' : `${fmtHrs(800 - tqHours)} remaining of 800h`,
+      color: tqHours > 800 ? 'red' : tqHours >= 750 ? 'amber' : 'blue',
     },
     {
       label: `${year} Annual Hours`,
       value: fmtHrs(annHours),
-      sub:   annHours >= 1400 ? '⚠ 1,400h annual limit EXCEEDED' : `${fmtHrs(1400 - annHours)} remaining of 1,400h`,
-      color: annHours >= 1400 ? 'red' : annHours >= 1300 ? 'amber' : 'blue',
+      sub:   annHours > 1400 ? '⚠ 1,400h annual limit EXCEEDED' : `${fmtHrs(1400 - annHours)} remaining of 1,400h`,
+      color: annHours > 1400 ? 'red' : annHours >= 1300 ? 'amber' : 'blue',
     },
   ]
 

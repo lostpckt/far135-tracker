@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { loadEntries, saveEntries, runBulkValidationIfNeeded } from '@/lib/storage'
+import { loadEntries, saveEntries } from '@/lib/storage'
 import { ms, exportCSV, importCSV, type SkippedRow } from '@/lib/calculations'
 import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
 import { downloadBackup, parseBackup, lastBackupMs, recordRestoredBackup, requestPersistentStorage, type ParsedBackup } from '@/lib/backup'
@@ -21,10 +21,7 @@ import TzMigrationDialog from '@/components/TzMigrationDialog'
 import RunReportDialog from '@/components/RunReportDialog'
 
 export default function App() {
-  const [entries, setEntries] = useState<Entry[]>(() => {
-    const loaded = loadEntries()
-    return runBulkValidationIfNeeded(loaded) ?? loaded
-  })
+  const [entries, setEntries] = useState<Entry[]>(loadEntries)
   const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
   const [editingDuty, setEditingDuty]     = useState<Entry[] | null>(null)
   const [showRunReport, setShowRunReport] = useState(false)
@@ -148,7 +145,7 @@ export default function App() {
             onChange={handleRestoreFileChange}
           />
           <button
-            onClick={() => exportCSV(entries, tz)}
+            onClick={() => exportCSV(entries)}
             className="text-green-700 border border-green-200 bg-green-50 hover:bg-green-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
           >
             Export CSV
@@ -197,13 +194,12 @@ export default function App() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Import CSV?</DialogTitle></DialogHeader>
           {pendingImport && (() => {
-            const flights  = pendingImport.entries.filter(e => !e.restDay).length
-            const restDays = pendingImport.entries.filter(e => e.restDay).length
+            const flights  = pendingImport.entries.length
             const skipped  = pendingImport.skipped
             return (
               <div className="space-y-3">
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Found <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'} and <strong>{restDays}</strong> rest day {restDays === 1 ? 'row' : 'rows'}.
+                  Found <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'}.
                 </p>
                 {skipped.length > 0 && (
                   <div className="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
@@ -242,12 +238,11 @@ export default function App() {
           <DialogHeader><DialogTitle>Restore Backup?</DialogTitle></DialogHeader>
           {pendingRestore && (() => {
             const flights  = pendingRestore.entries.filter(e => !e.restDay).length
-            const restDays = pendingRestore.entries.filter(e => e.restDay).length
             const made     = pendingRestore.exportedAt ? new Date(pendingRestore.exportedAt).toLocaleString() : 'unknown date'
             return (
               <div className="space-y-3">
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Backup from <strong>{made}</strong> with <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'} and <strong>{restDays}</strong> rest day {restDays === 1 ? 'entry' : 'entries'}.
+                  Backup from <strong>{made}</strong> with <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'}.
                   {pendingRestore.tz && pendingRestore.tz !== tz && <> Timezone will change to <strong>{pendingRestore.tz}</strong>.</>}
                 </p>
                 <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">

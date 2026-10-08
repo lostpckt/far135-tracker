@@ -3,9 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ms, parseHobbs, checkRestOverlapForEntry } from '@/lib/calculations'
+import { ms, parseHobbs, overlappingDuty } from '@/lib/calculations'
 import { localToUtcIso, tzAbbr, splitForEdit } from '@/lib/timezone'
-import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
@@ -23,8 +22,6 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
 
   const s  = splitForEdit(firstLeg.showTime,    tz)
   const r  = splitForEdit(firstLeg.releaseTime, tz)
-  const rs = splitForEdit(lastLeg.restStart,    tz)
-  const re = splitForEdit(lastLeg.restEnd,      tz)
 
   const [showDate, setShowDate] = useState(s.d)
   const [showTime, setShowTime] = useState(s.t)
@@ -32,10 +29,6 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
   const [relTime, setRelTime]   = useState(r.t)
   const [offHobbs, setOffHobbs] = useState(firstLeg.offBlocks || '')
   const [onHobbs, setOnHobbs]   = useState(lastLeg.onBlocks || '')
-  const [rsDate, setRsDate]     = useState(rs.d)
-  const [rsTime, setRsTime]     = useState(rs.t)
-  const [reDate, setReDate]     = useState(re.d)
-  const [reTime, setReTime]     = useState(re.t)
   const [err, setErr]           = useState('')
 
   function handleSave() {
@@ -49,51 +42,21 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
     if (!show)    { setErr('Show Time is required.'); return }
     if (!release) { setErr('Release Time is required.'); return }
     if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
+    if (overlappingDuty(entries, show, release, new Set(legs.map(l => l.id)))) {
+      setErr('These times overlap another logged duty period. Check the Show and Release times.')
+      return
+    }
 
-    const updatedLegs: Entry[] = legs.map((leg, i) => ({
+    onSave(legs.map((leg, i) => ({
       ...leg,
       showTime:    show,
       releaseTime: release,
       offBlocks:   i === 0               ? offHobbs.trim() : leg.offBlocks,
       onBlocks:    i === legs.length - 1 ? onHobbs.trim()  : leg.onBlocks,
-      restStart:        i === legs.length - 1 ? (localToUtcIso(rsDate, rsTime, tz) ?? leg.restStart) : leg.restStart,
-      restEnd:          i === legs.length - 1 ? (localToUtcIso(reDate, reTime, tz) ?? leg.restEnd)   : leg.restEnd,
-    }))
-
-    // Merge the updated legs into the full entry list so the rest-overlap check
-    // sees accurate context (new releaseTime affects every leg's anchor), then
-    // only clear each leg's "needs review" flag if it actually passes — matches
-    // runBulkValidationIfNeeded's semantics rather than blindly stamping on save.
-    const merged = entries.map(e => {
-      const updatedLeg = updatedLegs.find(l => l.id === e.id)
-      return updatedLeg ?? e
-    })
-
-    onSave(updatedLegs.map(leg => ({
-      ...leg,
-      validationVersion: checkRestOverlapForEntry(leg, merged) ? ENTRY_VALIDATION_VERSION : undefined,
     })))
   }
 
   const abbr = tzAbbr(tz)
-
-  const restWarnings: string[] = []
-  const releaseMs = ms(localToUtcIso(relDate, relTime, tz))
-  const rsMs = rsDate && rsTime ? ms(localToUtcIso(rsDate, rsTime, tz)) : null
-  const reMs = reDate && reTime ? ms(localToUtcIso(reDate, reTime, tz)) : null
-  const legIds = new Set(legs.map(l => l.id))
-  if (rsMs !== null && releaseMs !== null && rsMs < releaseMs)
-    restWarnings.push('Rest Start is before Release Time')
-  if (reMs !== null && releaseMs !== null) {
-    for (const e of entries) {
-      if (e.restDay || e.part91 || legIds.has(e.id)) continue
-      const eShowMs = ms(e.showTime)
-      if (eShowMs !== null && eShowMs > releaseMs) {
-        if (reMs > eShowMs) restWarnings.push('Rest End overlaps the next duty period\'s Show Time')
-        break
-      }
-    }
-  }
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
@@ -121,14 +84,6 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
             <Input type="number" value={onHobbs} onChange={e => setOnHobbs(e.target.value)} placeholder="12349.0" step="0.1" min="0" className="text-sm h-8" />
           </div>
 
-          <SectionLabel>Rest Period — enter times in {abbr}</SectionLabel>
-          <DTField label={`Rest Start (${abbr})`} date={rsDate} time={rsTime} onDate={setRsDate} onTime={setRsTime} tz={tz} onClear={() => { setRsDate(''); setRsTime('') }} />
-          <DTField label={`Rest End (${abbr})`}   date={reDate} time={reTime} onDate={setReDate} onTime={setReTime} tz={tz} onClear={() => { setReDate(''); setReTime('') }} />
-          {restWarnings.length > 0 && (
-            <div className="col-span-full rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1">
-              {restWarnings.map(w => <p key={w} className="text-xs text-amber-700 dark:text-amber-400">⚠ {w}</p>)}
-            </div>
-          )}
         </div>
 
         {err && <p className="text-red-600 text-xs mt-1">{err}</p>}
