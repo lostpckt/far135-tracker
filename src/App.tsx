@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { loadEntries, saveEntries, runBulkValidationIfNeeded } from '@/lib/storage'
-import { ms, exportCSV, importCSV } from '@/lib/calculations'
+import { ms, exportCSV, importCSV, type SkippedRow } from '@/lib/calculations'
 import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
+import { downloadBackup, parseBackup, lastBackupMs, requestPersistentStorage, type ParsedBackup } from '@/lib/backup'
 import type { Entry } from '@/types/entry'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import Header from '@/components/Header'
@@ -15,6 +16,7 @@ import QuickReference from '@/components/QuickReference'
 import HowToUse from '@/components/HowToUse'
 import UpdateBanner from '@/components/UpdateBanner'
 import InstallBanner from '@/components/InstallBanner'
+import BackupReminder from '@/components/BackupReminder'
 import TzMigrationDialog from '@/components/TzMigrationDialog'
 import RunReportDialog from '@/components/RunReportDialog'
 
@@ -26,22 +28,52 @@ export default function App() {
   const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
   const [editingDuty, setEditingDuty]     = useState<Entry[] | null>(null)
   const [showRunReport, setShowRunReport] = useState(false)
-  const [pendingImport, setPendingImport] = useState<Entry[] | null>(null)
+  const [pendingImport, setPendingImport] = useState<{ entries: Entry[]; skipped: SkippedRow[] } | null>(null)
+  const [pendingRestore, setPendingRestore] = useState<ParsedBackup | null>(null)
   const [importError, setImportError]     = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [lastBackup, setLastBackup]       = useState(lastBackupMs)
+  const fileInputRef    = useRef<HTMLInputElement>(null)
+  const restoreInputRef = useRef<HTMLInputElement>(null)
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  useEffect(requestPersistentStorage, [])
+
+  function readFile(e: React.ChangeEvent<HTMLInputElement>, onText: (text: string) => void) {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
     const reader = new FileReader()
-    reader.onload = ev => {
-      const text = ev.target?.result as string
+    reader.onload = ev => onText(ev.target?.result as string)
+    reader.readAsText(file)
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    readFile(e, text => {
       const result = importCSV(text)
       if ('error' in result) { setImportError(result.error); return }
       setPendingImport(result)
-    }
-    reader.readAsText(file)
+    })
+  }
+
+  function handleRestoreFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    readFile(e, text => {
+      const result = parseBackup(text)
+      if ('error' in result) { setImportError(result.error); return }
+      setPendingRestore(result)
+    })
+  }
+
+  function handleBackup() {
+    if (!entries.length) { alert('No data to back up.'); return }
+    downloadBackup(entries, tz).then(saved => { if (saved) setLastBackup(Date.now()) })
+  }
+
+  function confirmRestore(r: ParsedBackup) {
+    updateEntries(r.entries)
+    if (r.tz) handleTzChange(r.tz)
+    // Backup entries are already stored in UTC — never offer the legacy tz migration on them.
+    setMigrated()
+    setShowMigration(false)
+    setPendingRestore(null)
   }
   const [dark, setDark]                   = useState(() => localStorage.getItem('far135_theme') === 'dark')
   const [tz, setTz]                       = useState(loadTz)
@@ -82,6 +114,7 @@ export default function App() {
       <Header dark={dark} onToggleDark={() => setDark(d => !d)} tz={tz} onTzChange={handleTzChange} />
       <div className="max-w-screen-2xl mx-auto p-5 space-y-5">
         <InstallBanner />
+        <BackupReminder entryCount={entries.length} lastBackup={lastBackup} onBackup={handleBackup} />
         <RegNote />
         <HowToUse />
         <Dashboard entries={entries} tz={tz} />
@@ -94,6 +127,25 @@ export default function App() {
           onDelete={id => updateEntries(entries.filter(e => e.id !== id))}
         />
         <div className="flex flex-wrap gap-2.5 items-center px-1">
+          <button
+            onClick={handleBackup}
+            className="text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
+          >
+            Back Up Data
+          </button>
+          <button
+            onClick={() => restoreInputRef.current?.click()}
+            className="text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
+          >
+            Restore Backup
+          </button>
+          <input
+            ref={restoreInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleRestoreFileChange}
+          />
           <button
             onClick={() => exportCSV(entries, tz)}
             className="text-green-700 border border-green-200 bg-green-50 hover:bg-green-600 hover:text-white text-sm h-8 px-3 rounded-md font-medium transition-colors"
@@ -144,13 +196,22 @@ export default function App() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Import CSV?</DialogTitle></DialogHeader>
           {pendingImport && (() => {
-            const flights  = pendingImport.filter(e => !e.restDay).length
-            const restDays = pendingImport.filter(e => e.restDay).length
+            const flights  = pendingImport.entries.filter(e => !e.restDay).length
+            const restDays = pendingImport.entries.filter(e => e.restDay).length
+            const skipped  = pendingImport.skipped
             return (
               <div className="space-y-3">
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   Found <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'} and <strong>{restDays}</strong> rest day {restDays === 1 ? 'row' : 'rows'}.
                 </p>
+                {skipped.length > 0 && (
+                  <div className="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                    <p><strong>{skipped.length}</strong> {skipped.length === 1 ? 'row' : 'rows'} will <strong>not</strong> be imported:</p>
+                    <ul className="mt-1 max-h-32 overflow-y-auto list-disc ml-4">
+                      {skipped.map(s => <li key={s.line}>Line {s.line}: {s.reason}</li>)}
+                    </ul>
+                  </div>
+                )}
                 <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
                   This will <strong>replace all existing data</strong>. Export your current log first if you want to keep it.
                 </p>
@@ -165,10 +226,47 @@ export default function App() {
               Cancel
             </button>
             <button
-              onClick={() => { if (pendingImport) { updateEntries(pendingImport); setPendingImport(null) } }}
+              onClick={() => { if (pendingImport) { updateEntries(pendingImport.entries); setPendingImport(null) } }}
               className="text-sm h-8 px-3 rounded-md bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
             >
               Replace &amp; Import
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore confirmation */}
+      <Dialog open={!!pendingRestore} onOpenChange={open => { if (!open) setPendingRestore(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Restore Backup?</DialogTitle></DialogHeader>
+          {pendingRestore && (() => {
+            const flights  = pendingRestore.entries.filter(e => !e.restDay).length
+            const restDays = pendingRestore.entries.filter(e => e.restDay).length
+            const made     = pendingRestore.exportedAt ? new Date(pendingRestore.exportedAt).toLocaleString() : 'unknown date'
+            return (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Backup from <strong>{made}</strong> with <strong>{flights}</strong> flight {flights === 1 ? 'entry' : 'entries'} and <strong>{restDays}</strong> rest day {restDays === 1 ? 'entry' : 'entries'}.
+                  {pendingRestore.tz && pendingRestore.tz !== tz && <> Timezone will change to <strong>{pendingRestore.tz}</strong>.</>}
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  This will <strong>replace all existing data</strong>. Back up your current log first if you want to keep it.
+                </p>
+              </div>
+            )
+          })()}
+          <DialogFooter className="gap-2">
+            <button
+              onClick={() => setPendingRestore(null)}
+              className="text-sm h-8 px-3 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { if (pendingRestore) confirmRestore(pendingRestore) }}
+              className="text-sm h-8 px-3 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium transition-colors"
+            >
+              Replace &amp; Restore
             </button>
           </DialogFooter>
         </DialogContent>

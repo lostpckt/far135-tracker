@@ -1,5 +1,7 @@
 import type { Entry, Computed } from '@/types/entry'
+import { ENTRY_VALIDATION_VERSION } from '@/types/entry'
 import { localToUtcIso, utcToLocalParts, monthStartMs } from '@/lib/timezone'
+import { saveFile } from '@/lib/backup'
 
 export function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -309,12 +311,8 @@ export function exportCSV(entries: Entry[], tz?: string): void {
     ].join(',')
   })
 
-  const csv  = [hdr, ...rows].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const a    = document.createElement('a')
-  a.href     = URL.createObjectURL(blob)
-  a.download = `far135_log_${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
+  const csv = [hdr, ...rows].join('\n')
+  void saveFile(csv, `far135_log_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv')
 }
 
 function parseCSVRow(line: string): string[] {
@@ -341,7 +339,9 @@ function parseCSVRow(line: string): string[] {
   return fields
 }
 
-export function importCSV(text: string): Entry[] | { error: string } {
+export interface SkippedRow { line: number; reason: string }
+
+export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow[] } | { error: string } {
   const lines = text.split(/\r?\n/).filter(l => l.trim())
   if (lines.length < 2) return { error: 'File is empty or has no data rows.' }
 
@@ -370,12 +370,13 @@ export function importCSV(text: string): Entry[] | { error: string } {
   const get = (row: string[], i: number) => (i === -1 ? '' : (row[i] ?? ''))
 
   const entries: Entry[] = []
+  const skipped: SkippedRow[] = []
   for (let li = 1; li < lines.length; li++) {
     const row = parseCSVRow(lines[li])
     if (row.every(c => !c.trim())) continue
 
     const showTime = get(row, showIdx).trim()
-    if (!showTime) continue
+    if (!showTime) { skipped.push({ line: li + 1, reason: 'missing Show Time' }); continue }
 
     const isRestDay = get(row, restDayIdx).trim() === 'Yes'
     const routeVal  = get(row, depIdx).trim()
@@ -386,10 +387,11 @@ export function importCSV(text: string): Entry[] | { error: string } {
     const onBlocks  = get(row, onIdx).trim()
 
     if (!isRestDay) {
-      if (!dep || !arr) continue
+      if (!dep || !arr) { skipped.push({ line: li + 1, reason: 'missing departure or arrival' }); continue }
       const offN = parseHobbs(offBlocks)
       const onN  = parseHobbs(onBlocks)
-      if (offN === null || onN === null || onN <= offN) continue
+      if (offN === null || onN === null) { skipped.push({ line: li + 1, reason: 'missing or unreadable Hobbs reading' }); continue }
+      if (onN <= offN) { skipped.push({ line: li + 1, reason: 'On Blocks not greater than Off Blocks' }); continue }
     }
 
     const part91 = isRestDay
@@ -418,6 +420,11 @@ export function importCSV(text: string): Entry[] | { error: string } {
   }
 
   if (!entries.length) return { error: 'No valid entries found in file.' }
-  return entries
+  // CSV doesn't carry validationVersion, so stamp it the same way new entries
+  // are — otherwise every imported entry shows a false "needs review" flag.
+  const validated = entries.map(e =>
+    checkRestOverlapForEntry(e, entries) ? { ...e, validationVersion: ENTRY_VALIDATION_VERSION } : e
+  )
+  return { entries: validated, skipped }
 }
 

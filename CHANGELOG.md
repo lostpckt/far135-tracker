@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-08
+
+### Added
+- **Back Up Data / Restore Backup** — a new backup file (`.json`) stores every entry exactly as saved, plus your timezone setting, so a restore is an exact copy. Unlike the CSV export, it can't be damaged by opening it in a spreadsheet app. Restore checks the whole file first and refuses a damaged or unrecognized file instead of restoring part of it. Restoring replaces all current data, and the confirmation shows the backup's date and entry counts first.
+- **Backup reminder** — your log lives only in this browser's storage, which can be lost if Safari clears website data, the home-screen app is deleted, or the device is reset or replaced. If you have entries and haven't made a backup in 15 days (or ever), a banner at the top offers **Back Up Now**. Only Back Up Data counts as a backup; a CSV export doesn't.
+- **Asks the browser to keep the app's data permanently** — the app now requests persistent storage on launch, so the browser is less likely to clear it on its own. Browsers can decline, so this helps but doesn't replace a backup.
+
+### Changed
+- **On iPhone and iPad, Back Up Data and Export CSV open the share sheet** so the file can be saved straight to Files or iCloud Drive. Plain downloads are unreliable in home-screen apps. Other devices still get a normal download.
+
+### Fixed
+- **Imported CSV entries no longer all show "needs review"** — the CSV file doesn't carry the internal validation marker, so every imported entry was flagged. Import now runs the same rest-overlap check as adding a new entry and only flags entries that genuinely fail it.
+- **CSV import no longer drops rows silently** — rows missing a departure or arrival, missing a Hobbs reading, or with On Blocks not greater than Off Blocks were skipped without any notice. The import confirmation now lists each skipped row by line number with the reason, before anything is replaced.
+
 ## 2026-09-26 (2)
 
 ### Fixed
