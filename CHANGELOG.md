@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-09
+
+### Fixed
+- **Flight Log "Duty OK?" no longer shows N/A on multi-leg days that end with a Part 91 leg** — the duty-period summary row took its 14-hour duty result from the day's last leg, and a Part 91 leg carries no Part 135 results. Mixed days ending in a Part 91 leg showed N/A, which would have hidden a duty day over 14 hours. It now uses the day's last Part 135 leg, as the rest and flight-limit columns already did. The dashboard and PDF report were not affected.
+- **Hours always display as valid minutes** — values are rounded to whole minutes before formatting, so an amount like 1.9999 hours shows "2h 00m" and can never show "1h 60m".
+
 ## 2026-10-08 (4)
 
 ### Fixed

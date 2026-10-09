@@ -20,8 +20,10 @@ export function hrs(startMs: number | null, endMs: number | null): number | null
 
 export function fmtHrs(h: number | null | undefined): string {
   if (h === null || h === undefined || isNaN(h)) return '—'
-  const hh = Math.floor(h)
-  const mm = Math.round((h - hh) * 60)
+  // Round to whole minutes first, so e.g. 1.9999 h reads "2h 00m", never "1h 60m".
+  const total = Math.round(h * 60)
+  const hh = Math.floor(total / 60)
+  const mm = total - hh * 60
   return `${hh}h ${String(mm).padStart(2, '0')}m`
 }
 
@@ -299,7 +301,8 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
     maxFlight:   lastP135C?.maxFlight ?? 8,
     flightOk:    allPart91 ? null : p135Idx.some(i => computedLegs[i].flightOk === false) ? false : true,
     dutyPeriod:  lastC?.dutyPeriod ?? null,
-    dutyOk:      allPart91 ? null : lastC?.dutyOk ?? null,
+    // From the last Part 135 leg: a trailing Part 91 leg carries no Part 135 results.
+    dutyOk:      allPart91 ? null : lastP135C?.dutyOk ?? null,
     reqRest:     lastP135C?.reqRest ?? 10,
     lookbackOk:  allPart91 ? null : worstBool(p135Idx.map(i => computedLegs[i].lookbackOk)),
     consRest:    lastC?.consRest ?? null,
