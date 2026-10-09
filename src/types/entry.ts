@@ -8,8 +8,8 @@ export interface Entry {
   releaseTime: string
   dep: string
   arr: string
-  offBlocks: string     // Hobbs meter reading stored as numeric string, e.g. "12345.6"
-  onBlocks: string      // Hobbs meter reading stored as numeric string, e.g. "12345.6"
+  offBlocks: string     // Hobbs reading in tenths, e.g. "12345.6" (older entries may lack the ".0")
+  onBlocks: string      // Hobbs reading in tenths, e.g. "12345.6" (older entries may lack the ".0")
   reason: string
   part91: boolean
   // ── Legacy, no longer used ──────────────────────────────────────────────────

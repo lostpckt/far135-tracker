@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ms, parseHobbs, hobbsFlightTime, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
 import { localToUtcIso, localTimeHint, tzAbbr, splitForEdit } from '@/lib/timezone'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
@@ -48,7 +48,8 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
     const onN  = parseHobbs(onHobbs)
     if (!dep.trim()) { setErr('Departure ICAO is required.'); return }
     if (!arr.trim()) { setErr('Arrival ICAO is required.'); return }
-    if (offN === null || onN === null) { setErr('Off Blocks and On Blocks Hobbs readings are required.'); return }
+    if (!offHobbs.trim() || !onHobbs.trim()) { setErr('Off Blocks and On Blocks Hobbs readings are required.'); return }
+    if (offN === null || onN === null) { setErr('Hobbs readings must be in tenths of an hour, e.g. 12345.6.'); return }
     if (onN <= offN) { setErr('On Blocks Hobbs must be greater than Off Blocks Hobbs.'); return }
     const timeHint = localTimeHint(showDate, showTime, tz) ?? localTimeHint(relDate, relTime, tz)
     if (timeHint) { setErr(timeHint); return }
@@ -64,7 +65,7 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
     // This leg plus the other legs of the duty period it will belong to.
     const siblingFlight = entries
       .filter(e => e.id !== entry.id && !e.restDay && e.showTime === show && e.releaseTime === release)
-      .reduce((sum, e) => sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0), 0)
+      .reduce((sum, e) => sum + legTenths(e), 0)
     if (flightExceedsDuty(show, release, siblingFlight + (onN - offN))) {
       setErr('Total flight time for this duty period is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
       return
@@ -80,8 +81,8 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
       releaseTime: release,
       dep:         dep.toUpperCase().trim(),
       arr:         arr.toUpperCase().trim(),
-      offBlocks:   offHobbs.trim(),
-      onBlocks:    onHobbs.trim(),
+      offBlocks:   fmtHobbs(offHobbs),
+      onBlocks:    fmtHobbs(onHobbs),
       reason,
       part91,
     })

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ms, parseHobbs, hobbsFlightTime, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { ms, parseHobbs, fmtHobbs, flightTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
 import { localToUtcIso, localTimeHint, tzAbbr, splitForEdit } from '@/lib/timezone'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
@@ -35,7 +35,8 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
     setErr('')
     const offN = parseHobbs(offHobbs)
     const onN  = parseHobbs(onHobbs)
-    if (offN === null || onN === null) { setErr('Hobbs Start and End are required.'); return }
+    if (!offHobbs.trim() || !onHobbs.trim()) { setErr('Hobbs Start and End are required.'); return }
+    if (offN === null || onN === null) { setErr('Hobbs readings must be in tenths of an hour, e.g. 12345.6.'); return }
     if (onN <= offN) { setErr('Hobbs End must be greater than Hobbs Start.'); return }
     const timeHint = localTimeHint(showDate, showTime, tz) ?? localTimeHint(relDate, relTime, tz)
     if (timeHint) { setErr(timeHint); return }
@@ -53,10 +54,10 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
       ...leg,
       showTime:    show,
       releaseTime: release,
-      offBlocks:   i === 0               ? offHobbs.trim() : leg.offBlocks,
-      onBlocks:    i === legs.length - 1 ? onHobbs.trim()  : leg.onBlocks,
+      offBlocks:   i === 0               ? fmtHobbs(offHobbs) : leg.offBlocks,
+      onBlocks:    i === legs.length - 1 ? fmtHobbs(onHobbs)  : leg.onBlocks,
     }))
-    const legTimes = updated.map(l => hobbsFlightTime(parseHobbs(l.offBlocks), parseHobbs(l.onBlocks)))
+    const legTimes = updated.map(l => flightTenths(parseHobbs(l.offBlocks), parseHobbs(l.onBlocks)))
     const badLeg = legTimes.findIndex(t => t === null || t <= 0)
     if (badLeg >= 0) { setErr(`Leg ${badLeg + 1}'s On Blocks Hobbs would not be greater than its Off Blocks. Check the Hobbs readings.`); return }
     if (flightExceedsDuty(show, release, legTimes.reduce<number>((s, t) => s + (t ?? 0), 0))) {

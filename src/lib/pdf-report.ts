@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Entry } from '@/types/entry'
 import {
-  ms, fmtHrs, fmtDT, hobbsFlightTime, parseHobbs, compute, restPeriodsInWindow, roundHrs,
+  ms, fmtHrs, fmtDT, fmtHobbs, legTenths, tenthsToHrs, compute, restPeriodsInWindow,
   quarterFlightHours, twoQuarterFlightHours, flightHoursInWindow,
 } from '@/lib/calculations'
 import { utcToLocalParts, monthStartMs } from '@/lib/timezone'
@@ -43,9 +43,9 @@ function baseTableOpts(margin: number, fontSize: number) {
 // the duty was for); flight hours from the period's (entity-scoped) legs.
 function periodStats(allEntries: Entry[], period: Entry[], periodStart: number, periodEnd: number) {
   const restDays = restPeriodsInWindow(allEntries, periodStart, periodEnd, Date.now())
-  const part135Flight = roundHrs(period
+  const part135Flight = tenthsToHrs(period
     .filter(e => !e.part91)
-    .reduce((sum, e) => sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0), 0))
+    .reduce((sum, e) => sum + legTenths(e), 0))
   return { restDays, part135Flight }
 }
 
@@ -87,7 +87,7 @@ function buildData(
 
   const computed = new Map(flightLegs.map(e => [e.id, compute(e, allEntries)]))
 
-  let totalFlight = 0
+  let totalTenths = 0
   const violations: { date: string; type: string; detail: string }[] = []
   const exceedances: { date: string; route: string; over: string; reason: string; reqRest: number }[] = []
   // Each violation is counted once per duty period, not once per leg.
@@ -101,7 +101,7 @@ function buildData(
 
   for (const e of flightLegs) {
     const c = computed.get(e.id)!
-    totalFlight += c.legFlight || 0
+    totalTenths += legTenths(e)
     if (e.part91) continue
     if (c.flightOk   === false) flag('flight',   e, { date: fmtDT(e.releaseTime || e.showTime), type: 'Flight Time Exceeded',    detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h; duty period did not qualify under Sec. 135.267(c))` })
     if (c.dutyOk     === false) flag('duty',     e, { date: fmtDT(e.showTime),                  type: 'Duty Period Exceeded',    detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
@@ -125,6 +125,7 @@ function buildData(
 
   const sorted = [...periodEntries].sort((a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0))
 
+  // Day totals in tenths.
   const dayMap = new Map<string, { p135: number; p91: number; showTime: string; releaseTime: string; hasViolation: boolean }>()
   for (const e of periodEntries) {
     const dk = entryLocalDate(e, tz)
@@ -132,7 +133,7 @@ function buildData(
     if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, showTime: e.showTime ?? '', releaseTime: e.releaseTime ?? '', hasViolation: false })
     const dd = dayMap.get(dk)!
     if (e.releaseTime && e.releaseTime > dd.releaseTime) dd.releaseTime = e.releaseTime
-    const ft = hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0
+    const ft = legTenths(e)
     if (e.part91) { dd.p91 += ft } else {
       dd.p135 += ft
       const c = computed.get(e.id)!
@@ -141,7 +142,7 @@ function buildData(
   }
 
   return {
-    statusText, failDetail, part135Legs, part91Legs, totalFlight,
+    statusText, failDetail, part135Legs, part91Legs, totalFlight: tenthsToHrs(totalTenths),
     totalViolations, scRows, violations, exceedances, sorted, computed, dayMap,
   }
 }
@@ -237,7 +238,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
       seenDates.add(dk)
       const dd = r.dayMap.get(dk)
       if (!dd) continue
-      rows.push([dk, fmtTime(dd.showTime, tz), fmtTime(dd.releaseTime, tz), dd.p135 > 0 ? fmtHrs(dd.p135) : '—', dd.p91 > 0 ? fmtHrs(dd.p91) : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
+      rows.push([dk, fmtTime(dd.showTime, tz), fmtTime(dd.releaseTime, tz), dd.p135 > 0 ? fmtHrs(tenthsToHrs(dd.p135)) : '—', dd.p91 > 0 ? fmtHrs(tenthsToHrs(dd.p91)) : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
     }
     return rows
   }
@@ -250,7 +251,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
         rows.push([
           fmtDT(e.showTime), e.crew === 'D' ? 'Dual' : 'Single',
           `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
-          e.offBlocks || '—', e.onBlocks || '—', fmtHrs(c.legFlight),
+          fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtHrs(c.legFlight),
           { content: 'Part 91 — Excluded from Sec. 135.267 limits', colSpan: 8, styles: { halign: 'left' as const } },
         ])
         continue
@@ -258,7 +259,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
       rows.push([
         fmtDT(e.showTime), e.crew === 'D' ? 'Dual' : 'Single',
         `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
-        e.offBlocks || '—', e.onBlocks || '—', fmtHrs(c.legFlight),
+        fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtHrs(c.legFlight),
         c.cQualifies ? `${fmtHrs(c.dutyFlight)} / ${c.maxFlight}h (c)`
           : c.rolling24 !== null ? `${fmtHrs(c.rolling24)} / ${c.maxFlight}h` : '—',
         c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED',

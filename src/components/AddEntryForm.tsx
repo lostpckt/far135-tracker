@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import LegRow, { type LegData } from '@/components/LegRow'
 import { SectionLabel } from '@/components/FormHelpers'
-import { uid, ms, parseHobbs, hobbsFlightTime, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { uid, ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
 import { localToUtcIso, localTimeHint, utcToLocalParts, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -93,11 +93,12 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       const label = legs.length > 1 ? `Leg ${i + 1}: ` : ''
       if (!leg.dep.trim()) { setErr(`${label}Departure ICAO is required.`); return }
       if (!leg.arr.trim()) { setErr(`${label}Arrival ICAO is required.`); return }
-      if (offN === null || onN === null) { setErr(`${label}Off Blocks and On Blocks Hobbs readings are required.`); return }
+      if (!leg.offHobbs.trim() || !leg.onHobbs.trim()) { setErr(`${label}Off Blocks and On Blocks Hobbs readings are required.`); return }
+      if (offN === null || onN === null) { setErr(`${label}Hobbs readings must be in tenths of an hour, e.g. 12345.6.`); return }
       if (onN <= offN) { setErr(`${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`); return }
-      legData.push({ dep: leg.dep, arr: leg.arr, off: leg.offHobbs.trim(), on: leg.onHobbs.trim(), reason: leg.reason, part91: leg.part91 })
+      legData.push({ dep: leg.dep, arr: leg.arr, off: fmtHobbs(leg.offHobbs), on: fmtHobbs(leg.onHobbs), reason: leg.reason, part91: leg.part91 })
     }
-    const totalFlight = legData.reduce((sum, l) => sum + (hobbsFlightTime(parseHobbs(l.off), parseHobbs(l.on)) ?? 0), 0)
+    const totalFlight = legData.reduce((sum, l) => sum + legTenths({ offBlocks: l.off, onBlocks: l.on }), 0)
     if (flightExceedsDuty(show, release, totalFlight)) {
       setErr('Total flight time is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
       return

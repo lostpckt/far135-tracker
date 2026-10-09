@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
-import { compute, computeDutyPeriod, fmtDT, fmtHrs, restPeriodsInWindow } from '@/lib/calculations'
+import { compute, computeDutyPeriod, fmtDT, fmtHobbs, fmtHrs, restPeriodsInWindow } from '@/lib/calculations'
 import { utcToLocalParts, localYearMonth, monthStartMs } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -238,8 +238,8 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                             {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}{p91Badge}
                             {e.tailNumber && <div className="text-[0.65rem] text-slate-400">{e.tailNumber}</div>}
                           </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.offBlocks) || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.onBlocks) || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {e.part91
@@ -314,8 +314,8 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                             {p91Badge}
                             {legs[0].tailNumber && <div className="text-[0.65rem] text-slate-400">{legs[0].tailNumber}</div>}
                           </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[0].offBlocks || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{legs[legs.length - 1].onBlocks || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[0].offBlocks) || '—'}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[legs.length - 1].onBlocks) || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(totalFlight)}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {allPart91
@@ -368,8 +368,8 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                                 {e.part91 && <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>}
                                 {e.tailNumber && <div className="text-[0.65rem] text-slate-400">{e.tailNumber}</div>}
                               </td>
-                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.offBlocks || '—'}</td>
-                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.onBlocks || '—'}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.offBlocks) || '—'}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.onBlocks) || '—'}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                                 {e.part91

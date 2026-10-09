@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-09 (2)
+
+### Changed
+- **Flight time is counted in exact tenths of an hour** — Hobbs readings are tenths, but the app did its math in decimals the computer can't store exactly, so 12345.6 − 12343.3 came out as 2.29999… hours. Yesterday's rounding fix kept that from mattering; now the app counts whole tenths (2.3 h is 23 tenths), so a day of exactly 8.0 hours can never land a hair over the limit. Every flight-time total, limit check and exceedance in your log calculates the same as before.
+- **Hobbs readings always show one decimal** — a reading typed as 12345 is saved as 12345.0, and older readings saved without the decimal display as 12345.0 in the Flight Log, PDF reports and CSV export. Your stored data isn't rewritten.
+
+### Fixed
+- **Hobbs readings with more than one decimal are refused** — Add Entry and both edit dialogs now say "Hobbs readings must be in tenths of an hour, e.g. 12345.6." instead of accepting a reading like 12345.67. CSV import skips such rows and says why.
+
 ## 2026-10-09
 
 ### Removed

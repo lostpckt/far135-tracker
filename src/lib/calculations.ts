@@ -40,30 +40,53 @@ export function fmtDT(dtStr: string | undefined | null): string {
 }
 
 
-/** Parse a Hobbs meter reading string into a float, or null if invalid. */
+// ── Flight time in tenths ────────────────────────────────────────────────────
+// Hobbs meters read in tenths of an hour, so flight time is counted in whole
+// tenths (2.3 h = 23) and converted to hours only for display. Readings parsed
+// as floats aren't exact (12345.6 − 12343.3 computes as 2.2999999999992724), so
+// a total exactly at a limit could land a hair over it and falsely read as
+// EXCEEDED. Whole numbers add, subtract and compare exactly.
+
+const TENTH = 360000   // ms in 0.1 h
+
+/**
+ * Parse a Hobbs reading ("12345.6" or "12345") into whole tenths (123456), or
+ * null if it isn't a reading in tenths. Built from the digits, never via a float.
+ */
 export function parseHobbs(val: string | undefined | null): number | null {
-  if (!val) return null
-  const n = parseFloat(val)
-  return isNaN(n) ? null : n
+  const m = /^(\d+)(?:\.(\d)?)?$/.exec(val?.trim() ?? '')
+  return m ? Number(m[1]) * 10 + Number(m[2] ?? 0) : null
+}
+
+/** A Hobbs reading in tenths as text with one decimal: 123450 → "12345.0". */
+export function fmtTenths(t: number): string {
+  return `${Math.floor(t / 10)}.${t % 10}`
 }
 
 /**
- * Round an hours value to 0.01 h. Hobbs readings are decimal (tenths), but their
- * floating-point differences aren't exact (2.3 h computes as 2.2999999999992724),
- * so sums that are exactly at a limit could land a hair over it (8.000000000000028)
- * and falsely read as EXCEEDED. Rounding every flight time and every sum keeps
- * limit comparisons exact.
+ * A Hobbs reading as typed or stored, shown with one decimal ("12345" →
+ * "12345.0"). Used both to display readings and to normalize them on save.
+ * Text that isn't a valid reading is returned as-is.
  */
-export function roundHrs(h: number): number {
-  return Math.round(h * 100) / 100
+export function fmtHobbs(val: string | undefined | null): string {
+  const t = parseHobbs(val)
+  return t === null ? (val ?? '').trim() : fmtTenths(t)
 }
 
-/** Flight time from Hobbs readings: onHobbs - offHobbs. */
-export function hobbsFlightTime(offHobbs: number | null, onHobbs: number | null): number | null {
+/** Flight time in tenths from Hobbs readings in tenths: onHobbs - offHobbs. */
+export function flightTenths(offHobbs: number | null, onHobbs: number | null): number | null {
   if (offHobbs === null || onHobbs === null) return null
   const diff = onHobbs - offHobbs
-  if (diff < 0) return null
-  return roundHrs(diff)
+  return diff < 0 ? null : diff
+}
+
+/** A leg's flight time in tenths, or 0 if its Hobbs readings are missing or invalid. */
+export function legTenths(e: Pick<Entry, 'offBlocks' | 'onBlocks'>): number {
+  return flightTenths(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0
+}
+
+export function tenthsToHrs(t: number): number {
+  return t / 10
 }
 
 const HOUR = 3600000
@@ -79,7 +102,7 @@ const DAY  = 86400000
 interface DutyPeriodSpan {
   show: number
   release: number
-  f135: number    // Part 135 flight time in this duty period, h
+  f135: number    // Part 135 flight time in this duty period, tenths
 }
 
 interface DutyIndex {
@@ -106,7 +129,7 @@ function dutyIndex(all: Entry[]): DutyIndex {
     const key = dutyKey(e)
     let dp = map.get(key)
     if (!dp) { dp = { show, release: ms(e.releaseTime) ?? show, f135: 0 }; map.set(key, dp) }
-    if (!e.part91) dp.f135 = roundHrs(dp.f135 + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0))
+    if (!e.part91) dp.f135 += legTenths(e)
   }
   const keys = [...map.keys()].sort((a, b) => map.get(a)!.show - map.get(b)!.show)
   const idx: DutyIndex = { periods: keys.map(k => map.get(k)!), byKey: new Map(keys.map((k, i) => [k, i])) }
@@ -131,13 +154,13 @@ export function overlappingDuty(all: Entry[], show: string, release: string, exc
 }
 
 /**
- * True if a duty period's total flight time (all legs, Part 91 included) is
- * longer than the duty period itself — always a data-entry error, usually a
- * mistyped Hobbs reading.
+ * True if a duty period's total flight time in tenths (all legs, Part 91
+ * included) is longer than the duty period itself — always a data-entry error,
+ * usually a mistyped Hobbs reading.
  */
-export function flightExceedsDuty(show: string, release: string, flightHrs: number): boolean {
+export function flightExceedsDuty(show: string, release: string, flightTenths: number): boolean {
   const s = ms(show), r = ms(release)
-  return s !== null && r !== null && roundHrs(flightHrs) > (r - s) / HOUR
+  return s !== null && r !== null && flightTenths * TENTH > r - s
 }
 
 /** The rest gaps between consecutive duty periods, as [release, next show] ms. */
@@ -177,27 +200,29 @@ export function compute(entry: Entry, all: Entry[]): Computed {
   const next  = dpIdx >= 0 && dpIdx + 1 < periods.length ? periods[dpIdx + 1] : null
 
   // Flight time from Hobbs; duty from show/release; rest from release to the next show
-  c.legFlight  = hobbsFlightTime(offHobbs, onHobbs)
+  const legT   = flightTenths(offHobbs, onHobbs)
+  const maxT   = entry.crew === 'D' ? 100 : 80
+  c.legFlight  = legT !== null ? tenthsToHrs(legT) : null
   c.dutyPeriod = hrs(showMs, relMs)
   c.consRest   = dp && next ? Math.max(0, next.show - dp.release) / HOUR : null
-  c.maxFlight  = entry.crew === 'D' ? 10 : 8
-  c.dutyFlight = dp ? dp.f135 : null
+  c.maxFlight  = tenthsToHrs(maxT)
+  c.dutyFlight = dp ? tenthsToHrs(dp.f135) : null
 
   // Rolling 24-hr window anchored to releaseTime (or showTime fallback) since Hobbs has no timestamp.
   // Computed before the Part 91 check so the dashboard reflects accumulated Part 135 hours
   // even when the most recent leg is a Part 91 repositioning flight.
   const anchorMs = relMs ?? showMs
+  let rollT: number | null = null
   if (anchorMs !== null) {
     const windowStart = anchorMs - 86400000
-    c.rolling24 = roundHrs(all.reduce((sum, e) => {
+    rollT = all.reduce((sum, e) => {
       if (e.part91) return sum
       const eAnchor = ms(e.releaseTime) ?? ms(e.showTime)
       if (eAnchor === null || eAnchor > anchorMs || eAnchor <= windowStart) return sum
-      return sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0)
-    }, 0))
-  } else {
-    c.rolling24 = null
+      return sum + legTenths(e)
+    }, 0)
   }
+  c.rolling24 = rollT !== null ? tenthsToHrs(rollT) : null
 
   if (entry.part91) {
     c.excAmt     = 0
@@ -223,19 +248,19 @@ export function compute(entry: Entry, all: Entry[]): Computed {
     && c.dutyPeriod !== null && c.dutyPeriod <= 14
     && restBefore !== null && restBefore >= 10
     && (c.consRest === null || c.consRest >= 10)
-    && dp.f135 <= c.maxFlight
+    && dp.f135 <= maxT
 
   // Under (c) the duty period's own flight time is what's limited; otherwise
   // the (b) rolling 24-hour total is.
-  c.excAmt = c.cQualifies ? 0
-    : c.rolling24 !== null ? roundHrs(Math.max(0, c.rolling24 - c.maxFlight)) : 0
+  const excT = c.cQualifies || rollT === null ? 0 : Math.max(0, rollT - maxT)
+  c.excAmt = tenthsToHrs(excT)
 
   // §135.267(e): exceeded by not more than 30 min → 11 h; by more than 30 but
   // not more than 60 min → 12 h; by more than 60 min → 16 h.
-  if      (c.excAmt === 0)  c.reqRest = 10
-  else if (c.excAmt <= 0.5) c.reqRest = 11
-  else if (c.excAmt <= 1)   c.reqRest = 12
-  else                      c.reqRest = 16
+  if      (excT === 0)  c.reqRest = 10
+  else if (excT <= 5)   c.reqRest = 11
+  else if (excT <= 10)  c.reqRest = 12
+  else                  c.reqRest = 16
 
   // Lookback, §135.267(d): at least 10 consecutive hours of rest must fall WITHIN
   // the 24 hours before the assignment's completion (release, or show as fallback).
@@ -255,7 +280,7 @@ export function compute(entry: Entry, all: Entry[]): Computed {
     c.lookbackOk = found ? true : lbStart < periods[0].show ? null : false
   }
 
-  c.flightOk = c.cQualifies ? true : c.rolling24 !== null ? c.rolling24 <= c.maxFlight : null
+  c.flightOk = c.cQualifies ? true : rollT !== null ? rollT <= maxT : null
   c.dutyOk   = c.dutyPeriod !== null ? c.dutyPeriod <= 14 : null
   c.restOk   = c.consRest !== null ? c.consRest >= c.reqRest : null
 
@@ -296,7 +321,7 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
   return {
     computedLegs,
     allPart91,
-    totalFlight: roundHrs(computedLegs.reduce((s, c) => s + (c.legFlight ?? 0), 0)),
+    totalFlight: tenthsToHrs(legs.reduce((s, l) => s + legTenths(l), 0)),
     rolling24:   lastP135C?.rolling24 ?? null,
     maxFlight:   lastP135C?.maxFlight ?? 8,
     flightOk:    allPart91 ? null : p135Idx.some(i => computedLegs[i].flightOk === false) ? false : true,
@@ -314,24 +339,30 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
   }
 }
 
-/** Part 135 flight hours of legs released within [start, end). */
-export function flightHoursInWindow(entries: Entry[], start: number, end: number): number {
-  return roundHrs(entries.reduce((sum, e) => {
+/** Part 135 flight time in tenths of legs released within [start, end). */
+function flightTenthsInWindow(entries: Entry[], start: number, end: number): number {
+  return entries.reduce((sum, e) => {
     if (e.restDay || e.part91) return sum
     const anchor = ms(e.releaseTime) ?? ms(e.showTime)
     if (anchor === null || anchor < start || anchor >= end) return sum
-    return sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0)
-  }, 0))
+    return sum + legTenths(e)
+  }, 0)
+}
+
+/** Part 135 flight hours of legs released within [start, end). */
+export function flightHoursInWindow(entries: Entry[], start: number, end: number): number {
+  return tenthsToHrs(flightTenthsInWindow(entries, start, end))
 }
 
 export function quarterFlightHours(entries: Entry[], qIdx: number, year: number, tz?: string): number {
   return flightHoursInWindow(entries, monthStartMs(year, qIdx * 3, tz), monthStartMs(year, qIdx * 3 + 3, tz))
 }
 
+/** Hours in the quarter plus the previous one, which may span a year boundary. */
 export function twoQuarterFlightHours(entries: Entry[], qIdx: number, year: number, tz?: string): number {
   const prevQ    = qIdx === 0 ? 3 : qIdx - 1
   const prevYear = qIdx === 0 ? year - 1 : year
-  return roundHrs(quarterFlightHours(entries, qIdx, year, tz) + quarterFlightHours(entries, prevQ, prevYear, tz))
+  return flightHoursInWindow(entries, monthStartMs(prevYear, prevQ * 3, tz), monthStartMs(year, qIdx * 3 + 3, tz))
 }
 
 export function annualFlightHours(entries: Entry[], year: number, tz?: string): number {
@@ -370,7 +401,7 @@ export function exportCSV(entries: Entry[]): void {
       q(e.tailNumber || ''),
       q(e.entity || ''),
       q(`${(e.dep || '').toUpperCase()}-${(e.arr || '').toUpperCase()}`),
-      q(e.offBlocks), q(e.onBlocks),
+      q(fmtHobbs(e.offBlocks)), q(fmtHobbs(e.onBlocks)),
       q(c.legFlight !== null ? c.legFlight.toFixed(2) : ''),
       q(c.rolling24 !== null ? c.rolling24.toFixed(2) : ''),
       q(c.maxFlight),
@@ -461,13 +492,13 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
     const dashIdx   = routeVal.indexOf('-')
     const dep       = dashIdx !== -1 ? routeVal.slice(0, dashIdx) : routeVal
     const arr       = dashIdx !== -1 ? routeVal.slice(dashIdx + 1) : ''
-    const offBlocks = get(row, offIdx).trim()
-    const onBlocks  = get(row, onIdx).trim()
+    const offBlocks = fmtHobbs(get(row, offIdx))
+    const onBlocks  = fmtHobbs(get(row, onIdx))
 
     if (!dep || !arr) { skipped.push({ line: li + 1, reason: 'missing departure or arrival' }); continue }
     const offN = parseHobbs(offBlocks)
     const onN  = parseHobbs(onBlocks)
-    if (offN === null || onN === null) { skipped.push({ line: li + 1, reason: 'missing or unreadable Hobbs reading' }); continue }
+    if (offN === null || onN === null) { skipped.push({ line: li + 1, reason: 'missing Hobbs reading, or not in tenths (e.g. 12345.6)' }); continue }
     if (onN <= offN) { skipped.push({ line: li + 1, reason: 'On Blocks not greater than Off Blocks' }); continue }
 
     const part91 = get(row, part135Idx).trim() !== 'True'
