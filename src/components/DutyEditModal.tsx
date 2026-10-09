@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ms, parseHobbs, overlappingDuty } from '@/lib/calculations'
-import { localToUtcIso, tzAbbr, splitForEdit } from '@/lib/timezone'
+import { ms, parseHobbs, hobbsFlightTime, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { localToUtcIso, localTimeHint, tzAbbr, splitForEdit } from '@/lib/timezone'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
@@ -37,6 +37,8 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
     const onN  = parseHobbs(onHobbs)
     if (offN === null || onN === null) { setErr('Hobbs Start and End are required.'); return }
     if (onN <= offN) { setErr('Hobbs End must be greater than Hobbs Start.'); return }
+    const timeHint = localTimeHint(showDate, showTime, tz) ?? localTimeHint(relDate, relTime, tz)
+    if (timeHint) { setErr(timeHint); return }
     const show    = localToUtcIso(showDate, showTime, tz)
     const release = localToUtcIso(relDate, relTime, tz)
     if (!show)    { setErr('Show Time is required.'); return }
@@ -47,16 +49,25 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
       return
     }
 
-    onSave(legs.map((leg, i) => ({
+    const updated = legs.map((leg, i) => ({
       ...leg,
       showTime:    show,
       releaseTime: release,
       offBlocks:   i === 0               ? offHobbs.trim() : leg.offBlocks,
       onBlocks:    i === legs.length - 1 ? onHobbs.trim()  : leg.onBlocks,
-    })))
+    }))
+    const legTimes = updated.map(l => hobbsFlightTime(parseHobbs(l.offBlocks), parseHobbs(l.onBlocks)))
+    const badLeg = legTimes.findIndex(t => t === null || t <= 0)
+    if (badLeg >= 0) { setErr(`Leg ${badLeg + 1}'s On Blocks Hobbs would not be greater than its Off Blocks. Check the Hobbs readings.`); return }
+    if (flightExceedsDuty(show, release, legTimes.reduce<number>((s, t) => s + (t ?? 0), 0))) {
+      setErr('Total flight time is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
+      return
+    }
+
+    onSave(updated)
   }
 
-  const abbr = tzAbbr(tz)
+  const abbr = tzAbbr(tz, showDate)
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
@@ -71,8 +82,8 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
 
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 py-2">
           <SectionLabel>Duty Period — times in {abbr}</SectionLabel>
-          <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} required />
-          <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} required />
+          <DTField label="Show Time"    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} required />
+          <DTField label="Release Time" date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} required />
 
           <SectionLabel>Hobbs Readings</SectionLabel>
           <div className="flex flex-col gap-1">

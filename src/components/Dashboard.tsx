@@ -65,24 +65,29 @@ export default function Dashboard({ entries, tz }: Props) {
   const lastP135Entry  = p135Entries.length ? p135Entries[p135Entries.length - 1] : null
   const lastP135Calc   = lastP135Entry ? compute(lastP135Entry, entries) : null
 
-  const allWarnings = entries.filter(e => {
-    if (e.restDay) return false
+  // Duty periods (not legs) with any Part 135 compliance failure.
+  const violatingDuties = new Set(p135Entries.filter(e => {
     const c = compute(e, entries)
-    return c.flightOk === false || c.dutyOk === false || c.restOk === false
-  }).length
+    return c.flightOk === false || c.dutyOk === false || c.restOk === false || c.lookbackOk === false
+  }).map(e => `${e.showTime}|${e.releaseTime}`))
+  const allWarnings = violatingDuties.size
 
-  // Next legal duty start: releaseTime of last leg + required rest
+  // Next legal duty start: the later of (a) the last Part 135 release plus its
+  // required rest and (b) the last release of ANY duty, Part 91 included, plus
+  // 10 h — a Part 91 duty after the last Part 135 one also needs 10 h of rest
+  // before the next Part 135 duty can qualify under §135.267(c).
   type Color = 'green' | 'red' | 'blue' | 'amber'
   let nextDutyValue = '—'
   let nextDutySub   = ''
   let nextDutyColor: Color = 'blue'
 
   if (lastP135Entry?.releaseTime && lastP135Calc && lastP135Calc.reqRest !== null) {
-    const releaseMs = new Date(lastP135Entry.releaseTime).getTime()
-    const legalMs   = releaseMs + lastP135Calc.reqRest * 3600000
+    const releaseMs    = new Date(lastP135Entry.releaseTime).getTime()
+    const lastAnyRelMs = Math.max(...nonRestEntries.map(e => ms(e.releaseTime) ?? 0))
+    const legalMs      = Math.max(releaseMs + lastP135Calc.reqRest * 3600000, lastAnyRelMs + 10 * 3600000)
     const nowMs     = now.getTime()
     const legalIso  = new Date(legalMs).toISOString()
-    const abbr      = tzAbbr(tz)
+    const abbr      = tzAbbr(tz, utcToLocalParts(legalIso, tz)?.date)
 
     // Format the legal time in local timezone
     const local = utcToLocalParts(legalIso, tz)
@@ -140,7 +145,7 @@ export default function Dashboard({ entries, tz }: Props) {
     {
       label: 'Active Violations',
       value: allWarnings,
-      sub:   allWarnings === 0 ? 'All entries compliant' : 'Review flagged rows',
+      sub:   allWarnings === 0 ? 'All duty periods compliant' : `Duty period${allWarnings !== 1 ? 's' : ''} flagged in the log`,
       color: allWarnings === 0 ? 'green' : 'red',
     },
   ]

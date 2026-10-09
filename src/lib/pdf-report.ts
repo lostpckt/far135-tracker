@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'
 import type { Entry } from '@/types/entry'
 import {
   ms, fmtHrs, fmtDT, hobbsFlightTime, parseHobbs, compute, restPeriodsInWindow, roundHrs,
+  quarterFlightHours, twoQuarterFlightHours, flightHoursInWindow,
 } from '@/lib/calculations'
 import { utcToLocalParts, monthStartMs } from '@/lib/timezone'
 
@@ -87,30 +88,38 @@ function buildData(
   const computed = new Map(flightLegs.map(e => [e.id, compute(e, allEntries)]))
 
   let totalFlight = 0
-  let flightFailCount = 0, dutyFailCount = 0, restFailCount = 0
   const violations: { date: string; type: string; detail: string }[] = []
   const exceedances: { date: string; route: string; over: string; reason: string; reqRest: number }[] = []
+  // Each violation is counted once per duty period, not once per leg.
+  const seen = new Set<string>()
+  const fails = { flight: 0, duty: 0, rest: 0, lookback: 0 }
+  const flag = (kind: keyof typeof fails, e: Entry, v: { date: string; type: string; detail: string }) => {
+    const key = `${kind}|${e.showTime}|${e.releaseTime}`
+    if (seen.has(key)) return
+    seen.add(key); fails[kind]++; violations.push(v)
+  }
 
   for (const e of flightLegs) {
     const c = computed.get(e.id)!
     totalFlight += c.legFlight || 0
     if (e.part91) continue
-    if (c.flightOk === false) { flightFailCount++; violations.push({ date: fmtDT(e.releaseTime || e.showTime), type: 'Flight Time Exceeded', detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h)` }) }
-    if (c.dutyOk  === false) { dutyFailCount++;   violations.push({ date: fmtDT(e.showTime),                  type: 'Duty Period Exceeded',   detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` }) }
-    if (c.restOk  === false) { restFailCount++;   violations.push({ date: fmtDT(e.releaseTime),               type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` }) }
+    if (c.flightOk   === false) flag('flight',   e, { date: fmtDT(e.releaseTime || e.showTime), type: 'Flight Time Exceeded',    detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h; duty period did not qualify under Sec. 135.267(c))` })
+    if (c.dutyOk     === false) flag('duty',     e, { date: fmtDT(e.showTime),                  type: 'Duty Period Exceeded',    detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
+    if (c.restOk     === false) flag('rest',     e, { date: fmtDT(e.releaseTime),               type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` })
+    if (c.lookbackOk === false) flag('lookback', e, { date: fmtDT(e.releaseTime || e.showTime), type: '10-hr Look-Back Not Met', detail: 'Less than 10 consecutive hours of rest in the 24 hours before release' })
     if (c.excAmt > 0) exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
   }
 
-  const totalViolations = flightFailCount + dutyFailCount + restFailCount
+  const totalViolations = fails.flight + fails.duty + fails.rest + fails.lookback
   const overallOk  = d.isOverallOk(totalViolations, restDays)
   const statusText = overallOk ? 'COMPLIANT' : 'REVIEW REQUIRED'
-  const failDetail = !overallOk ? ` — ${totalViolations} violation(s)${!d.isOverallOk(0, restDays) ? ' and/or rest day shortfall' : ''} detected` : ''
+  const failDetail = !overallOk ? ` — ${totalViolations} violation(s)${!d.isOverallOk(0, restDays) ? ' and/or rest period shortfall' : ''} detected` : ''
 
   const scRows: [string, string][] = [
-    ['Rolling 24-hr Flight Time', flightFailCount === 0 ? 'PASS' : `${flightFailCount} VIOLATION(S)`],
-    ['14-Hour Duty Day Limit',    dutyFailCount   === 0 ? 'PASS' : `${dutyFailCount} VIOLATION(S)`],
-    ['Rest Requirements',         restFailCount   === 0 ? 'PASS' : `${restFailCount} DEFICIENCY(IES)`],
-    ['10-hr Look-Back Rest',      'See detail rows below'],
+    ['Flight Time (Sec. 135.267(b)/(c))', fails.flight   === 0 ? 'PASS' : `${fails.flight} VIOLATION(S)`],
+    ['14-Hour Duty Day Limit',            fails.duty     === 0 ? 'PASS' : `${fails.duty} VIOLATION(S)`],
+    ['Rest Requirements',                 fails.rest     === 0 ? 'PASS' : `${fails.rest} DEFICIENCY(IES)`],
+    ['10-hr Look-Back Rest (Sec. 135.267(d))', fails.lookback === 0 ? 'PASS' : `${fails.lookback} VIOLATION(S)`],
     ...d.extraScorecard,
   ]
 
@@ -127,7 +136,7 @@ function buildData(
     if (e.part91) { dd.p91 += ft } else {
       dd.p135 += ft
       const c = computed.get(e.id)!
-      if (c.flightOk === false || c.dutyOk === false || c.restOk === false) dd.hasViolation = true
+      if (c.flightOk === false || c.dutyOk === false || c.restOk === false || c.lookbackOk === false) dd.hasViolation = true
     }
   }
 
@@ -242,7 +251,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
           fmtDT(e.showTime), e.crew === 'D' ? 'Dual' : 'Single',
           `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
           e.offBlocks || '—', e.onBlocks || '—', fmtHrs(c.legFlight),
-          { content: 'Part 91 — Excluded from Sec. 135.267 limits', colSpan: 7, styles: { halign: 'left' as const } },
+          { content: 'Part 91 — Excluded from Sec. 135.267 limits', colSpan: 8, styles: { halign: 'left' as const } },
         ])
         continue
       }
@@ -255,6 +264,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
         c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED',
         fmtHrs(c.dutyPeriod),
         c.dutyOk === null ? 'N/A' : c.dutyOk ? 'OK' : 'EXCEEDED',
+        c.lookbackOk === null ? 'N/A' : c.lookbackOk ? 'OK' : 'CHECK',
         `${fmtHrs(c.consRest)} / ${c.reqRest}h`,
         c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT',
         c.excAmt > 0 ? fmtHrs(c.excAmt) : '—',
@@ -278,7 +288,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
     sectionHeading('Flight Log (Full Detail)')
     autoTable(doc, {
       startY: y,
-      head: [['Show Time', 'Crew', 'Route', 'Off Blocks', 'On Blocks', 'Leg Time', 'Flight / Limit', 'Flt', 'Duty', 'Duty OK', 'Rest After', 'Rest OK', 'Exc']],
+      head: [['Show Time', 'Crew', 'Route', 'Off Blocks', 'On Blocks', 'Leg Time', 'Flight / Limit', 'Flt', 'Duty', 'Duty OK', 'Look-Back', 'Rest After', 'Rest OK', 'Exc']],
       body: fullLogBody(),
       ...baseTableOpts(margin, 7),
     })
@@ -323,7 +333,18 @@ export function generateQuarterlyReportPDF(
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= qStart && a < qEnd })
   if (!period.length) return false
 
-  const { restDays, part135Flight } = periodStats(entries, period, qStart, qEnd)
+  const { restDays } = periodStats(entries, period, qStart, qEnd)
+
+  // §135.267(a) limits apply to the pilot's total Part 135 flying, so they're
+  // computed across all entities even when the report is filtered to one.
+  // "Exceed" means over the limit; exactly at it is legal.
+  const allNote = entity ? ' (all entities)' : ''
+  const qHrs  = quarterFlightHours(entries, qIdx, year, tz)
+  const tqHrs = twoQuarterFlightHours(entries, qIdx, year, tz)
+  const ytd   = flightHoursInWindow(entries, monthStartMs(year, 0, tz), qEnd)
+  const limitRow = (label: string, hrs: number, max: number, what: string): [string, string] =>
+    [`${label}${allNote}`, hrs <= max ? `${fmtHrs(hrs)} of ${max}h ${what} — OK` : `${fmtHrs(hrs)} — EXCEEDS ${max}h ${what}`]
+  const limitsOk = qHrs <= 500 && tqHrs <= 800 && ytd <= 1400
 
   const doc = renderPDF(entries, {
     periodEntries: period, periodStart: qStart, periodEnd: qEnd,
@@ -331,10 +352,12 @@ export function generateQuarterlyReportPDF(
     restDays,
     extraScorecard: [
       ['24-hr Rest Periods (>=13/qtr)', `${restDays} of 13 required`],
-      ['Quarterly Flight Hours Sec. 135.267(a)', part135Flight <= 500 ? `${fmtHrs(part135Flight)} of 500h — OK` : `${fmtHrs(part135Flight)} — EXCEEDED`],
+      limitRow('Quarterly Flight Hours Sec. 135.267(a)', qHrs, 500, 'quarterly'),
+      limitRow('Two-Quarter Flight Hours Sec. 135.267(a)', tqHrs, 800, 'with previous quarter'),
+      limitRow(`Calendar-Year Flight Hours to Q${qIdx + 1} end Sec. 135.267(a)`, ytd, 1400, 'annual'),
     ],
     restDayStatLabel: rd => `${rd} / 13`,
-    isOverallOk: (v, rd) => v === 0 && rd >= 13,
+    isOverallOk: (v, rd) => v === 0 && rd >= 13 && limitsOk,
   }, tz, entity, logDetail)
 
   const qNum = `${year}-Q${qIdx + 1}`

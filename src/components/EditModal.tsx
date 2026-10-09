@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ms, parseHobbs, overlappingDuty } from '@/lib/calculations'
-import { localToUtcIso, tzAbbr, splitForEdit } from '@/lib/timezone'
+import { ms, parseHobbs, hobbsFlightTime, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { localToUtcIso, localTimeHint, tzAbbr, splitForEdit } from '@/lib/timezone'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
@@ -50,6 +50,8 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
     if (!arr.trim()) { setErr('Arrival ICAO is required.'); return }
     if (offN === null || onN === null) { setErr('Off Blocks and On Blocks Hobbs readings are required.'); return }
     if (onN <= offN) { setErr('On Blocks Hobbs must be greater than Off Blocks Hobbs.'); return }
+    const timeHint = localTimeHint(showDate, showTime, tz) ?? localTimeHint(relDate, relTime, tz)
+    if (timeHint) { setErr(timeHint); return }
     const show    = localToUtcIso(showDate, showTime, tz)
     const release = localToUtcIso(relDate, relTime, tz)
     if (!show)    { setErr('Show Time is required.'); return }
@@ -57,6 +59,14 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
     if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
     if (overlappingDuty(entries, show, release, new Set([entry.id]))) {
       setErr('These times overlap another logged duty period. To move a whole multi-leg duty period, use its duty-period edit.')
+      return
+    }
+    // This leg plus the other legs of the duty period it will belong to.
+    const siblingFlight = entries
+      .filter(e => e.id !== entry.id && !e.restDay && e.showTime === show && e.releaseTime === release)
+      .reduce((sum, e) => sum + (hobbsFlightTime(parseHobbs(e.offBlocks), parseHobbs(e.onBlocks)) ?? 0), 0)
+    if (flightExceedsDuty(show, release, siblingFlight + (onN - offN))) {
+      setErr('Total flight time for this duty period is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
       return
     }
 
@@ -77,7 +87,7 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
     })
   }
 
-  const abbr = tzAbbr(tz)
+  const abbr = tzAbbr(tz, showDate)
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
@@ -111,8 +121,8 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
           </div>
 
           <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
-          <DTField label={`Show Time (${abbr})`}    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} required />
-          <DTField label={`Release Time (${abbr})`} date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} required />
+          <DTField label="Show Time"    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} required />
+          <DTField label="Release Time" date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} required />
 
           <SectionLabel>Flight Leg</SectionLabel>
           <div className="flex flex-col gap-1">

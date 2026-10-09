@@ -32,10 +32,13 @@ export function setMigrated(): void {
   localStorage.setItem(MIGRATION_KEY, '1')
 }
 
-export function tzAbbr(tz: string): string {
+// Short zone name (e.g. PDT / PST). Pass the YYYY-MM-DD date being entered so a
+// December date reads PST even when today is in daylight time.
+export function tzAbbr(tz: string, date?: string): string {
+  const at = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T12:00:00Z`) : new Date()
   return (
     Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
-      .formatToParts(new Date())
+      .formatToParts(at)
       .find(p => p.type === 'timeZoneName')?.value ?? tz
   )
 }
@@ -53,12 +56,17 @@ function offsetMs(utcMs: number, tz: string): number {
   return Date.UTC(g('year'), g('month') - 1, g('day'), h, g('minute'), g('second')) - utcMs
 }
 
+function normTime(timeStr: string): string {
+  return timeStr.length === 4 ? `${timeStr.slice(0, 2)}:${timeStr.slice(2)}` : timeStr
+}
+
 // Convert a local date + time (in given timezone) to a UTC ISO string ending in "Z".
+// Returns '' for missing or invalid input, and for a local time that doesn't exist
+// because the clocks spring forward over it (see nonexistentLocalTime). A time that
+// occurs twice when clocks fall back resolves to the first (daylight-time) one.
 export function localToUtcIso(dateStr: string, timeStr: string, tz: string): string {
   if (!dateStr || !timeStr) return ''
-  const norm = timeStr.length === 4
-    ? `${timeStr.slice(0, 2)}:${timeStr.slice(2)}`
-    : timeStr
+  const norm = normTime(timeStr)
   if (!/^\d{2}:\d{2}$/.test(norm)) return ''
   const approx = Date.parse(`${dateStr}T${norm}:00Z`)
   if (isNaN(approx)) return ''
@@ -66,7 +74,19 @@ export function localToUtcIso(dateStr: string, timeStr: string, tz: string): str
   const utcMs = approx - offsetMs(approx - offsetMs(approx, tz), tz)
   const d = new Date(utcMs)
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}Z`
+  const iso = `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}Z`
+  // A spring-forward gap time converts to a different local time; reject it.
+  const back = utcToLocalParts(iso, tz)
+  return back && back.date === dateStr && back.time === norm ? iso : ''
+}
+
+// True when the local date + time is well-formed but doesn't exist in the
+// timezone, because clocks spring forward over it (e.g. 02:30 on the US DST start day).
+export function nonexistentLocalTime(dateStr: string, timeStr: string, tz: string): boolean {
+  if (!dateStr || !timeStr) return false
+  const norm = normTime(timeStr)
+  if (!/^\d{2}:\d{2}$/.test(norm) || isNaN(Date.parse(`${dateStr}T${norm}:00Z`))) return false
+  return localToUtcIso(dateStr, timeStr, tz) === ''
 }
 
 // Split a UTC ISO string into local date and time parts for editing.
@@ -81,6 +101,13 @@ export function utcToLocalParts(utcStr: string, tz: string): { date: string; tim
   const g    = (t: string) => pts.find(p => p.type === t)?.value ?? ''
   const hour = g('hour') === '24' ? '00' : g('hour')
   return { date: `${g('year')}-${g('month')}-${g('day')}`, time: `${hour}:${g('minute')}` }
+}
+
+// Explains why a typed local time can't be saved, or null if it's fine.
+export function localTimeHint(date: string, time: string, tz: string): string | null {
+  return nonexistentLocalTime(date, time, tz)
+    ? `${time} doesn't exist on ${date}: clocks spring forward over it. Use the time after the change.`
+    : null
 }
 
 // Calendar period boundaries (months, quarters, years) are defined in the

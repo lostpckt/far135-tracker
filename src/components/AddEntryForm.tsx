@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import LegRow, { type LegData } from '@/components/LegRow'
 import { SectionLabel } from '@/components/FormHelpers'
-import { uid, ms, parseHobbs, overlappingDuty } from '@/lib/calculations'
-import { localToUtcIso, tzAbbr } from '@/lib/timezone'
+import { uid, ms, parseHobbs, hobbsFlightTime, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { localToUtcIso, localTimeHint, utcToLocalParts, tzAbbr } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 const DRAFT_KEY = 'far135_v1_form_draft'
@@ -38,6 +38,8 @@ function emptyLeg(): LegData {
 }
 
 function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string; tz: string }) {
+  const hint = localTimeHint(dateStr, timeStr, tz)
+  if (hint) return <span className="text-[0.68rem] text-red-600">{hint}</span>
   const utc = localToUtcIso(dateStr, timeStr, tz)
   if (!utc) return null
   return <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>
@@ -49,7 +51,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
   const [tailNumber, setTailNumber] = useState(d?.tailNumber ?? '')
   const [entity, setEntity]         = useState(d?.entity ?? '')
   const [crew, setCrew]             = useState<'S' | 'D'>(d?.crew ?? 'S')
-  const [showDate, setShowDate]     = useState(d?.showDate ?? new Date().toLocaleDateString('en-CA'))
+  const [showDate, setShowDate]     = useState(d?.showDate ?? (utcToLocalParts(new Date().toISOString(), tz)?.date ?? ''))
   const [showTime, setShowTime]     = useState(d?.showTime ?? '')
   const [relDate, setRelDate]       = useState(d?.relDate ?? '')
   const [relTime, setRelTime]       = useState(d?.relTime ?? '')
@@ -74,6 +76,8 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     if (!tailNumber.trim()) { setErr('Aircraft tail number is required.'); return }
     if (!entity.trim()) { setErr('Entity is required for Part 135 flights.'); return }
 
+    const timeHint = localTimeHint(showDate, showTime, tz) ?? localTimeHint(relDate, relTime, tz)
+    if (timeHint) { setErr(timeHint); return }
     const show    = localToUtcIso(showDate, showTime, tz)
     const release = localToUtcIso(relDate, relTime, tz)
     if (!show)    { setErr('Show Time is required.'); return }
@@ -93,6 +97,11 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       if (onN <= offN) { setErr(`${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`); return }
       legData.push({ dep: leg.dep, arr: leg.arr, off: leg.offHobbs.trim(), on: leg.onHobbs.trim(), reason: leg.reason, part91: leg.part91 })
     }
+    const totalFlight = legData.reduce((sum, l) => sum + (hobbsFlightTime(parseHobbs(l.off), parseHobbs(l.on)) ?? 0), 0)
+    if (flightExceedsDuty(show, release, totalFlight)) {
+      setErr('Total flight time is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
+      return
+    }
 
     const newEntries: Entry[] = legData.map(leg => ({
       id: uid(), pilot: '', crew,
@@ -109,7 +118,8 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     resetForm()
   }
 
-  const abbr = tzAbbr(tz)
+  const abbr    = tzAbbr(tz, showDate)
+  const relAbbr = tzAbbr(tz, relDate || showDate)
 
   return (
     <Card>
@@ -166,7 +176,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Release Time ({abbr}) <span className="text-red-500">*</span></Label>
+            <Label className="text-xs font-semibold text-slate-500">Release Time ({relAbbr}) <span className="text-red-500">*</span></Label>
             <div className="flex gap-1.5">
               <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
               <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />

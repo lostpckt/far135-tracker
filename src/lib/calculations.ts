@@ -128,6 +128,16 @@ export function overlappingDuty(all: Entry[], show: string, release: string, exc
   })
 }
 
+/**
+ * True if a duty period's total flight time (all legs, Part 91 included) is
+ * longer than the duty period itself — always a data-entry error, usually a
+ * mistyped Hobbs reading.
+ */
+export function flightExceedsDuty(show: string, release: string, flightHrs: number): boolean {
+  const s = ms(show), r = ms(release)
+  return s !== null && r !== null && roundHrs(flightHrs) > (r - s) / HOUR
+}
+
 /** The rest gaps between consecutive duty periods, as [release, next show] ms. */
 function restGaps(periods: DutyPeriodSpan[]): [number, number][] {
   const gaps: [number, number][] = []
@@ -301,7 +311,8 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
   }
 }
 
-function flightHoursInWindow(entries: Entry[], start: number, end: number): number {
+/** Part 135 flight hours of legs released within [start, end). */
+export function flightHoursInWindow(entries: Entry[], start: number, end: number): number {
   return roundHrs(entries.reduce((sum, e) => {
     if (e.restDay || e.part91) return sum
     const anchor = ms(e.releaseTime) ?? ms(e.showTime)

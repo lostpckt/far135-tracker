@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-08 (4)
+
+### Fixed
+- **Times that don't exist on a daylight-saving change are refused** — on the day clocks spring forward, 02:00–02:59 never happens. Entering, say, 02:30 was quietly stored as 01:30, an hour off. The form now says the time doesn't exist and asks for the time after the change. (A time that happens twice when clocks fall back still uses the first one; the Zulu preview under the field shows which.)
+- **Timezone labels match the date being entered** — a December date now reads PST rather than today's PDT. Conversions were already correct; only the label was wrong.
+- **The Add Entry form's default date uses your selected timezone**, not the device's, so it can't be a day off around midnight when the two differ.
+- **A duty period whose flight time is longer than the duty period itself is refused** — this catches mistyped Hobbs readings, such as 8831.3 for 8381.3, in Add Entry and both edit dialogs. The duty-period edit also checks that every leg's Hobbs readings still make sense after you change the first or last reading.
+- **Dashboard "Active Violations" now includes look-back failures and counts duty periods**, not legs. One bad four-leg day counts once, not four times.
+- **"Next Legal Duty" now accounts for Part 91 duty** — it's the later of your last Part 135 release plus the required rest, and your last release of any duty (Part 91 included) plus 10 hours. Before, a Part 91 duty after your last Part 135 one was ignored, so the card could show "Legal" right after it.
+- **PDF reports now count look-back failures as violations** — they're listed in Violations Detail, scored in the scorecard, mark the day in the summary log, and have their own column in the full-detail log. Before, a failed look-back appeared nowhere in the report. Each violation is now also counted once per duty period instead of once per leg.
+- **Quarterly PDF reports check all three §135.267(a) limits** — the 800-hour two-quarter and 1,400-hour calendar-year limits are added alongside the 500-hour quarterly one. The yearly figure runs from January 1 through the end of the reported quarter. All three count your total Part 135 flying, even when the report is filtered to one entity, and going over any of them marks the report "REVIEW REQUIRED."
+
 ## 2026-10-08 (3)
 
 ### Changed
