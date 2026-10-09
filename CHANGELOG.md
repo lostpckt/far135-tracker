@@ -2,7 +2,13 @@
 
 ## 2026-10-09
 
+### Removed
+- **One-time timezone setup dialog** — the prompt that converted entries saved before the app switched to UTC timestamps. That conversion is long complete, and backups, restores and new installs already skipped it, so the dialog and its conversion code are gone. Stored data is unaffected.
+
 ### Fixed
+- **"Check for update" no longer says "Up to date" when it couldn't check** — offline, the check fails, but the app still waited and then reported "Up to date." It now says "Couldn't check for updates — are you online?"
+- **"Check for update" reports a slow download correctly** — the app used to wait 2.5 seconds for a new version to start downloading and then assume there wasn't one. On a slow connection you'd see "Up to date" followed by the update banner. It now asks the browser directly: "Downloading update…" while a new version is coming in (the banner takes over when it's ready), or "Up to date" right away when there's nothing new.
+- **The update watcher runs once** — the header and the update banner each started their own copy of the service-worker update watcher. One copy now runs and both share its result. No visible change.
 - **Flight Log "Duty OK?" no longer shows N/A on multi-leg days that end with a Part 91 leg** — the duty-period summary row took its 14-hour duty result from the day's last leg, and a Part 91 leg carries no Part 135 results. Mixed days ending in a Part 91 leg showed N/A, which would have hidden a duty day over 14 hours. It now uses the day's last Part 135 leg, as the rest and flight-limit columns already did. The dashboard and PDF report were not affected.
 - **Hours always display as valid minutes** — values are rounded to whole minutes before formatting, so an amount like 1.9999 hours shows "2h 00m" and can never show "1h 60m".
 

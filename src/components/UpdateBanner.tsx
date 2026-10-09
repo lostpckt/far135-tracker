@@ -1,9 +1,13 @@
-import { useRegisterSW } from 'virtual:pwa-register/react'
 import ChangelogModal from '@/components/ChangelogModal'
 
-export default function UpdateBanner() {
-  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW()
+interface Props {
+  needRefresh: boolean
+  onRefresh: () => void
+}
 
+// Shown when a new version has downloaded and is waiting. The service-worker
+// watcher (useRegisterSW) runs once, in App, and passes its state down.
+export default function UpdateBanner({ needRefresh, onRefresh }: Props) {
   if (!needRefresh) return null
 
   return (
@@ -15,7 +19,7 @@ export default function UpdateBanner() {
         </button>
       </ChangelogModal>
       <button
-        onClick={() => updateServiceWorker(true)}
+        onClick={onRefresh}
         className="rounded-lg bg-white text-blue-700 font-semibold px-3 py-1 hover:bg-blue-50 transition-colors"
       >
         Refresh

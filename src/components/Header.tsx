@@ -1,30 +1,30 @@
 import { useState, useRef, useEffect } from 'react'
 import { Moon, Sun, Globe, MoreVertical } from 'lucide-react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ChangelogModal from '@/components/ChangelogModal'
 import { TIMEZONES, tzAbbr } from '@/lib/timezone'
+import { checkForAppUpdate } from '@/lib/updateCheck'
 
 interface Props {
   dark: boolean
   onToggleDark: () => void
   tz: string
   onTzChange: (tz: string) => void
+  needRefresh: boolean   // a new version is downloaded and waiting (UpdateBanner shows it)
 }
 
-// How long to wait, after the update-check request itself resolves, for the
-// service worker to actually finish installing and flip `needRefresh` — before
-// concluding there's genuinely no update. reg.update() resolving only means the
-// check request completed, not that an update wasn't found.
-const UPDATE_SETTLE_MS = 2500
+type CheckPhase = 'idle' | 'checking' | 'downloading' | 'upToDate' | 'failed'
 
-type CheckPhase = 'idle' | 'checking' | 'settling' | 'upToDate'
+// How long a result message stays up, and the most we'll show "Downloading…"
+// before giving up on hearing back (the banner still appears whenever it's ready).
+const RESULT_MS       = 3000
+const DOWNLOAD_MAX_MS = 60000
 
-export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
-  const { needRefresh: [needRefresh] } = useRegisterSW()
+export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh }: Props) {
   const [phase, setPhase] = useState<CheckPhase>('idle')
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const phaseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -36,43 +36,48 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Resolves the "settling" phase once we know whether an update was actually
-  // found: if `needRefresh` flips true, hand off to UpdateBanner immediately;
-  // otherwise wait out the settle window before declaring "Up to date".
-  useEffect(() => {
-    if (needRefresh) { setPhase('idle'); return }
-    if (phase !== 'settling') return
-    const t = setTimeout(() => {
-      setPhase('upToDate')
-      setTimeout(() => setPhase('idle'), 3000)
-    }, UPDATE_SETTLE_MS)
-    return () => clearTimeout(t)
-  }, [phase, needRefresh])
+  useEffect(() => () => clearTimeout(phaseTimer.current), [])
+
+  // Show a phase, optionally returning to idle after `ms`.
+  function showPhase(p: CheckPhase, ms?: number) {
+    clearTimeout(phaseTimer.current)
+    setPhase(p)
+    if (ms) phaseTimer.current = setTimeout(() => setPhase('idle'), ms)
+  }
 
   async function checkForUpdate() {
-    setPhase('checking')
-    try {
-      const reg = await navigator.serviceWorker.getRegistration()
-      await reg?.update()
-    } finally {
-      setPhase('settling')
+    showPhase('checking')
+    const r = await checkForAppUpdate()
+    if (r.kind === 'downloading') {
+      // UpdateBanner takes over when the download finishes.
+      showPhase('downloading', DOWNLOAD_MAX_MS)
+      r.worker.addEventListener('statechange', () => {
+        if (r.worker.state === 'redundant') showPhase('failed', RESULT_MS)
+      })
+    } else if (r.kind === 'waiting') {
+      showPhase('idle')   // already downloaded; UpdateBanner is showing it
+    } else {
+      showPhase(r.kind, RESULT_MS)
     }
   }
 
-  const checking    = phase === 'checking' || phase === 'settling'
-  const checked     = phase === 'upToDate'
-  const checkLabel  = checking ? 'Checking…' : checked ? 'Up to date' : 'Check for update'
+  // Once an update is waiting, the banner speaks for it.
+  const shown      = needRefresh ? 'idle' : phase
+  const busy       = shown === 'checking' || shown === 'downloading'
+  const checkLabel = { idle: 'Check for update', checking: 'Checking…', downloading: 'Downloading…', upToDate: 'Up to date', failed: "Couldn't check" }[shown]
+  const toast      = {
+    idle: null,
+    checking: 'Checking for update…',
+    downloading: 'Downloading update…',
+    upToDate: <><span className="text-green-400">✓</span> Up to date</>,
+    failed: "Couldn't check for updates — are you online?",
+  }[shown]
 
   return (
     <>
-    {checking && (
+    {toast && (
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-3 shadow-lg text-white text-sm font-medium pointer-events-none select-none">
-        Checking for update…
-      </div>
-    )}
-    {checked && !needRefresh && (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-3 shadow-lg text-white text-sm font-medium pointer-events-none select-none">
-        <span className="text-green-400">✓</span> Up to date
+        {toast}
       </div>
     )}
     <header className="bg-slate-900 text-white px-6 py-3.5 flex items-center gap-3">
@@ -107,7 +112,7 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
       </ChangelogModal>
       <button
         onClick={checkForUpdate}
-        disabled={checking}
+        disabled={busy}
         className="hidden lg:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 disabled:cursor-wait w-[118px] text-center shrink-0"
       >
         {checkLabel}
@@ -142,7 +147,7 @@ export default function Header({ dark, onToggleDark, tz, onTzChange }: Props) {
             </ChangelogModal>
             <button
               onClick={() => { checkForUpdate(); setMenuOpen(false) }}
-              disabled={checking}
+              disabled={busy}
               className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors disabled:cursor-wait opacity-80"
             >
               {checkLabel}

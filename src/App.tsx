@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { loadEntries, saveEntries } from '@/lib/storage'
 import { ms, exportCSV, importCSV, type SkippedRow } from '@/lib/calculations'
-import { loadTz, saveTz, isMigrated, setMigrated } from '@/lib/timezone'
+import { loadTz, saveTz } from '@/lib/timezone'
 import { downloadBackup, parseBackup, lastBackupMs, recordRestoredBackup, requestPersistentStorage, type ParsedBackup } from '@/lib/backup'
 import type { Entry } from '@/types/entry'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -17,11 +18,13 @@ import HowToUse from '@/components/HowToUse'
 import UpdateBanner from '@/components/UpdateBanner'
 import InstallBanner from '@/components/InstallBanner'
 import BackupReminder from '@/components/BackupReminder'
-import TzMigrationDialog from '@/components/TzMigrationDialog'
 import RunReportDialog from '@/components/RunReportDialog'
 
 export default function App() {
   const [entries, setEntries] = useState<Entry[]>(loadEntries)
+  // The one service-worker watcher: a new version waiting → UpdateBanner; Header's
+  // "Check for update" also reads it. (Each useRegisterSW call registers its own watcher.)
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW()
   const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
   const [editingDuty, setEditingDuty]     = useState<Entry[] | null>(null)
   const [showRunReport, setShowRunReport] = useState(false)
@@ -67,20 +70,11 @@ export default function App() {
   function confirmRestore(r: ParsedBackup) {
     updateEntries(r.entries)
     if (r.tz) handleTzChange(r.tz)
-    // Backup entries are already stored in UTC — never offer the legacy tz migration on them.
-    setMigrated()
-    setShowMigration(false)
     setLastBackup(recordRestoredBackup(r.exportedAt))
     setPendingRestore(null)
   }
   const [dark, setDark]                   = useState(() => localStorage.getItem('far135_theme') === 'dark')
   const [tz, setTz]                       = useState(loadTz)
-  const [showMigration, setShowMigration] = useState(() => {
-    if (isMigrated()) return false
-    // No existing entries — nothing to migrate, mark done automatically.
-    if (loadEntries().length === 0) { setMigrated(); return false }
-    return true
-  })
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -100,16 +94,9 @@ export default function App() {
     saveTz(newTz)
   }
 
-  function handleMigrationComplete(migratedEntries: Entry[], chosenTz: string) {
-    updateEntries(migratedEntries)
-    handleTzChange(chosenTz)
-    setMigrated()
-    setShowMigration(false)
-  }
-
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950">
-      <Header dark={dark} onToggleDark={() => setDark(d => !d)} tz={tz} onTzChange={handleTzChange} />
+      <Header dark={dark} onToggleDark={() => setDark(d => !d)} tz={tz} onTzChange={handleTzChange} needRefresh={needRefresh} />
       <div className="max-w-screen-2xl mx-auto p-5 space-y-5">
         <InstallBanner />
         <BackupReminder entryCount={entries.length} lastBackup={lastBackup} onBackup={handleBackup} />
@@ -187,7 +174,7 @@ export default function App() {
         </div>
       </div>
 
-      <UpdateBanner />
+      <UpdateBanner needRefresh={needRefresh} onRefresh={() => updateServiceWorker(true)} />
 
       {/* Import confirmation */}
       <Dialog open={!!pendingImport} onOpenChange={open => { if (!open) setPendingImport(null) }}>
@@ -291,9 +278,6 @@ export default function App() {
         tz={tz}
       />
 
-      {showMigration && (
-        <TzMigrationDialog entries={entries} onComplete={handleMigrationComplete} />
-      )}
 
       {editingDuty && (
         <DutyEditModal
