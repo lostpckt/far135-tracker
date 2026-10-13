@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-13 (2)
+
+### Added
+- **Show Time and Release Time each have their own timezone** — a globe dropdown after each time picks the zone the clock read in, so a duty that starts at 16:00 PDT and ends at 20:50 MDT is entered as-is, with no converting. Both start on your device's current timezone, which phones update automatically when you change zones, and both reset to it after each entry. The Zulu preview under each time shows what will be saved. The edit dialogs have the same dropdowns.
+- **Each time displays in the zone it was entered in** — the Flight Log and PDF reports show, for example, "16:00 PDT" and "20:50 MDT" on the same duty day. Calculations are unchanged: every time is still stored and compared in Zulu. Entries saved before this update have no zone of their own and display in the header timezone. Backups and CSV export carry each time's zone (new "Show TZ" / "Release TZ" CSV columns).
+
+### Changed
+- **The header timezone is now your home timezone** — it sets where months, quarters and years begin for the period limits, rest-period counts and reports, and shows the dashboard and older entries.
+- **The Regulatory Reference note no longer says to pick one timezone and stick with it**, and "How to use this tool" explains the per-time dropdowns.
+
 ## 2026-10-13
 
 ### Changed

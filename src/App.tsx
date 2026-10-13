@@ -103,7 +103,7 @@ export default function App() {
         <RegNote />
         <HowToUse />
         <Dashboard entries={entries} tz={tz} />
-        <AddEntryForm entries={entries} onAdd={updateEntries} tz={tz} />
+        <AddEntryForm entries={entries} onAdd={updateEntries} />
         <FlightLog
           entries={entries}
           tz={tz}

@@ -390,7 +390,7 @@ export function exportCSV(entries: Entry[]): void {
     'Max Allowed (h)', 'Flight Limit Basis', 'Flight Time OK', 'Duty Period (h)', 'Duty OK',
     '10-hr Lookback OK', 'Consecutive Rest (h)', 'Required Rest (h)',
     'Rest OK', 'Exceedance (h)', 'Exceedance Reason',
-    'Rest Start', 'Rest End', 'Part 135',
+    'Rest Start', 'Rest End', 'Part 135', 'Show TZ', 'Release TZ',
   ].join(',')
 
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
@@ -423,6 +423,7 @@ export function exportCSV(entries: Entry[]): void {
       q(e.reason || ''),
       q(restEnd ? e.releaseTime : ''), q(restEnd),
       q(e.part91 ? '' : 'True'),
+      q(e.showTz || ''), q(e.releaseTz || ''),
     ].join(',')
   })
 
@@ -454,6 +455,12 @@ function parseCSVRow(line: string): string[] {
   return fields
 }
 
+// A timezone name the browser recognizes, or undefined.
+function validTz(z: string): string | undefined {
+  if (!z) return undefined
+  try { new Intl.DateTimeFormat('en-US', { timeZone: z }); return z } catch { return undefined }
+}
+
 export interface SkippedRow { line: number; reason: string }
 
 export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow[] } | { error: string } {
@@ -478,6 +485,8 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
   const reasonIdx   = idx('Exceedance Reason')
   const restDayIdx  = idx('24-hr Rest Day')   // legacy column in older exports
   const part135Idx  = idx('Part 135')
+  const showTzIdx   = idx('Show TZ')
+  const relTzIdx    = idx('Release TZ')
   // Rest Start / Rest End columns are ignored: rest is derived from release
   // and the next show time.
 
@@ -517,6 +526,8 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
       entity:      get(row, entityIdx).trim() || undefined,
       showTime,
       releaseTime: get(row, releaseIdx).trim() || '',
+      showTz:      validTz(get(row, showTzIdx).trim()),
+      releaseTz:   validTz(get(row, relTzIdx).trim()),
       dep,
       arr,
       offBlocks,

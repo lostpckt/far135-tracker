@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
-import { localToUtcIso, localTimeHint, tzAbbr, splitForEdit } from '@/lib/timezone'
+import { localToUtcIso, localTimeHint, splitForEdit } from '@/lib/timezone'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
 
@@ -20,8 +20,11 @@ interface Props {
 
 export default function EditModal({ entry, entries, tz, onSave, onClose }: Props) {
   // State initialized from props on mount. Parent uses key={entry.id} to remount on entry change.
-  const s  = splitForEdit(entry.showTime,    tz)
-  const r  = splitForEdit(entry.releaseTime, tz)
+  // Each time edits in the zone it was entered in (header zone for older entries).
+  const [showTz, setShowTz] = useState(entry.showTz ?? tz)
+  const [relTz, setRelTz]   = useState(entry.releaseTz ?? tz)
+  const s  = splitForEdit(entry.showTime,    showTz)
+  const r  = splitForEdit(entry.releaseTime, relTz)
 
   const [tailNumber, setTailNumber]   = useState(entry.tailNumber || '')
   const [entity, setEntity]           = useState(entry.entity || '')
@@ -51,10 +54,10 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
     if (!offHobbs.trim() || !onHobbs.trim()) { setErr('Off Blocks and On Blocks Hobbs readings are required.'); return }
     if (offN === null || onN === null) { setErr('Hobbs readings must be in tenths of an hour, e.g. 12345.6.'); return }
     if (onN <= offN) { setErr('On Blocks Hobbs must be greater than Off Blocks Hobbs.'); return }
-    const timeHint = localTimeHint(showDate, showTime, tz) ?? localTimeHint(relDate, relTime, tz)
+    const timeHint = localTimeHint(showDate, showTime, showTz) ?? localTimeHint(relDate, relTime, relTz)
     if (timeHint) { setErr(timeHint); return }
-    const show    = localToUtcIso(showDate, showTime, tz)
-    const release = localToUtcIso(relDate, relTime, tz)
+    const show    = localToUtcIso(showDate, showTime, showTz)
+    const release = localToUtcIso(relDate, relTime, relTz)
     if (!show)    { setErr('Show Time is required.'); return }
     if (!release) { setErr('Release Time is required.'); return }
     if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
@@ -79,6 +82,8 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
       entity: entity.trim() || undefined,
       showTime:    show,
       releaseTime: release,
+      showTz,
+      releaseTz:   relTz,
       dep:         dep.toUpperCase().trim(),
       arr:         arr.toUpperCase().trim(),
       offBlocks:   fmtHobbs(offHobbs),
@@ -87,8 +92,6 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
       part91,
     })
   }
-
-  const abbr = tzAbbr(tz, showDate)
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
@@ -121,9 +124,9 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
             </div>
           </div>
 
-          <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
-          <DTField label="Show Time"    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={tz} required />
-          <DTField label="Release Time" date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={tz} required />
+          <SectionLabel>Duty Period</SectionLabel>
+          <DTField label="Show Time"    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={showTz} onTz={setShowTz} required />
+          <DTField label="Release Time" date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={relTz}  onTz={setRelTz}  required />
 
           <SectionLabel>Flight Leg</SectionLabel>
           <div className="flex flex-col gap-1">

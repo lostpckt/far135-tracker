@@ -6,6 +6,11 @@ export interface Entry {
   entity?: string       // Operating certificate holder / air carrier name
   showTime: string      // UTC ISO, e.g. "2026-05-15T03:15Z"
   releaseTime: string
+  // IANA zone each time was entered in (e.g. "America/Denver"). Display only:
+  // calculations use the UTC times. Absent on entries saved before 2026-10-13,
+  // which display in the header timezone.
+  showTz?: string
+  releaseTz?: string
   dep: string
   arr: string
   offBlocks: string     // Hobbs reading in tenths, e.g. "12345.6" (older entries may lack the ".0")

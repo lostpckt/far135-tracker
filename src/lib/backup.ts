@@ -30,7 +30,7 @@ export function buildBackup(entries: Entry[], tz: string): BackupFile {
 }
 
 const STRING_FIELDS = ['id', 'pilot', 'showTime', 'releaseTime', 'dep', 'arr', 'offBlocks', 'onBlocks', 'restStart', 'restEnd', 'reason'] as const
-const OPTIONAL_STRING_FIELDS = ['tailNumber', 'entity', 'restDayEnd'] as const
+const OPTIONAL_STRING_FIELDS = ['tailNumber', 'entity', 'showTz', 'releaseTz', 'restDayEnd'] as const
 
 // Returns a description of what's wrong with the entry, or null if it's valid.
 function entryProblem(e: unknown): string | null {

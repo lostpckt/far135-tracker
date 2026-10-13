@@ -231,8 +231,8 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                         : null
                       return (
                         <tr key={e.id} className={e.part91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtLocalDT(e.showTime, tz)}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtLocalDT(e.releaseTime, tz) : <span className="text-slate-400">—</span>}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtLocalDT(e.showTime, e.showTz ?? tz)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtLocalDT(e.releaseTime, e.releaseTz ?? tz) : <span className="text-slate-400">—</span>}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.crew === 'D' ? 'Dual' : 'Single'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}{p91Badge}
@@ -299,11 +299,11 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                               >
                                 {isDutyExpanded ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
                               </button>
-                              {fmtLocalDT(legs[0].showTime, tz)}
+                              {fmtLocalDT(legs[0].showTime, legs[0].showTz ?? tz)}
                             </div>
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {legs[0].releaseTime ? fmtLocalDT(legs[0].releaseTime, tz) : <span className="text-slate-400">—</span>}
+                            {legs[0].releaseTime ? fmtLocalDT(legs[0].releaseTime, legs[0].releaseTz ?? tz) : <span className="text-slate-400">—</span>}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {legs[0].crew === 'D' ? 'Dual' : 'Single'}

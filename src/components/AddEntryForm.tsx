@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import LegRow, { type LegData } from '@/components/LegRow'
-import { SectionLabel } from '@/components/FormHelpers'
+import { SectionLabel, TzSelect } from '@/components/FormHelpers'
 import { uid, ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
-import { localToUtcIso, localTimeHint, utcToLocalParts, tzAbbr } from '@/lib/timezone'
+import { localToUtcIso, localTimeHint, utcToLocalParts, deviceTz } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 const DRAFT_KEY = 'far135_v1_form_draft'
@@ -20,6 +20,8 @@ interface DraftState {
   showTime: string
   relDate: string
   relTime: string
+  showTz?: string
+  relTz?: string
   legs: LegData[]
 }
 
@@ -30,7 +32,6 @@ function readDraft(): DraftState | null {
 interface Props {
   entries: Entry[]
   onAdd: (updated: Entry[]) => void
-  tz: string
 }
 
 function emptyLeg(): LegData {
@@ -45,13 +46,17 @@ function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string
   return <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>
 }
 
-export default function AddEntryForm({ entries, onAdd, tz }: Props) {
+export default function AddEntryForm({ entries, onAdd }: Props) {
   const d = readDraft()
+  // Show and Release each have their own zone, defaulting to the device's, so
+  // a duty that starts in PDT and ends in MDT is entered as the clocks read.
+  const [showTz, setShowTz] = useState(() => d?.showTz ?? deviceTz())
+  const [relTz, setRelTz]   = useState(() => d?.relTz ?? deviceTz())
 
   const [tailNumber, setTailNumber] = useState(d?.tailNumber ?? '')
   const [entity, setEntity]         = useState(d?.entity ?? '')
   const [crew, setCrew]             = useState<'S' | 'D'>(d?.crew ?? 'S')
-  const [showDate, setShowDate]     = useState(d?.showDate ?? (utcToLocalParts(new Date().toISOString(), tz)?.date ?? ''))
+  const [showDate, setShowDate]     = useState(d?.showDate ?? (utcToLocalParts(new Date().toISOString(), showTz)?.date ?? ''))
   const [showTime, setShowTime]     = useState(d?.showTime ?? '')
   const [relDate, setRelDate]       = useState(d?.relDate ?? '')
   const [relTime, setRelTime]       = useState(d?.relTime ?? '')
@@ -60,12 +65,13 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, legs }))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, showTz, relTz, legs }))
     } catch { /* localStorage unavailable */ }
-  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, legs])
+  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, showTz, relTz, legs])
 
   function resetForm() {
     setTailNumber(''); setEntity(''); setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
+    setShowTz(deviceTz()); setRelTz(deviceTz())
     setLegs([emptyLeg()]); setErr('')
     try { localStorage.removeItem(DRAFT_KEY) } catch { /* localStorage unavailable */ }
   }
@@ -76,10 +82,10 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     if (!tailNumber.trim()) { setErr('Aircraft tail number is required.'); return }
     if (!entity.trim()) { setErr('Entity is required for Part 135 flights.'); return }
 
-    const timeHint = localTimeHint(showDate, showTime, tz) ?? localTimeHint(relDate, relTime, tz)
+    const timeHint = localTimeHint(showDate, showTime, showTz) ?? localTimeHint(relDate, relTime, relTz)
     if (timeHint) { setErr(timeHint); return }
-    const show    = localToUtcIso(showDate, showTime, tz)
-    const release = localToUtcIso(relDate, relTime, tz)
+    const show    = localToUtcIso(showDate, showTime, showTz)
+    const release = localToUtcIso(relDate, relTime, relTz)
     if (!show)    { setErr('Show Time is required.'); return }
     if (!release) { setErr('Release Time is required.'); return }
     if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
@@ -108,7 +114,7 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
       id: uid(), pilot: '', crew,
       tailNumber: tailNumber.trim() || undefined,
       entity: entity.trim() || undefined,
-      showTime: show, releaseTime: release,
+      showTime: show, releaseTime: release, showTz, releaseTz: relTz,
       dep: leg.dep, arr: leg.arr,
       offBlocks: leg.off, onBlocks: leg.on,
       restStart: '', restEnd: '',
@@ -119,8 +125,6 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
     resetForm()
   }
 
-  const abbr    = tzAbbr(tz, showDate)
-  const relAbbr = tzAbbr(tz, relDate || showDate)
 
   return (
     <Card>
@@ -164,25 +168,27 @@ export default function AddEntryForm({ entries, onAdd, tz }: Props) {
             </div>
           </div>
 
-          <SectionLabel>Duty Period — enter times in {abbr}</SectionLabel>
+          <SectionLabel>Duty Period</SectionLabel>
 
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Show Time ({abbr}) <span className="text-red-500">*</span></Label>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <Label className="text-xs font-semibold text-slate-500">Show Time <span className="text-red-500">*</span></Label>
             <div className="flex gap-1.5">
               <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
               <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
+              <TzSelect tz={showTz} date={showDate} onChange={setShowTz} />
             </div>
-            <UtcPreview dateStr={showDate} timeStr={showTime} tz={tz} />
+            <UtcPreview dateStr={showDate} timeStr={showTime} tz={showTz} />
             <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs font-semibold text-slate-500">Release Time ({relAbbr}) <span className="text-red-500">*</span></Label>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <Label className="text-xs font-semibold text-slate-500">Release Time <span className="text-red-500">*</span></Label>
             <div className="flex gap-1.5">
               <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
               <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
+              <TzSelect tz={relTz} date={relDate || showDate} onChange={setRelTz} />
             </div>
-            <UtcPreview dateStr={relDate} timeStr={relTime} tz={tz} />
+            <UtcPreview dateStr={relDate} timeStr={relTime} tz={relTz} />
             <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr). Rest runs from here to your next Show Time.</span>
           </div>
 

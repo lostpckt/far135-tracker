@@ -13,6 +13,23 @@ export const TIMEZONES = [
 
 const TZ_KEY = 'far135_tz'
 
+// The device's current timezone. Phones update it automatically when they
+// change zones, so it's the default for new Show/Release times.
+export function deviceTz(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
+// TIMEZONES plus any extra zones (the device's, or one saved on an entry) that
+// aren't in it, labeled by city, e.g. "Boise".
+export function tzOptions(...extra: (string | undefined)[]): { value: string; label: string }[] {
+  const opts = [...TIMEZONES]
+  for (const z of extra) {
+    if (!z || opts.some(o => o.value === z)) continue
+    opts.push({ value: z, label: (z.split('/').pop() ?? z).replace(/_/g, ' ') })
+  }
+  return opts
+}
+
 export function loadTz(): string {
   return localStorage.getItem(TZ_KEY) || Intl.DateTimeFormat().resolvedOptions().timeZone
 }

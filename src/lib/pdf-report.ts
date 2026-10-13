@@ -20,6 +20,13 @@ function entryLocalDate(e: Entry, tz?: string): string {
   return e.showTime.split('T')[0] ?? ''
 }
 
+// The zone a time was entered in; entries saved before per-time zones use the
+// report's timezone.
+const showZone    = (e: Entry, tz?: string) => e.showTz ?? tz
+const releaseZone = (e: Entry, tz?: string) => e.releaseTz ?? tz
+// Release time with its zone, falling back to show time when there's no release.
+const anchorWhen  = (e: Entry, tz?: string) => e.releaseTime ? fmtWhen(e.releaseTime, releaseZone(e, tz)) : fmtWhen(e.showTime, showZone(e, tz))
+
 // Date and time in the selected timezone with its zone label, e.g. "05/14 20:15 PDT".
 function fmtWhen(dt: string | undefined, tz?: string): string {
   return tz ? fmtLocalDT(dt, tz) : fmtDT(dt)
@@ -84,7 +91,7 @@ function buildData(
   exceedances: { date: string; route: string; over: string; reason: string; reqRest: number }[]
   sorted: Entry[]
   computed: Map<string, ReturnType<typeof compute>>
-  dayMap: Map<string, { p135: number; p91: number; showTime: string; releaseTime: string; hasViolation: boolean }>
+  dayMap: Map<string, { p135: number; p91: number; showTime: string; showTz?: string; releaseTime: string; releaseTz?: string; hasViolation: boolean }>
 } {
   const { periodEntries, restDays } = d
   const flightLegs  = periodEntries
@@ -109,11 +116,11 @@ function buildData(
     const c = computed.get(e.id)!
     totalTenths += legTenths(e)
     if (e.part91) continue
-    if (c.flightOk   === false) flag('flight',   e, { date: fmtWhen(e.releaseTime || e.showTime, tz), type: 'Flight Time Exceeded',    detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h; duty period did not qualify under Sec. 135.267(c))` })
-    if (c.dutyOk     === false) flag('duty',     e, { date: fmtWhen(e.showTime, tz),                  type: 'Duty Period Exceeded',    detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
-    if (c.restOk     === false) flag('rest',     e, { date: fmtWhen(e.releaseTime, tz),               type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` })
-    if (c.lookbackOk === false) flag('lookback', e, { date: fmtWhen(e.releaseTime || e.showTime, tz), type: '10-hr Look-Back Not Met', detail: 'Less than 10 consecutive hours of rest in the 24 hours before release' })
-    if (c.excAmt > 0) exceedances.push({ date: fmtWhen(e.releaseTime || e.showTime, tz), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
+    if (c.flightOk   === false) flag('flight',   e, { date: anchorWhen(e, tz), type: 'Flight Time Exceeded',    detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h; duty period did not qualify under Sec. 135.267(c))` })
+    if (c.dutyOk     === false) flag('duty',     e, { date: fmtWhen(e.showTime, showZone(e, tz)),    type: 'Duty Period Exceeded',    detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
+    if (c.restOk     === false) flag('rest',     e, { date: fmtWhen(e.releaseTime, releaseZone(e, tz)), type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` })
+    if (c.lookbackOk === false) flag('lookback', e, { date: anchorWhen(e, tz), type: '10-hr Look-Back Not Met', detail: 'Less than 10 consecutive hours of rest in the 24 hours before release' })
+    if (c.excAmt > 0) exceedances.push({ date: anchorWhen(e, tz), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
   }
 
   const totalViolations = fails.flight + fails.duty + fails.rest + fails.lookback
@@ -132,13 +139,13 @@ function buildData(
   const sorted = [...periodEntries].sort((a, b) => (ms(a.showTime) ?? 0) - (ms(b.showTime) ?? 0))
 
   // Day totals in tenths.
-  const dayMap = new Map<string, { p135: number; p91: number; showTime: string; releaseTime: string; hasViolation: boolean }>()
+  const dayMap = new Map<string, { p135: number; p91: number; showTime: string; showTz?: string; releaseTime: string; releaseTz?: string; hasViolation: boolean }>()
   for (const e of periodEntries) {
-    const dk = entryLocalDate(e, tz)
+    const dk = entryLocalDate(e, showZone(e, tz))
     if (!dk) continue
-    if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, showTime: e.showTime ?? '', releaseTime: e.releaseTime ?? '', hasViolation: false })
+    if (!dayMap.has(dk)) dayMap.set(dk, { p135: 0, p91: 0, showTime: e.showTime ?? '', showTz: showZone(e, tz), releaseTime: e.releaseTime ?? '', releaseTz: releaseZone(e, tz), hasViolation: false })
     const dd = dayMap.get(dk)!
-    if (e.releaseTime && e.releaseTime > dd.releaseTime) dd.releaseTime = e.releaseTime
+    if (e.releaseTime && e.releaseTime > dd.releaseTime) { dd.releaseTime = e.releaseTime; dd.releaseTz = releaseZone(e, tz) }
     const ft = legTenths(e)
     if (e.part91) { dd.p91 += ft } else {
       dd.p135 += ft
@@ -240,12 +247,12 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
     const seenDates = new Set<string>()
     const rows: (string | SpanCell)[][] = []
     for (const e of r.sorted) {
-      const dk = entryLocalDate(e, tz)
+      const dk = entryLocalDate(e, showZone(e, tz))
       if (!dk || seenDates.has(dk)) continue
       seenDates.add(dk)
       const dd = r.dayMap.get(dk)
       if (!dd) continue
-      rows.push([dk, fmtTime(dd.showTime, tz), fmtTime(dd.releaseTime, tz), dd.p135 > 0 ? fmtFlight(tenthsToHrs(dd.p135)).replace(/h$/, '') : '—', dd.p91 > 0 ? fmtFlight(tenthsToHrs(dd.p91)).replace(/h$/, '') : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
+      rows.push([dk, fmtTime(dd.showTime, dd.showTz), fmtTime(dd.releaseTime, dd.releaseTz), dd.p135 > 0 ? fmtFlight(tenthsToHrs(dd.p135)).replace(/h$/, '') : '—', dd.p91 > 0 ? fmtFlight(tenthsToHrs(dd.p91)).replace(/h$/, '') : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
     }
     return rows
   }
@@ -256,7 +263,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
       const c = r.computed.get(e.id)!
       if (e.part91) {
         rows.push([
-          fmtWhen(e.showTime, tz), e.crew === 'D' ? 'Dual' : 'Single',
+          fmtWhen(e.showTime, showZone(e, tz)), e.crew === 'D' ? 'Dual' : 'Single',
           `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
           fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight).replace(/h$/, ''),
           { content: 'Part 91 — Excluded from Sec. 135.267 limits', colSpan: 8, styles: { halign: 'left' as const } },
@@ -264,7 +271,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
         continue
       }
       rows.push([
-        fmtWhen(e.showTime, tz), e.crew === 'D' ? 'Dual' : 'Single',
+        fmtWhen(e.showTime, showZone(e, tz)), e.crew === 'D' ? 'Dual' : 'Single',
         `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
         fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight).replace(/h$/, ''),
         c.cQualifies ? `${fmtHrs(c.dutyFlight)} / ${c.maxFlight}h (c)`

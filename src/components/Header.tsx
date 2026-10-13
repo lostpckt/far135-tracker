@@ -88,7 +88,7 @@ export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh
         </p>
       </div>
 
-      <div className="flex items-center gap-1.5 border border-slate-600 rounded-md px-2 py-1 shrink-0" title="Input timezone — times are stored as UTC">
+      <div className="flex items-center gap-1.5 border border-slate-600 rounded-md px-2 py-1 shrink-0" title="Home timezone — sets where months and quarters begin, and shows the dashboard and older entries">
         <Globe size={13} className="opacity-50 shrink-0" />
         <Select value={tz} onValueChange={onTzChange}>
           <SelectTrigger className="border-0 bg-transparent text-white text-xs h-auto p-0 gap-1 focus:ring-0 shadow-none w-auto min-w-0">
