@@ -92,6 +92,26 @@ export function utcToLocalParts(utcStr: string, tz: string): { date: string; tim
   return { date: `${g('year')}-${g('month')}-${g('day')}`, time: `${hour}:${g('minute')}` }
 }
 
+// Display a stored UTC timestamp in the selected timezone, e.g. "10/13 08:15 PDT".
+// The zone label is taken at that instant, so a winter entry reads PST. Display
+// only; stored values and calculations stay in UTC.
+export function fmtLocalDT(utcStr: string | undefined | null, tz: string): string {
+  if (!utcStr) return '—'
+  const d = new Date(utcStr)
+  if (isNaN(d.getTime())) return '—'
+  if (tz === 'UTC') {
+    const p = utcToLocalParts(utcStr, tz)!
+    return `${p.date.slice(5, 7)}/${p.date.slice(8)} ${p.time}Z`
+  }
+  const pts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23', timeZoneName: 'short',
+  }).formatToParts(d)
+  const g    = (t: string) => pts.find(p => p.type === t)?.value ?? ''
+  const hour = g('hour') === '24' ? '00' : g('hour')
+  return `${g('month')}/${g('day')} ${hour}:${g('minute')} ${g('timeZoneName')}`
+}
+
 // Explains why a typed local time can't be saved, or null if it's fine.
 export function localTimeHint(date: string, time: string, tz: string): string | null {
   return nonexistentLocalTime(date, time, tz)

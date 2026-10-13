@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
-import { compute, computeDutyPeriod, fmtDT, fmtHobbs, fmtHrs, restPeriodsInWindow } from '@/lib/calculations'
-import { utcToLocalParts, localYearMonth, monthStartMs } from '@/lib/timezone'
+import { compute, computeDutyPeriod, fmtHobbs, fmtHrs, fmtFlight, restPeriodsInWindow } from '@/lib/calculations'
+import { utcToLocalParts, localYearMonth, monthStartMs, fmtLocalDT } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 interface Props {
@@ -231,8 +231,8 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                         : null
                       return (
                         <tr key={e.id} className={e.part91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtDT(e.showTime)}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtDT(e.releaseTime) : <span className="text-slate-400">—</span>}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtLocalDT(e.showTime, tz)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtLocalDT(e.releaseTime, tz) : <span className="text-slate-400">—</span>}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.crew === 'D' ? 'Dual' : 'Single'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}{p91Badge}
@@ -240,7 +240,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.offBlocks) || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.onBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(c.legFlight)}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {e.part91
                               ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
@@ -299,11 +299,11 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                               >
                                 {isDutyExpanded ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
                               </button>
-                              {fmtDT(legs[0].showTime)}
+                              {fmtLocalDT(legs[0].showTime, tz)}
                             </div>
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {legs[0].releaseTime ? fmtDT(legs[0].releaseTime) : <span className="text-slate-400">—</span>}
+                            {legs[0].releaseTime ? fmtLocalDT(legs[0].releaseTime, tz) : <span className="text-slate-400">—</span>}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {legs[0].crew === 'D' ? 'Dual' : 'Single'}
@@ -316,7 +316,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[0].offBlocks) || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[legs.length - 1].onBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(totalFlight)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(totalFlight)}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {allPart91
                               ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
@@ -370,7 +370,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                               </td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.offBlocks) || '—'}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.onBlocks) || '—'}</td>
-                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtHrs(c.legFlight)}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(c.legFlight)}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                                 {e.part91
                                   ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>

@@ -27,6 +27,12 @@ export function fmtHrs(h: number | null | undefined): string {
   return `${hh}h ${String(mm).padStart(2, '0')}m`
 }
 
+/** Flight time in decimal hours as read off the Hobbs, e.g. 2.3 → "2.3h". */
+export function fmtFlight(h: number | null | undefined): string {
+  if (h === null || h === undefined || isNaN(h)) return '—'
+  return `${h.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h`
+}
+
 export function fmtDT(dtStr: string | undefined | null): string {
   if (!dtStr) return '—'
   const d = new Date(dtStr)

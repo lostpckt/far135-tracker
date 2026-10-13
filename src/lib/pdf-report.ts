@@ -2,10 +2,10 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Entry } from '@/types/entry'
 import {
-  ms, fmtHrs, fmtDT, fmtHobbs, legTenths, tenthsToHrs, compute, restPeriodsInWindow,
+  ms, fmtHrs, fmtFlight, fmtDT, fmtHobbs, legTenths, tenthsToHrs, compute, restPeriodsInWindow,
   quarterFlightHours, twoQuarterFlightHours, flightHoursInWindow,
 } from '@/lib/calculations'
-import { utcToLocalParts, monthStartMs } from '@/lib/timezone'
+import { utcToLocalParts, monthStartMs, fmtLocalDT } from '@/lib/timezone'
 
 export type LogDetail = 'summary' | 'full' | 'both'
 
@@ -20,9 +20,15 @@ function entryLocalDate(e: Entry, tz?: string): string {
   return e.showTime.split('T')[0] ?? ''
 }
 
+// Date and time in the selected timezone with its zone label, e.g. "05/14 20:15 PDT".
+function fmtWhen(dt: string | undefined, tz?: string): string {
+  return tz ? fmtLocalDT(dt, tz) : fmtDT(dt)
+}
+
+// Time only, e.g. "20:15 PDT" (the summary log shows the date in its own column).
 function fmtTime(dt: string, tz?: string): string {
   if (!dt) return '—'
-  if (dt.endsWith('Z') && tz) return utcToLocalParts(dt, tz)?.time ?? dt.slice(11, 16)
+  if (dt.endsWith('Z') && tz) return fmtLocalDT(dt, tz).slice(6)
   return dt.slice(11, 16) || '—'
 }
 
@@ -103,11 +109,11 @@ function buildData(
     const c = computed.get(e.id)!
     totalTenths += legTenths(e)
     if (e.part91) continue
-    if (c.flightOk   === false) flag('flight',   e, { date: fmtDT(e.releaseTime || e.showTime), type: 'Flight Time Exceeded',    detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h; duty period did not qualify under Sec. 135.267(c))` })
-    if (c.dutyOk     === false) flag('duty',     e, { date: fmtDT(e.showTime),                  type: 'Duty Period Exceeded',    detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
-    if (c.restOk     === false) flag('rest',     e, { date: fmtDT(e.releaseTime),               type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` })
-    if (c.lookbackOk === false) flag('lookback', e, { date: fmtDT(e.releaseTime || e.showTime), type: '10-hr Look-Back Not Met', detail: 'Less than 10 consecutive hours of rest in the 24 hours before release' })
-    if (c.excAmt > 0) exceedances.push({ date: fmtDT(e.releaseTime || e.showTime), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
+    if (c.flightOk   === false) flag('flight',   e, { date: fmtWhen(e.releaseTime || e.showTime, tz), type: 'Flight Time Exceeded',    detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h; duty period did not qualify under Sec. 135.267(c))` })
+    if (c.dutyOk     === false) flag('duty',     e, { date: fmtWhen(e.showTime, tz),                  type: 'Duty Period Exceeded',    detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
+    if (c.restOk     === false) flag('rest',     e, { date: fmtWhen(e.releaseTime, tz),               type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` })
+    if (c.lookbackOk === false) flag('lookback', e, { date: fmtWhen(e.releaseTime || e.showTime, tz), type: '10-hr Look-Back Not Met', detail: 'Less than 10 consecutive hours of rest in the 24 hours before release' })
+    if (c.excAmt > 0) exceedances.push({ date: fmtWhen(e.releaseTime || e.showTime, tz), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
   }
 
   const totalViolations = fails.flight + fails.duty + fails.rest + fails.lookback
@@ -151,7 +157,8 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
   const r = buildData(allEntries, d, tz)
   const doc = new jsPDF({ orientation: logDetail === 'full' ? 'landscape' : 'portrait', unit: 'pt', format: 'letter' })
 
-  const generated = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })
+  const now = new Date()
+  const generated = `${now.toLocaleDateString('en-US', { dateStyle: 'long', timeZone: tz })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' })}`
   const margin = 40
   let y = margin
 
@@ -177,7 +184,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
     doc.setFont('helvetica', 'normal')
     const statLine = [
       `Part 135 Legs: ${r.part135Legs.length}${r.part91Legs.length ? ` (+${r.part91Legs.length} Part 91)` : ''}`,
-      `Total Flight Time: ${fmtHrs(r.totalFlight)}`,
+      `Total Flight Time: ${fmtFlight(r.totalFlight)}`,
       `24-hr Rest Periods: ${d.restDayStatLabel(d.restDays)}`,
       `Total Violations: ${r.totalViolations}`,
     ].join('   |   ')
@@ -238,7 +245,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
       seenDates.add(dk)
       const dd = r.dayMap.get(dk)
       if (!dd) continue
-      rows.push([dk, fmtTime(dd.showTime, tz), fmtTime(dd.releaseTime, tz), dd.p135 > 0 ? fmtHrs(tenthsToHrs(dd.p135)) : '—', dd.p91 > 0 ? fmtHrs(tenthsToHrs(dd.p91)) : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
+      rows.push([dk, fmtTime(dd.showTime, tz), fmtTime(dd.releaseTime, tz), dd.p135 > 0 ? fmtFlight(tenthsToHrs(dd.p135)) : '—', dd.p91 > 0 ? fmtFlight(tenthsToHrs(dd.p91)) : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
     }
     return rows
   }
@@ -249,17 +256,17 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
       const c = r.computed.get(e.id)!
       if (e.part91) {
         rows.push([
-          fmtDT(e.showTime), e.crew === 'D' ? 'Dual' : 'Single',
+          fmtWhen(e.showTime, tz), e.crew === 'D' ? 'Dual' : 'Single',
           `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
-          fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtHrs(c.legFlight),
+          fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight),
           { content: 'Part 91 — Excluded from Sec. 135.267 limits', colSpan: 8, styles: { halign: 'left' as const } },
         ])
         continue
       }
       rows.push([
-        fmtDT(e.showTime), e.crew === 'D' ? 'Dual' : 'Single',
+        fmtWhen(e.showTime, tz), e.crew === 'D' ? 'Dual' : 'Single',
         `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
-        fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtHrs(c.legFlight),
+        fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight),
         c.cQualifies ? `${fmtHrs(c.dutyFlight)} / ${c.maxFlight}h (c)`
           : c.rolling24 !== null ? `${fmtHrs(c.rolling24)} / ${c.maxFlight}h` : '—',
         c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED',
@@ -344,7 +351,7 @@ export function generateQuarterlyReportPDF(
   const tqHrs = twoQuarterFlightHours(entries, qIdx, year, tz)
   const ytd   = flightHoursInWindow(entries, monthStartMs(year, 0, tz), qEnd)
   const limitRow = (label: string, hrs: number, max: number, what: string): [string, string] =>
-    [`${label}${allNote}`, hrs <= max ? `${fmtHrs(hrs)} of ${max}h ${what} — OK` : `${fmtHrs(hrs)} — EXCEEDS ${max}h ${what}`]
+    [`${label}${allNote}`, hrs <= max ? `${fmtFlight(hrs)} of ${max}h ${what} — OK` : `${fmtFlight(hrs)} — EXCEEDS ${max}h ${what}`]
   const limitsOk = qHrs <= 500 && tqHrs <= 800 && ytd <= 1400
 
   const doc = renderPDF(entries, {
@@ -384,7 +391,7 @@ export function generateMonthlyReportPDF(
     restDays,
     extraScorecard: [
       ['24-hr Rest Periods This Month', `${restDays} (>=13/quarter required)`],
-      ['Part 135 Flight Hours (Month)', fmtHrs(part135Flight)],
+      ['Part 135 Flight Hours (Month)', fmtFlight(part135Flight)],
     ],
     restDayStatLabel: rd => `${rd}`,
     isOverallOk: v => v === 0,

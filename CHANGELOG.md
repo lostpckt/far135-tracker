@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-13
+
+### Changed
+- **The Flight Log and PDF reports show times in your local time** — times display in the timezone selected in the header, labeled with the zone in effect on that date (e.g. "05/14 20:15 PDT", "12/14 19:15 PST"). In the PDF this covers Violations Detail, Exceedances, both flight logs (the summary log was already local but had no zone label) and the "Generated" time. Choosing UTC / Zulu shows Zulu times as before. Only the display changed: entries are still stored in Zulu, every calculation is unchanged, and CSV export and backups stay in Zulu.
+- **Flight time shows in Hobbs decimal hours in the Flight Log and PDF reports** — leg time, the duty period's total flight time in the Flight Log, Part 135 / Part 91 daily totals in the PDF summary log, and monthly / quarterly / yearly totals read like the Hobbs (e.g. "2.3h") instead of hours and minutes ("2h 18m"). Flight time checked against the 8/10-hour limit (duty-period and rolling 24-hour), exceedance amounts, duty period and rest still show hours and minutes.
+- **"How to use this tool" no longer says Hobbs readings are 5 digits** — Hobbs meters vary in length; it now says readings are in tenths of an hour (e.g. 12345.6). Any number of digits was already accepted.
+
 ## 2026-10-09 (2)
 
 ### Changed
