@@ -245,7 +245,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
       seenDates.add(dk)
       const dd = r.dayMap.get(dk)
       if (!dd) continue
-      rows.push([dk, fmtTime(dd.showTime, tz), fmtTime(dd.releaseTime, tz), dd.p135 > 0 ? fmtFlight(tenthsToHrs(dd.p135)) : '—', dd.p91 > 0 ? fmtFlight(tenthsToHrs(dd.p91)) : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
+      rows.push([dk, fmtTime(dd.showTime, tz), fmtTime(dd.releaseTime, tz), dd.p135 > 0 ? fmtFlight(tenthsToHrs(dd.p135)).replace(/h$/, '') : '—', dd.p91 > 0 ? fmtFlight(tenthsToHrs(dd.p91)).replace(/h$/, '') : '—', dd.hasViolation ? 'VIOLATION' : 'OK'])
     }
     return rows
   }
