@@ -240,7 +240,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.offBlocks) || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.onBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(c.legFlight)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(c.legFlight).replace(/h$/, '')}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {e.part91
                               ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
@@ -316,7 +316,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[0].offBlocks) || '—'}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[legs.length - 1].onBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(totalFlight)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(totalFlight).replace(/h$/, '')}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             {allPart91
                               ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
@@ -370,7 +370,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                               </td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.offBlocks) || '—'}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.onBlocks) || '—'}</td>
-                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(c.legFlight)}</td>
+                              <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(c.legFlight).replace(/h$/, '')}</td>
                               <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                                 {e.part91
                                   ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>

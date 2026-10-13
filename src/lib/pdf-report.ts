@@ -258,7 +258,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
         rows.push([
           fmtWhen(e.showTime, tz), e.crew === 'D' ? 'Dual' : 'Single',
           `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
-          fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight),
+          fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight).replace(/h$/, ''),
           { content: 'Part 91 — Excluded from Sec. 135.267 limits', colSpan: 8, styles: { halign: 'left' as const } },
         ])
         continue
@@ -266,7 +266,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
       rows.push([
         fmtWhen(e.showTime, tz), e.crew === 'D' ? 'Dual' : 'Single',
         `${(e.dep || '—').toUpperCase()}-${(e.arr || '—').toUpperCase()}`,
-        fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight),
+        fmtHobbs(e.offBlocks) || '—', fmtHobbs(e.onBlocks) || '—', fmtFlight(c.legFlight).replace(/h$/, ''),
         c.cQualifies ? `${fmtHrs(c.dutyFlight)} / ${c.maxFlight}h (c)`
           : c.rolling24 !== null ? `${fmtHrs(c.rolling24)} / ${c.maxFlight}h` : '—',
         c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED',
