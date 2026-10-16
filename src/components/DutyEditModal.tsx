@@ -75,7 +75,7 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" onOpenAutoFocus={e => e.preventDefault()}>
+      <DialogContent className="@container sm:max-w-lg max-h-[90vh] overflow-y-auto" onOpenAutoFocus={e => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-sm font-bold">Edit Duty Period</DialogTitle>
         </DialogHeader>
@@ -84,7 +84,7 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
           Expand legs to edit individual leg details.
         </p>
 
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 py-2">
+        <div className="grid grid-cols-1 @md:grid-cols-2 gap-3.5 py-2">
           <SectionLabel>Duty Period</SectionLabel>
           <DTField label="Show Time"    date={showDate} time={showTime} onDate={setShowDate} onTime={setShowTime} tz={showTz} onTz={setShowTz} required />
           <DTField label="Release Time" date={relDate}  time={relTime}  onDate={setRelDate}  onTime={setRelTime}  tz={relTz}  onTz={setRelTz}  required />

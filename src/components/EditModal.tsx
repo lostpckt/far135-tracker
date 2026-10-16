@@ -95,15 +95,15 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={e => e.preventDefault()}>
+      <DialogContent className="@container sm:max-w-lg max-h-[90vh] overflow-y-auto" onOpenAutoFocus={e => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-sm font-bold">Edit Flight Entry</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5 py-2">
+        <div className="grid grid-cols-1 @md:grid-cols-2 gap-3.5 py-2">
 
           <SectionLabel>Identification</SectionLabel>
-          <div className="col-span-full grid grid-cols-[8rem_1fr_auto] gap-2 items-start">
+          <div className="col-span-full grid grid-cols-2 @md:grid-cols-[8rem_1fr_auto] gap-2 items-start">
             <div className="flex flex-col gap-1">
               <Label className="text-xs font-semibold text-slate-500">Tail Number <span className="text-red-500">*</span></Label>
               <Input value={tailNumber} onChange={e => setTailNumber(e.target.value.toUpperCase())} placeholder="N123AB" maxLength={8} className="text-sm h-8 uppercase w-full" />
@@ -112,7 +112,7 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
               <Label className="text-xs font-semibold text-slate-500">Entity <span className="text-red-500">*</span></Label>
               <Input value={entity} onChange={e => setEntity(e.target.value)} placeholder="e.g. Acme Air LLC" className="text-sm h-8" />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="col-span-2 @md:col-span-1 flex flex-col gap-1">
               <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>
               <Select value={crew} onValueChange={v => setCrew(v as 'S' | 'D')}>
                 <SelectTrigger className="text-sm h-8"><SelectValue /></SelectTrigger>

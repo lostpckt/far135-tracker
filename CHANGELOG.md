@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-16
+
+### Fixed
+- **Edit dialogs fit the screen they're on** — the Edit Flight Entry and Edit Duty Period dialogs now arrange their fields based on the dialog's own width. When there's room (e.g. iPad), fields sit in pairs: Departure beside Arrival ICAO, Off beside On Blocks, and the "Flight Leg" and "Other" headings get their own row instead of pushing Arrival down a row. When there isn't (e.g. a phone held upright), fields stack one per row, and Crew Configuration moves under Tail Number and Entity instead of being cut off. On tablets the edit dialog is also a little wider so the top row fits.
+
 ## 2026-10-13 (2)
 
 ### Added

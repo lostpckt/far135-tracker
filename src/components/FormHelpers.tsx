@@ -41,7 +41,7 @@ export function DTField({ label, date, time, onDate, onTime, tz, onTz, required,
   const hint = localTimeHint(date, time, tz)
   const hasValue = !!(date || time)
   return (
-    <div className={`flex flex-col gap-1${onTz ? ' sm:col-span-2' : ''}`}>
+    <div className={`flex flex-col gap-1${onTz ? ' @md:col-span-2' : ''}`}>
       <div className="flex items-center justify-between">
         <Label className="text-xs font-semibold text-slate-500">{label}{!onTz && ` (${tzAbbr(tz, date)})`}{required && <span className="text-red-500 ml-0.5">*</span>}</Label>
         {onClear && hasValue && (
