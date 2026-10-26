@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty, hobbsConflict, hobbsConflictMsg } from '@/lib/calculations'
 import { localToUtcIso, localTimeHint, splitForEdit } from '@/lib/timezone'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
@@ -73,6 +73,8 @@ export default function EditModal({ entry, entries, tz, onSave, onClose }: Props
       setErr('Total flight time for this duty period is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
       return
     }
+    const other = hobbsConflict(entries, { tailNumber, showTime: show, offBlocks: offHobbs, onBlocks: onHobbs }, new Set([entry.id]))
+    if (other) { setErr(hobbsConflictMsg(other, tz)); return }
 
     onSave({
       ...entry,

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-26
+
+### Fixed
+- **Hobbs readings must run forward in the same aircraft** — a later leg could be saved with Hobbs readings below an earlier leg's. Now, in the Add Flight Leg form, each leg's Off Blocks can't be below the previous leg's On Blocks. When you add or edit a leg (or edit a whole duty period), it's also checked against every logged leg with the same tail number: legs on earlier duty periods must end at or below its Off Blocks, legs on later duty periods must start at or above its On Blocks, and two legs in one duty period can't cover the same Hobbs range. If a check fails, the save is blocked and the error names the conflicting leg (route, show time, Hobbs). Different aircraft are never compared, since each has its own Hobbs meter. Logged legs without a tail number aren't checked.
+
 ## 2026-10-16
 
 ### Fixed

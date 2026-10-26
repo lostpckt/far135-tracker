@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ms, parseHobbs, fmtHobbs, flightTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { ms, parseHobbs, fmtHobbs, flightTenths, overlappingDuty, flightExceedsDuty, hobbsConflict, hobbsConflictMsg } from '@/lib/calculations'
 import { localToUtcIso, localTimeHint, splitForEdit } from '@/lib/timezone'
 import { SectionLabel, DTField } from '@/components/FormHelpers'
 import type { Entry } from '@/types/entry'
@@ -68,6 +68,12 @@ export default function DutyEditModal({ legs, entries, tz, onSave, onClose }: Pr
     if (flightExceedsDuty(show, release, legTimes.reduce<number>((s, t) => s + (t ?? 0), 0))) {
       setErr('Total flight time is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
       return
+    }
+    // Check against the other duty periods and against this one's other legs.
+    const others = entries.filter(e => !legs.some(l => l.id === e.id)).concat(updated)
+    for (const leg of updated) {
+      const other = hobbsConflict(others, leg, new Set([leg.id]))
+      if (other) { setErr(hobbsConflictMsg(other, tz)); return }
     }
 
     onSave(updated)

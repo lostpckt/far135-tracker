@@ -1,5 +1,5 @@
 import type { Entry, Computed } from '@/types/entry'
-import { monthStartMs } from '@/lib/timezone'
+import { monthStartMs, fmtLocalDT } from '@/lib/timezone'
 import { saveFile } from '@/lib/backup'
 
 export function uid(): string {
@@ -167,6 +167,39 @@ export function overlappingDuty(all: Entry[], show: string, release: string, exc
 export function flightExceedsDuty(show: string, release: string, flightTenths: number): boolean {
   const s = ms(show), r = ms(release)
   return s !== null && r !== null && flightTenths * TENTH > r - s
+}
+
+/**
+ * The first other logged leg in the same aircraft whose Hobbs readings are out
+ * of order with `leg`, or null. Hobbs only runs forward: a leg in an earlier
+ * duty period must end at or below this leg's Off Blocks, one in a later duty
+ * period must start at or above its On Blocks, and legs of the same duty period
+ * may not cover the same Hobbs range. Legs without a tail number or readable
+ * Hobbs are skipped.
+ */
+export function hobbsConflict(
+  all: Entry[],
+  leg: Pick<Entry, 'tailNumber' | 'showTime' | 'offBlocks' | 'onBlocks'>,
+  excludeIds: Set<string>,
+): Entry | null {
+  const tail = leg.tailNumber?.trim().toUpperCase()
+  const off = parseHobbs(leg.offBlocks), on = parseHobbs(leg.onBlocks), s = ms(leg.showTime)
+  if (!tail || off === null || on === null || s === null) return null
+  return all.find(e => {
+    if (e.restDay || excludeIds.has(e.id) || e.tailNumber?.trim().toUpperCase() !== tail) return false
+    const eOff = parseHobbs(e.offBlocks), eOn = parseHobbs(e.onBlocks), es = ms(e.showTime)
+    if (eOff === null || eOn === null || es === null) return false
+    if (es < s) return eOn > off
+    if (es > s) return eOff < on
+    return eOff < on && off < eOn
+  }) ?? null
+}
+
+/** Error text naming the leg `hobbsConflict()` found. */
+export function hobbsConflictMsg(other: Entry, tz: string): string {
+  return `Hobbs readings are out of order with ${other.tailNumber?.trim()}'s ${other.dep}–${other.arr} leg ` +
+    `(show ${fmtLocalDT(other.showTime, other.showTz ?? tz)}, Hobbs ${fmtHobbs(other.offBlocks)}–${fmtHobbs(other.onBlocks)}). ` +
+    'Hobbs only runs forward, so check the Hobbs readings and the Show time.'
 }
 
 /** The rest gaps between consecutive duty periods, as [release, next show] ms. */

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import LegRow, { type LegData } from '@/components/LegRow'
 import { SectionLabel, TzSelect } from '@/components/FormHelpers'
-import { uid, ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty } from '@/lib/calculations'
+import { uid, ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty, hobbsConflict, hobbsConflictMsg } from '@/lib/calculations'
 import { localToUtcIso, localTimeHint, utcToLocalParts, deviceTz } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -31,6 +31,7 @@ function readDraft(): DraftState | null {
 
 interface Props {
   entries: Entry[]
+  tz: string
   onAdd: (updated: Entry[]) => void
 }
 
@@ -46,7 +47,7 @@ function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string
   return <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>
 }
 
-export default function AddEntryForm({ entries, onAdd }: Props) {
+export default function AddEntryForm({ entries, tz, onAdd }: Props) {
   const d = readDraft()
   // Show and Release each have their own zone, defaulting to the device's, so
   // a duty that starts in PDT and ends in MDT is entered as the clocks read.
@@ -102,6 +103,10 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
       if (!leg.offHobbs.trim() || !leg.onHobbs.trim()) { setErr(`${label}Off Blocks and On Blocks Hobbs readings are required.`); return }
       if (offN === null || onN === null) { setErr(`${label}Hobbs readings must be in tenths of an hour, e.g. 12345.6.`); return }
       if (onN <= offN) { setErr(`${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`); return }
+      if (i > 0 && offN < (parseHobbs(legs[i - 1].onHobbs) ?? 0)) {
+        setErr(`${label}Off Blocks Hobbs can't be below Leg ${i}'s On Blocks Hobbs.`)
+        return
+      }
       legData.push({ dep: leg.dep, arr: leg.arr, off: fmtHobbs(leg.offHobbs), on: fmtHobbs(leg.onHobbs), reason: leg.reason, part91: leg.part91 })
     }
     const totalFlight = legData.reduce((sum, l) => sum + legTenths({ offBlocks: l.off, onBlocks: l.on }), 0)
@@ -120,6 +125,10 @@ export default function AddEntryForm({ entries, onAdd }: Props) {
       restStart: '', restEnd: '',
       reason: leg.reason, part91: leg.part91, restDay: false,
     }))
+    for (const leg of newEntries) {
+      const other = hobbsConflict(entries, leg, new Set())
+      if (other) { setErr(hobbsConflictMsg(other, tz)); return }
+    }
 
     onAdd([...entries, ...newEntries])
     resetForm()
