@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import IcaoField from '@/components/IcaoField'
 import { FieldError } from '@/components/FormHelpers'
 
@@ -103,9 +103,9 @@ export default function LegRow({ index, data, onChange, onRemove, onMoveUp, onMo
             />
           </div>
 
-          <div className="flex flex-col gap-1 self-start">
-            <Label className="text-[0.7rem]">&nbsp;</Label>
-            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">
+          {/* Bottom-aligned with the inputs when it shares their line; no gap above it when it wraps. */}
+          <div className="self-end">
+            <div className="flex items-center gap-2 h-8 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded px-2">
               <Checkbox
                 id={`leg-${data.key ?? index}-p91`}
                 checked={data.part91}
@@ -122,11 +122,11 @@ export default function LegRow({ index, data, onChange, onRemove, onMoveUp, onMo
           <div className="flex flex-col items-center gap-0.5 pt-4 shrink-0">
             <button type="button" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Move leg ${n} up`} title="Move up"
               className={`${iconBtn} text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:invisible`}>
-              <ChevronUp size={18} />
+              <ArrowUp size={18} strokeWidth={2.25} />
             </button>
             <button type="button" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Move leg ${n} down`} title="Move down"
               className={`${iconBtn} text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:invisible`}>
-              <ChevronDown size={18} />
+              <ArrowDown size={18} strokeWidth={2.25} />
             </button>
           </div>
         )}

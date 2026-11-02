@@ -14,11 +14,12 @@
 - **Airport code check** — after you leave a Departure or Arrival field holding a 3-character code that matches a known airport, a "Confirm KSQL" button appears under it (for "SQL"); tap it to use the ICAO code, or "Keep SQL" to leave it. A code that matches two airports offers both (e.g. KCHU or PACH). Codes with no ICAO match, like L52 or 0Q3, are accepted as typed with no prompt. It never blocks saving. Works in the Add Duty Entry form and the Edit Duty Entry dialog, and offline. The airport list (from OurAirports, about 42 KB to download) loads in the background after the app opens.
 
 ### Fixed
+- **No gap above the Part 91 box on narrow iPhones** — when it wraps to its own line under Off/On Blocks, it now sits right below them.
 - **Airport codes no longer cut off** in the leg boxes on a phone — wide letters (Q, M, W) made codes like KSQL show as "KSQ".
 - **Crew Configuration is two radio buttons, Single and Dual** — the dropdown was cut off in the edit dialog and the Add Duty Entry form on smaller screens, and couldn't be used with Apple Pencil. A filled dot marks the choice, so it's clear in light and dark mode. The "8 hr / 10 hr limit" text is gone; on a phone they sit on their own row under Tail Number and Entity.
 
 ### Changed
-- **Leg ▲ ▼ reorder buttons moved to the right end of each leg**, away from the trash can under the leg number, so a mis-tap can't delete a leg.
+- **Leg reorder buttons moved to the right end of each leg**, away from the trash can under the leg number, so a mis-tap can't delete a leg. They are now ↑ ↓ arrows instead of chevrons, so it's clearer they move the leg.
 - **Exceedance Reason only appears when there's an exceedance, and is then required** — it's one box for the whole duty, under the legs, instead of a box on every leg. It appears as soon as the times and Hobbs readings put the duty over the flight time limit, says by how much, and must be filled in to save. Each leg now fits on one line on an iPad mini in portrait. A reason already saved on a duty still shows when editing, so it can be changed or cleared.
 - **Off Blocks and On Blocks no longer say "(Hobbs)"**, and the example Hobbs reading is 1234.5 everywhere (boxes, error messages, How to use).
 - **How to use reads more easily** — short paragraphs, with the flight time formula set out on its own line: Flight time = On Blocks − Off Blocks. It also says plainly to enter each time in the timezone you were in.
