@@ -41,11 +41,11 @@ export default function ScrollX({ children }: { children: React.ReactNode }) {
     let target = want
     if (dir > 0) {
       // The column cut off at the right edge becomes the first column.
-      const fits = edges.filter(x => x > cur + 4 && x <= want)
+      const fits = edges.filter(x => x > cur + 4 && x <= want + 1)   // +1: a column ending right at the edge was fully shown
       if (fits.length) target = Math.max(...fits)
     } else {
       // Back a full screen, starting on a whole column.
-      const fits = edges.filter(x => x < cur - 4 && x >= want)
+      const fits = edges.filter(x => x < cur - 4 && x >= want - 1)
       if (fits.length) target = Math.min(...fits)
     }
     el.scrollTo({ left: Math.round(Math.min(max, Math.max(0, target))), behavior: 'smooth' })
