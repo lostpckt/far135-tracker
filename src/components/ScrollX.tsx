@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 
 // A sideways-scrolling area that shows when there's more off screen: a fade at
-// the edge with more content, and a "Swipe for more" tag until you reach the end.
+// the edge with more content, and a › arrow on the right fade until you reach the end.
+// The arrow sits below the column headers, centered, and stays mid-screen on a long table.
 export default function ScrollX({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [more, setMore] = useState({ left: false, right: false })
@@ -26,16 +27,17 @@ export default function ScrollX({ children }: { children: React.ReactNode }) {
     <div className="relative">
       <div ref={ref} className="overflow-x-auto">{children}</div>
       <div aria-hidden className={`pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-card to-transparent transition-opacity ${more.left ? 'opacity-100' : 'opacity-0'}`} />
-      <div aria-hidden className={`pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-card to-transparent transition-opacity ${more.right ? 'opacity-100' : 'opacity-0'}`} />
-      {more.right && (
+      <div className={`pointer-events-none absolute inset-y-0 right-0 w-10 pt-11 pb-2 flex flex-col items-end justify-center bg-gradient-to-l from-card via-card/70 to-transparent transition-opacity ${more.right ? 'opacity-100' : 'opacity-0'}`}>
         <button
           type="button"
+          tabIndex={more.right ? 0 : -1}
+          aria-label="Scroll right for more columns"
           onClick={() => ref.current?.scrollBy({ left: ref.current.clientWidth * 0.8, behavior: 'smooth' })}
-          className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-slate-900/80 dark:bg-slate-100/90 text-white dark:text-slate-900 text-[0.68rem] font-semibold pl-2.5 pr-1.5 py-1 shadow"
+          className={`sticky top-[45vh] bottom-[45vh] p-1 text-slate-500 dark:text-slate-300 ${more.right ? 'pointer-events-auto' : ''}`}
         >
-          Swipe for more <ChevronRight size={12} />
+          <ChevronRight size={22} strokeWidth={2.5} />
         </button>
-      )}
+      </div>
     </div>
   )
 }

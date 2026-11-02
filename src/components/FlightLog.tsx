@@ -175,7 +175,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
   }
 
   return (
-    <Card className={SECTION_CARD}>
+    <Card className={`${SECTION_CARD} overflow-clip`}>{/* clip, not hidden, so the scroll arrow can stay on screen (sticky) */}
       <CardHeader className={SECTION_HEADER}><CardTitle className={SECTION_TITLE}>Flight Log</CardTitle></CardHeader>
       <CardContent className="p-0">
         <ScrollX>
