@@ -26,7 +26,7 @@
 - **One menu for everything in the header** — the home timezone, light/dark mode, How to use, What's new, Check for update and Buy me a coffee are all in a ☰ menu at the far right of the header, on every screen size and orientation (an iPad in landscape no longer spreads them across the header).
 - **"How to use" is in the menu** — it's always there. On first launch it also shows, open, on the main page, with a "Got it" button; after that it no longer appears on the main page.
 - **Clearer sections** — the Dashboard, Add Duty Entry and Flight Log each sit in their own outlined box with a titled header bar.
-- **"Add Flight Leg" is now "Add Duty Entry"** — both the section and its button, whatever the number of legs.
+- **"Add Flight Leg" is now "Add Duty Entry"** for the section, and its button reads **"Add to Flight Log"**, whatever the number of legs.
 - **Show Time and Release Time hints sit beside their labels** instead of under the pickers.
 - **Leg number stays on one line** ("Leg 1"), and deleting a leg is a trash-can button under its number. Leg 1 has no delete button.
 - **The Regulatory Reference note no longer explains timezone entry**; How to use covers it.

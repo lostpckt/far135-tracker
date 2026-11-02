@@ -345,7 +345,7 @@ export default function DutyForm({ initial, entries, tz, editing, mixed = {}, on
           </div>
           <div className="flex flex-wrap gap-2.5 mt-2 items-center">
             <Button onClick={submit} className="bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm h-8">
-              Add Duty Entry
+              Add to Flight Log
             </Button>
           </div>
         </>
