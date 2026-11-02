@@ -3,18 +3,20 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 import { loadEntries, saveEntries } from '@/lib/storage'
 import { ms, exportCSV, importCSV, type SkippedRow } from '@/lib/calculations'
 import { loadTz, saveTz } from '@/lib/timezone'
-import { downloadBackup, parseBackup, lastBackupMs, recordRestoredBackup, requestPersistentStorage, type ParsedBackup } from '@/lib/backup'
+import { downloadBackup, parseBackup, lastBackupMs, recordRestoredBackup, requestPersistentStorage, backupDuties, dutyCount, loadReminderSetting, saveReminderSetting, type ParsedBackup } from '@/lib/backup'
 import type { Entry } from '@/types/entry'
+import { Plus } from 'lucide-react'
+import { ADD_FORM_ID } from '@/lib/section'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import Header from '@/components/Header'
 import RegNote from '@/components/RegNote'
 import Dashboard from '@/components/Dashboard'
 import AddEntryForm from '@/components/AddEntryForm'
 import FlightLog from '@/components/FlightLog'
-import EditModal from '@/components/EditModal'
-import DutyEditModal from '@/components/DutyEditModal'
+import EditDutyDialog from '@/components/EditDutyDialog'
 import QuickReference from '@/components/QuickReference'
-import HowToUse from '@/components/HowToUse'
+import HowToUseCard from '@/components/HowToUse'
+import { isFirstLaunch, markHowToSeen } from '@/lib/howto'
 import UpdateBanner from '@/components/UpdateBanner'
 import InstallBanner from '@/components/InstallBanner'
 import BackupReminder from '@/components/BackupReminder'
@@ -25,17 +27,21 @@ export default function App() {
   // The one service-worker watcher: a new version waiting → UpdateBanner; Header's
   // "Check for update" also reads it. (Each useRegisterSW call registers its own watcher.)
   const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW()
-  const [editingEntry, setEditingEntry]   = useState<Entry | null>(null)
   const [editingDuty, setEditingDuty]     = useState<Entry[] | null>(null)
   const [showRunReport, setShowRunReport] = useState(false)
   const [pendingImport, setPendingImport] = useState<{ entries: Entry[]; skipped: SkippedRow[] } | null>(null)
   const [pendingRestore, setPendingRestore] = useState<ParsedBackup | null>(null)
   const [importError, setImportError]     = useState<string | null>(null)
   const [lastBackup, setLastBackup]       = useState(lastBackupMs)
+  const [dutiesAtBackup, setDutiesAtBackup] = useState(() => backupDuties(entries))
+  const [reminder, setReminder]           = useState(loadReminderSetting)
+  // "How to use" shows on the main page on first launch only; after that it's in the menu.
+  const [showHowTo, setShowHowTo]         = useState(() => isFirstLaunch(entries.length))
   const fileInputRef    = useRef<HTMLInputElement>(null)
   const restoreInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(requestPersistentStorage, [])
+  useEffect(markHowToSeen, [])
 
   function readFile(e: React.ChangeEvent<HTMLInputElement>, onText: (text: string) => void) {
     const file = e.target.files?.[0]
@@ -64,13 +70,14 @@ export default function App() {
 
   function handleBackup() {
     if (!entries.length) { alert('No data to back up.'); return }
-    downloadBackup(entries, tz).then(saved => { if (saved) setLastBackup(Date.now()) })
+    downloadBackup(entries, tz).then(saved => { if (saved) { setLastBackup(Date.now()); setDutiesAtBackup(dutyCount(entries)) } })
   }
 
   function confirmRestore(r: ParsedBackup) {
     updateEntries(r.entries)
     if (r.tz) handleTzChange(r.tz)
-    setLastBackup(recordRestoredBackup(r.exportedAt))
+    setLastBackup(recordRestoredBackup(r.exportedAt, r.entries))
+    setDutiesAtBackup(dutyCount(r.entries))
     setPendingRestore(null)
   }
   const [dark, setDark]                   = useState(() => localStorage.getItem('far135_theme') === 'dark')
@@ -96,18 +103,35 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950">
-      <Header dark={dark} onToggleDark={() => setDark(d => !d)} tz={tz} onTzChange={handleTzChange} needRefresh={needRefresh} />
+      <Header dark={dark} onToggleDark={() => setDark(d => !d)} tz={tz} onTzChange={handleTzChange} needRefresh={needRefresh}
+        reminder={reminder} onReminderChange={r => { setReminder(r); saveReminderSetting(r) }} />
       <div className="max-w-screen-2xl mx-auto p-5 space-y-5">
         <InstallBanner />
-        <BackupReminder entryCount={entries.length} lastBackup={lastBackup} onBackup={handleBackup} />
+        <BackupReminder
+          entryCount={entries.length}
+          lastBackup={lastBackup}
+          newDuties={Math.max(0, dutyCount(entries) - dutiesAtBackup)}
+          reminder={reminder}
+          onBackup={handleBackup}
+        />
         <RegNote />
-        <HowToUse />
+        {showHowTo && <HowToUseCard onDismiss={() => setShowHowTo(false)} />}
+        <button
+          onClick={() => {
+            const card = document.getElementById(ADD_FORM_ID)
+            card?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            card?.querySelector('input')?.focus({ preventScroll: true })
+          }}
+          className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-600 hover:text-white text-blue-700 dark:text-blue-300 text-sm font-semibold py-2.5 transition-colors"
+        >
+          <Plus size={16} /> New Duty Entry
+        </button>
         <Dashboard entries={entries} tz={tz} />
         <AddEntryForm entries={entries} tz={tz} onAdd={updateEntries} />
         <FlightLog
           entries={entries}
           tz={tz}
-          onEdit={setEditingEntry}
+          onEdit={e => setEditingDuty(entries.filter(x => !x.restDay && x.showTime === e.showTime && x.releaseTime === e.releaseTime))}
           onEditDuty={setEditingDuty}
           onDelete={id => updateEntries(entries.filter(e => e.id !== id))}
         />
@@ -280,30 +304,18 @@ export default function App() {
 
 
       {editingDuty && (
-        <DutyEditModal
+        <EditDutyDialog
           legs={editingDuty}
           entries={entries}
           tz={tz}
           onSave={updatedLegs => {
-            const updatedMap = new Map(updatedLegs.map(e => [e.id, e]))
-            updateEntries(entries.map(e => updatedMap.get(e.id) ?? e))
+            // Replace the duty's legs; removed legs drop out, added ones come in,
+            // and the new order holds (legs of one duty share a Show Time, and the sort is stable).
+            const ids = new Set(editingDuty.map(e => e.id))
+            updateEntries([...entries.filter(e => !ids.has(e.id)), ...updatedLegs])
             setEditingDuty(null)
           }}
           onClose={() => setEditingDuty(null)}
-        />
-      )}
-
-      {editingEntry && (
-        <EditModal
-          key={editingEntry.id}
-          entry={editingEntry}
-          entries={entries}
-          tz={tz}
-          onSave={updated => {
-            updateEntries(entries.map(e => e.id === updated.id ? updated : e))
-            setEditingEntry(null)
-          }}
-          onClose={() => setEditingEntry(null)}
         />
       )}
     </div>

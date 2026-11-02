@@ -1,8 +1,12 @@
 import { Globe } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { localToUtcIso, localTimeHint, tzAbbr, tzOptions, deviceTz } from '@/lib/timezone'
+import { tzAbbr, tzOptions, deviceTz } from '@/lib/timezone'
+
+// An error message shown right under the field it's about.
+export function FieldError({ msg }: { msg?: string }) {
+  return msg ? <span role="alert" className="text-xs text-red-600">{msg}</span> : null
+}
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -30,38 +34,59 @@ export function TzSelect({ tz, date, onChange }: { tz: string; date: string; onC
   )
 }
 
-// Date + time inputs for a local time in `tz`. The label gets the zone name for
-// the date being entered (PDT vs PST), and a preview of the time in Zulu.
-export function DTField({ label, date, time, onDate, onTime, tz, onTz, required, onClear }: {
-  label: string; date: string; time: string
-  onDate: (v: string) => void; onTime: (v: string) => void
-  tz: string; onTz?: (tz: string) => void; required?: boolean; onClear?: () => void
+// Example shown inside an empty date box, in the style iOS displays dates.
+const DATE_EXAMPLE = 'e.g. ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+// A date or time input that shows example text while it's empty. iOS Safari
+// shows nothing in an empty date/time box (placeholder isn't supported), so the
+// example is drawn over it; desktop browsers' own "mm/dd/yyyy" is hidden until focus.
+export function DateTimeInput({ type, value, onChange, className, invalid, field }: {
+  type: 'date' | 'time'
+  value: string
+  onChange: (v: string) => void
+  className?: string     // sizing for the wrapper, e.g. flex-[1.5]
+  invalid?: boolean
+  field?: string         // data-field, for scrolling to an error
 }) {
-  const utc = localToUtcIso(date, time, tz)
-  const hint = localTimeHint(date, time, tz)
-  const hasValue = !!(date || time)
+  const empty = !value
   return (
-    <div className={`flex flex-col gap-1${onTz ? ' @md:col-span-2' : ''}`}>
-      <div className="flex items-center justify-between">
-        <Label className="text-xs font-semibold text-slate-500">{label}{!onTz && ` (${tzAbbr(tz, date)})`}{required && <span className="text-red-500 ml-0.5">*</span>}</Label>
-        {onClear && hasValue && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-[0.68rem] text-slate-400 hover:text-red-500 leading-none px-1"
-            aria-label={`Clear ${label}`}
-          >
-            Clear
-          </button>
-        )}
-      </div>
-      <div className="flex gap-1.5">
-        <Input type="date" value={date} onChange={e => onDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-        <Input type="time" value={time} onChange={e => onTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
-        {onTz && <TzSelect tz={tz} date={date} onChange={onTz} />}
-      </div>
-      {utc && <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>}
-      {hint && <span className="text-[0.68rem] text-red-600">{hint}</span>}
+    <div className={`relative min-w-0 ${className ?? ''}`} data-field={field}>
+      <Input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        aria-invalid={invalid || undefined}
+        className={`peer text-sm h-8 w-full appearance-none ${empty ? '[&::-webkit-datetime-edit]:opacity-0 focus:[&::-webkit-datetime-edit]:opacity-100' : ''}`}
+      />
+      {empty && (
+        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground whitespace-nowrap peer-focus:hidden">
+          {type === 'date' ? DATE_EXAMPLE : 'e.g. 07:15'}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Single / Dual pilot, as two side-by-side buttons (one is always selected).
+export function CrewToggle({ value, onChange }: { value: 'S' | 'D'; onChange: (v: 'S' | 'D') => void }) {
+  return (
+    <div role="radiogroup" aria-label="Crew configuration" className="inline-flex h-8 w-max rounded-md border border-input overflow-hidden">
+      {(['S', 'D'] as const).map(v => (
+        <button
+          key={v}
+          type="button"
+          role="radio"
+          aria-checked={value === v}
+          onClick={() => onChange(v)}
+          className={`px-3.5 text-sm font-medium transition-colors ${v === 'D' ? 'border-l border-input' : ''} ${
+            value === v
+              ? 'bg-slate-900 text-white dark:bg-blue-600'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          {v === 'S' ? 'Single' : 'Dual'}
+        </button>
+      ))}
     </div>
   )
 }

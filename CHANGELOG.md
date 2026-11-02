@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-11-02
+
+### Added
+- **Edit a whole duty entry, legs and all** — the pencil on any duty or leg in the Flight Log opens "Edit Duty Entry", laid out like the Add Duty Entry form. You can change everything, add legs, delete legs, and move legs up or down with the ▲ ▼ buttons under each leg number. It replaces the separate Edit Flight Entry and Edit Duty Period dialogs. If a duty's legs have different tail numbers or entities, those boxes say "Varies by leg": leave them blank to keep each leg's own, or fill them in to set every leg.
+- **Reorder legs while adding** — the same ▲ ▼ buttons work in the Add Duty Entry form.
+- **Autocomplete from your log** — Tail Number, Entity and the airport boxes suggest values you've logged before, most recent first.
+- **Errors point at the field** — when something can't be saved, the field at fault is outlined in red, the page scrolls to it, and the message appears right beside it (for a leg, under that leg).
+- **"New Duty Entry" button** near the top of the page jumps to the Add Duty Entry form and puts the cursor in Tail Number.
+- **Flight Log shows when there's more to the side** — on narrow screens, a fade at the edge and a "Swipe for more" tag (tap it to scroll) appear until you reach the last column.
+- **Example text in empty date and time boxes** — e.g. "e.g. 07:15", since iPhone and iPad show nothing in an empty date or time box.
+- **Backup reminder you can set** — under the ☰ menu, choose to be reminded every 1, 3, 7, 10 or 14 days or every 5, 10, 15 or 20 new duty entries, whichever comes first (default 14 days / 20 entries). The reminder banner says which one triggered it.
+- **Airport code check** — after you leave a Departure or Arrival field holding a 3-character code that matches a known airport, a "Confirm KSQL" button appears under it (for "SQL"); tap it to use the ICAO code, or "Keep SQL" to leave it. A code that matches two airports offers both (e.g. KCHU or PACH). Codes with no ICAO match, like L52 or 0Q3, are accepted as typed with no prompt. It never blocks saving. Works in the Add Duty Entry form and the Edit Duty Entry dialog, and offline. The airport list (from OurAirports, about 42 KB to download) loads in the background after the app opens.
+
+### Fixed
+- **Airport codes no longer cut off** in the leg boxes on a phone — wide letters (Q, M, W) made codes like KSQL show as "KSQ".
+- **Crew Configuration is two buttons, Single | Dual** — the dropdown was cut off in the edit dialog and the Add Duty Entry form on smaller screens, and couldn't be used with Apple Pencil. The buttons drop the "8 hr / 10 hr limit" text; on a phone they sit on their own row under Tail Number and Entity.
+
+### Changed
+- **Off Blocks and On Blocks no longer say "(Hobbs)"**, and the example Hobbs reading is 1234.5 everywhere (boxes, error messages, How to use).
+- **How to use reads more easily** — short paragraphs, with the flight time formula set out on its own line: Flight time = On Blocks − Off Blocks. It also says plainly to enter each time in the timezone you were in.
+- **One menu for everything in the header** — the home timezone, light/dark mode, How to use, What's new, Check for update and Buy me a coffee are all in a ☰ menu at the far right of the header, on every screen size and orientation (an iPad in landscape no longer spreads them across the header).
+- **"How to use" is in the menu** — it's always there. On first launch it also shows, open, on the main page, with a "Got it" button; after that it no longer appears on the main page.
+- **Clearer sections** — the Dashboard, Add Duty Entry and Flight Log each sit in their own outlined box with a titled header bar.
+- **"Add Flight Leg" is now "Add Duty Entry"** — both the section and its button, whatever the number of legs.
+- **Show Time and Release Time hints sit beside their labels** instead of under the pickers.
+- **Leg number stays on one line** ("Leg 1"), and deleting a leg is a trash-can button under its number. Leg 1 has no delete button.
+- **The Regulatory Reference note no longer explains timezone entry**; How to use covers it.
+
 ## 2026-11-01
 
 ### Added

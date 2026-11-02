@@ -1,32 +1,39 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import LegRow, { type LegData } from '@/components/LegRow'
-import { SectionLabel, TzSelect } from '@/components/FormHelpers'
-import { uid, ms, parseHobbs, fmtHobbs, legTenths, overlappingDuty, flightExceedsDuty, hobbsConflict, hobbsConflictMsg } from '@/lib/calculations'
-import { localToUtcIso, localTimeHint, utcToLocalParts, deviceTz } from '@/lib/timezone'
+import { SECTION_CARD, SECTION_HEADER, SECTION_TITLE, ADD_FORM_ID } from '@/lib/section'
+import DutyForm, { type DutyFormState } from '@/components/DutyForm'
+import { emptyLeg } from '@/lib/legs'
+import { utcToLocalParts, deviceTz } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
 const DRAFT_KEY = 'far135_v1_form_draft'
 
-interface DraftState {
-  tailNumber: string
-  entity: string
-  crew: 'S' | 'D'
-  showDate: string
-  showTime: string
-  relDate: string
-  relTime: string
-  showTz?: string
-  relTz?: string
-  legs: LegData[]
+// Show and Release each have their own zone, defaulting to the device's, so
+// a duty that starts in PDT and ends in MDT is entered as the clocks read.
+function blankDuty(): DutyFormState {
+  const tz = deviceTz()
+  return {
+    tailNumber: '', entity: '', crew: 'S',
+    showDate: utcToLocalParts(new Date().toISOString(), tz)?.date ?? '', showTime: '',
+    relDate: '', relTime: '', showTz: tz, relTz: tz,
+    legs: [emptyLeg()],
+  }
 }
 
-function readDraft(): DraftState | null {
-  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null') } catch { return null }
+function readDraft(): DutyFormState {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
+    // Older drafts may lack fields added since (e.g. the per-time zones).
+    return d ? { ...blankDuty(), ...d } : blankDuty()
+  } catch { return blankDuty() }
+}
+
+function saveDraft(s: DutyFormState) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(s)) } catch { /* localStorage unavailable */ }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY) } catch { /* localStorage unavailable */ }
 }
 
 interface Props {
@@ -35,217 +42,26 @@ interface Props {
   onAdd: (updated: Entry[]) => void
 }
 
-function emptyLeg(): LegData {
-  return { dep: '', arr: '', offHobbs: '', onHobbs: '', reason: '', part91: false }
-}
-
-function UtcPreview({ dateStr, timeStr, tz }: { dateStr: string; timeStr: string; tz: string }) {
-  const hint = localTimeHint(dateStr, timeStr, tz)
-  if (hint) return <span className="text-[0.68rem] text-red-600">{hint}</span>
-  const utc = localToUtcIso(dateStr, timeStr, tz)
-  if (!utc) return null
-  return <span className="text-[0.68rem] text-blue-400">→ {utc.slice(11, 16)}Z on {utc.slice(5, 10)}</span>
-}
-
 export default function AddEntryForm({ entries, tz, onAdd }: Props) {
-  const d = readDraft()
-  // Show and Release each have their own zone, defaulting to the device's, so
-  // a duty that starts in PDT and ends in MDT is entered as the clocks read.
-  const [showTz, setShowTz] = useState(() => d?.showTz ?? deviceTz())
-  const [relTz, setRelTz]   = useState(() => d?.relTz ?? deviceTz())
-
-  const [tailNumber, setTailNumber] = useState(d?.tailNumber ?? '')
-  const [entity, setEntity]         = useState(d?.entity ?? '')
-  const [crew, setCrew]             = useState<'S' | 'D'>(d?.crew ?? 'S')
-  const [showDate, setShowDate]     = useState(d?.showDate ?? (utcToLocalParts(new Date().toISOString(), showTz)?.date ?? ''))
-  const [showTime, setShowTime]     = useState(d?.showTime ?? '')
-  const [relDate, setRelDate]       = useState(d?.relDate ?? '')
-  const [relTime, setRelTime]       = useState(d?.relTime ?? '')
-  const [legs, setLegs]             = useState<LegData[]>(d?.legs ?? [emptyLeg()])
-  const [err, setErr]               = useState('')
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ tailNumber, entity, crew, showDate, showTime, relDate, relTime, showTz, relTz, legs }))
-    } catch { /* localStorage unavailable */ }
-  }, [tailNumber, entity, crew, showDate, showTime, relDate, relTime, showTz, relTz, legs])
-
-  function resetForm() {
-    setTailNumber(''); setEntity(''); setShowDate(''); setShowTime(''); setRelDate(''); setRelTime('')
-    setShowTz(deviceTz()); setRelTz(deviceTz())
-    setLegs([emptyLeg()]); setErr('')
-    try { localStorage.removeItem(DRAFT_KEY) } catch { /* localStorage unavailable */ }
-  }
-
-  function handleAdd() {
-    setErr('')
-
-    if (!tailNumber.trim()) { setErr('Aircraft tail number is required.'); return }
-    if (!entity.trim()) { setErr('Entity is required for Part 135 flights.'); return }
-
-    const timeHint = localTimeHint(showDate, showTime, showTz) ?? localTimeHint(relDate, relTime, relTz)
-    if (timeHint) { setErr(timeHint); return }
-    const show    = localToUtcIso(showDate, showTime, showTz)
-    const release = localToUtcIso(relDate, relTime, relTz)
-    if (!show)    { setErr('Show Time is required.'); return }
-    if (!release) { setErr('Release Time is required.'); return }
-    if ((ms(release) ?? 0) <= (ms(show) ?? 0)) { setErr('Release Time must be after Show Time.'); return }
-    if (overlappingDuty(entries, show, release, new Set())) { setErr('This duty period overlaps another logged duty period. Check the Show and Release times.'); return }
-
-    const legData: { dep: string; arr: string; off: string; on: string; reason: string; part91: boolean }[] = []
-    for (let i = 0; i < legs.length; i++) {
-      const leg  = legs[i]
-      const offN = parseHobbs(leg.offHobbs)
-      const onN  = parseHobbs(leg.onHobbs)
-      const label = legs.length > 1 ? `Leg ${i + 1}: ` : ''
-      if (!leg.dep.trim()) { setErr(`${label}Departure ICAO is required.`); return }
-      if (!leg.arr.trim()) { setErr(`${label}Arrival ICAO is required.`); return }
-      if (!leg.offHobbs.trim() || !leg.onHobbs.trim()) { setErr(`${label}Off Blocks and On Blocks Hobbs readings are required.`); return }
-      if (offN === null || onN === null) { setErr(`${label}Hobbs readings must be in tenths of an hour, e.g. 12345.6.`); return }
-      if (onN <= offN) { setErr(`${label}On Blocks Hobbs must be greater than Off Blocks Hobbs.`); return }
-      if (i > 0 && offN < (parseHobbs(legs[i - 1].onHobbs) ?? 0)) {
-        setErr(`${label}Off Blocks Hobbs can't be below Leg ${i}'s On Blocks Hobbs.`)
-        return
-      }
-      legData.push({ dep: leg.dep, arr: leg.arr, off: fmtHobbs(leg.offHobbs), on: fmtHobbs(leg.onHobbs), reason: leg.reason, part91: leg.part91 })
-    }
-    const totalFlight = legData.reduce((sum, l) => sum + legTenths({ offBlocks: l.off, onBlocks: l.on }), 0)
-    if (flightExceedsDuty(show, release, totalFlight)) {
-      setErr('Total flight time is longer than the duty period itself. Check the Hobbs readings and the Show/Release times.')
-      return
-    }
-
-    const newEntries: Entry[] = legData.map(leg => ({
-      id: uid(), pilot: '', crew,
-      tailNumber: tailNumber.trim() || undefined,
-      entity: entity.trim() || undefined,
-      showTime: show, releaseTime: release, showTz, releaseTz: relTz,
-      dep: leg.dep, arr: leg.arr,
-      offBlocks: leg.off, onBlocks: leg.on,
-      restStart: '', restEnd: '',
-      reason: leg.reason, part91: leg.part91, restDay: false,
-    }))
-    for (const leg of newEntries) {
-      const other = hobbsConflict(entries, leg, new Set())
-      if (other) { setErr(hobbsConflictMsg(other, tz)); return }
-    }
-
-    onAdd([...entries, ...newEntries])
-    resetForm()
-  }
-
+  // Bumping the key remounts the form empty (after adding, or "Clear form").
+  const [formKey, setFormKey] = useState(0)
+  function reset() { clearDraft(); setFormKey(k => k + 1) }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-bold">Add Flight Leg</CardTitle>
+    <Card id={ADD_FORM_ID} className={`${SECTION_CARD} scroll-mt-4`}>
+      <CardHeader className={SECTION_HEADER}>
+        <CardTitle className={SECTION_TITLE}>Add Duty Entry</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5">
-
-          <div className="col-span-full grid grid-cols-[8rem_1fr_auto] gap-2 items-start">
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Tail Number <span className="text-red-500">*</span></Label>
-              <Input
-                value={tailNumber}
-                onChange={e => setTailNumber(e.target.value.toUpperCase())}
-                placeholder="N123AB"
-                maxLength={8}
-                className="text-sm h-8 uppercase w-full"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Entity <span className="text-red-500">*</span></Label>
-              <Input
-                value={entity}
-                onChange={e => setEntity(e.target.value)}
-                placeholder="e.g. Acme Air LLC"
-                className="text-sm h-8"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs font-semibold text-slate-500">Crew Configuration</Label>
-              <Select value={crew} onValueChange={v => setCrew(v as 'S' | 'D')}>
-                <SelectTrigger className="text-sm h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectItem value="S">Single Pilot — 8 hr limit</SelectItem>
-                  <SelectItem value="D">Dual Pilot — 10 hr limit</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <SectionLabel>Duty Period</SectionLabel>
-
-          <div className="flex flex-col gap-1 sm:col-span-2">
-            <Label className="text-xs font-semibold text-slate-500">Show Time <span className="text-red-500">*</span></Label>
-            <div className="flex gap-1.5">
-              <Input type="date" value={showDate} onChange={e => setShowDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-              <Input type="time" value={showTime} onChange={e => setShowTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
-              <TzSelect tz={showTz} date={showDate} onChange={setShowTz} />
-            </div>
-            <UtcPreview dateStr={showDate} timeStr={showTime} tz={showTz} />
-            <span className="text-[0.68rem] text-slate-400">When you reported for duty (24-hr)</span>
-          </div>
-
-          <div className="flex flex-col gap-1 sm:col-span-2">
-            <Label className="text-xs font-semibold text-slate-500">Release Time <span className="text-red-500">*</span></Label>
-            <div className="flex gap-1.5">
-              <Input type="date" value={relDate} onChange={e => setRelDate(e.target.value)} className="text-sm h-8 flex-[1.5] appearance-none" />
-              <Input type="time" value={relTime} onChange={e => setRelTime(e.target.value)} className="text-sm h-8 flex-1 min-w-0 appearance-none" />
-              <TzSelect tz={relTz} date={relDate || showDate} onChange={setRelTz} />
-            </div>
-            <UtcPreview dateStr={relDate} timeStr={relTime} tz={relTz} />
-            <span className="text-[0.68rem] text-slate-400">When duty officially ended (24-hr). Rest runs from here to your next Show Time.</span>
-          </div>
-
-          <SectionLabel>Flight Legs</SectionLabel>
-
-          <div className="col-span-full">
-            {legs.map((leg, i) => (
-              <LegRow
-                key={i}
-                index={i}
-                data={leg}
-                onChange={updated => setLegs(legs.map((l, j) => j === i ? updated : l))}
-                onRemove={() => setLegs(legs.filter((_, j) => j !== i))}
-                showRemove={legs.length > 1}
-              />
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                const prev = legs[legs.length - 1]
-                setLegs([...legs, { ...emptyLeg(), dep: prev?.arr ?? '', offHobbs: prev?.onHobbs ?? '' }])
-              }}
-              className="w-full border border-dashed border-blue-300 bg-blue-50 hover:bg-blue-600 hover:text-white hover:border-solid text-blue-600 text-sm font-semibold rounded-lg py-2 mt-1 transition-colors"
-            >
-              + Add Another Leg
-            </button>
-          </div>
-
-        </div>
-
-        {err && <p className="text-red-600 text-xs mt-3">{err}</p>}
-
-        <div className="flex items-center justify-between mt-3">
-          <span className="text-[0.68rem] text-slate-400">Draft autosaved</span>
-          <button
-            type="button"
-            onClick={resetForm}
-            className="text-[0.68rem] text-slate-400 hover:text-red-500 underline"
-          >
-            Clear form
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-2.5 mt-2 items-center">
-          <Button onClick={handleAdd} className="bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm h-8">
-            Add Entry
-          </Button>
-        </div>
+        <DutyForm
+          key={formKey}
+          initial={formKey === 0 ? readDraft() : blankDuty()}
+          entries={entries}
+          tz={tz}
+          onChange={saveDraft}
+          onSubmit={legs => { onAdd([...entries, ...legs]); reset() }}
+          onClear={reset}
+        />
       </CardContent>
     </Card>
   )

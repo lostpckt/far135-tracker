@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Moon, Sun, Globe, MoreVertical } from 'lucide-react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Moon, Sun, Menu, X, Globe, BookOpen, Sparkles, RefreshCw, Coffee, HardDriveDownload } from 'lucide-react'
+import { REMINDER_DAY_CHOICES, REMINDER_DUTY_CHOICES, type ReminderSetting } from '@/lib/backup'
 import ChangelogModal from '@/components/ChangelogModal'
-import { TIMEZONES, tzAbbr } from '@/lib/timezone'
+import { HowToUseDialog } from '@/components/HowToUse'
+import { tzOptions, tzAbbr } from '@/lib/timezone'
 import { checkForAppUpdate } from '@/lib/updateCheck'
 
 interface Props {
@@ -11,6 +12,8 @@ interface Props {
   tz: string
   onTzChange: (tz: string) => void
   needRefresh: boolean   // a new version is downloaded and waiting (UpdateBanner shows it)
+  reminder: ReminderSetting
+  onReminderChange: (r: ReminderSetting) => void
 }
 
 type CheckPhase = 'idle' | 'checking' | 'downloading' | 'upToDate' | 'failed'
@@ -20,9 +23,15 @@ type CheckPhase = 'idle' | 'checking' | 'downloading' | 'upToDate' | 'failed'
 const RESULT_MS       = 3000
 const DOWNLOAD_MAX_MS = 60000
 
-export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh }: Props) {
+const itemClass = 'w-full flex items-center gap-2.5 text-left px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors'
+
+// Every header control lives in one menu at the far right, at every screen size.
+export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh, reminder, onReminderChange }: Props) {
   const [phase, setPhase] = useState<CheckPhase>('idle')
   const [menuOpen, setMenuOpen] = useState(false)
+  // The dialogs are rendered outside the menu so closing the menu doesn't close them.
+  const [howToOpen, setHowToOpen] = useState(false)
+  const [changelogOpen, setChangelogOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const phaseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -80,108 +89,108 @@ export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh
         {toast}
       </div>
     )}
-    <header className="bg-slate-900 text-white px-6 py-3.5 flex items-center gap-3">
+    <header className="bg-slate-900 text-white px-4 sm:px-6 py-3.5 flex items-center gap-3">
       <div className="flex-1 min-w-0">
-        <h1 className="text-lg font-bold whitespace-nowrap">✈ FAR 135.267 Duty &amp; Flight Time Tracker</h1>
+        <h1 className="text-base sm:text-lg font-bold leading-tight">✈ FAR 135.267 Duty &amp; Flight Time Tracker</h1>
         <p className="text-xs opacity-60 mt-0.5">
           Part 135 Unscheduled Operations — Pilot Records | Data stored locally in your browser
         </p>
       </div>
 
-      <div className="flex items-center gap-1.5 border border-slate-600 rounded-md px-2 py-1 shrink-0" title="Home timezone — sets where months and quarters begin, and shows the dashboard and older entries">
-        <Globe size={13} className="opacity-50 shrink-0" />
-        <Select value={tz} onValueChange={onTzChange}>
-          <SelectTrigger className="border-0 bg-transparent text-white text-xs h-auto p-0 gap-1 focus:ring-0 shadow-none w-auto min-w-0">
-            <SelectValue>{tzAbbr(tz)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent align="end">
-            {TIMEZONES.map(t => (
-              <SelectItem key={t.value} value={t.value} className="text-xs">
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Desktop: inline buttons */}
-      <ChangelogModal>
-        <button className="hidden lg:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 shrink-0">
-          What's new
-        </button>
-      </ChangelogModal>
-      <button
-        onClick={checkForUpdate}
-        disabled={busy}
-        className="hidden lg:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 disabled:cursor-wait w-[118px] text-center shrink-0"
-      >
-        {checkLabel}
-      </button>
-      <a
-        href="https://buymeacoffee.com/lostpckt"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="hidden lg:block text-xs opacity-50 hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-700 shrink-0 whitespace-nowrap"
-      >
-        ☕ Buy me a coffee
-      </a>
-
-      {/* Mobile: overflow menu */}
-      <div className="relative lg:hidden shrink-0" ref={menuRef}>
+      <div className="relative shrink-0" ref={menuRef}>
         <button
           onClick={() => setMenuOpen(o => !o)}
-          className="p-2 rounded-lg hover:bg-slate-700 transition-colors opacity-50 hover:opacity-100"
-          aria-label="More options"
+          className="flex items-center gap-1.5 border border-slate-500 rounded-lg px-2.5 py-1.5 hover:bg-slate-700 transition-colors"
+          aria-label="Menu"
+          aria-expanded={menuOpen}
         >
-          <MoreVertical size={18} />
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[160px] z-50">
-            <ChangelogModal>
-              <button
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
-                onClick={() => setMenuOpen(false)}
+          <div className="absolute right-0 top-full mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 w-72 z-50">
+            <div className="px-4 pt-2 pb-3 border-b border-slate-700">
+              <label htmlFor="home-tz" className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-1.5">
+                <Globe size={13} className="opacity-60" />
+                Home timezone ({tzAbbr(tz)})
+              </label>
+              <select
+                id="home-tz"
+                value={tz}
+                onChange={e => onTzChange(e.target.value)}
+                className="w-full rounded-md bg-slate-700 border border-slate-600 text-white text-sm px-2 py-1.5"
               >
-                What's new
-              </button>
-            </ChangelogModal>
+                {tzOptions(tz).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <p className="text-[0.68rem] text-slate-400 mt-1.5 leading-snug">
+                Sets where months and quarters begin, and shows the dashboard and older entries.
+              </p>
+            </div>
+
+            <div className="px-4 pt-2.5 pb-3 border-b border-slate-700">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-1.5">
+                <HardDriveDownload size={13} className="opacity-60" />
+                Backup reminder
+              </p>
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-slate-400">Every</span>
+                <select
+                  aria-label="Remind after this many days"
+                  value={reminder.days}
+                  onChange={e => onReminderChange({ ...reminder, days: Number(e.target.value) })}
+                  className="rounded-md bg-slate-700 border border-slate-600 text-white text-sm px-1.5 py-1"
+                >
+                  {REMINDER_DAY_CHOICES.map(d => <option key={d} value={d}>{d} {d === 1 ? 'day' : 'days'}</option>)}
+                </select>
+                <span className="text-slate-400">or</span>
+                <select
+                  aria-label="Remind after this many new duty entries"
+                  value={reminder.duties}
+                  onChange={e => onReminderChange({ ...reminder, duties: Number(e.target.value) })}
+                  className="rounded-md bg-slate-700 border border-slate-600 text-white text-sm px-1.5 py-1"
+                >
+                  {REMINDER_DUTY_CHOICES.map(n => <option key={n} value={n}>{n} entries</option>)}
+                </select>
+              </div>
+              <p className="text-[0.68rem] text-slate-400 mt-1.5 leading-snug">Whichever comes first.</p>
+            </div>
+
+            <button onClick={onToggleDark} className={`${itemClass} border-b border-slate-700`}>
+              {dark ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
+              {dark ? 'Light mode' : 'Dark mode'}
+            </button>
+
+            <button onClick={() => { setHowToOpen(true); setMenuOpen(false) }} className={itemClass}>
+              <BookOpen size={16} className="opacity-70" />
+              How to use
+            </button>
+            <button onClick={() => { setChangelogOpen(true); setMenuOpen(false) }} className={itemClass}>
+              <Sparkles size={16} className="opacity-70" />
+              What's new
+            </button>
             <button
               onClick={() => { checkForUpdate(); setMenuOpen(false) }}
               disabled={busy}
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors disabled:cursor-wait opacity-80"
+              className={`${itemClass} disabled:cursor-wait`}
             >
+              <RefreshCw size={16} className="opacity-70" />
               {checkLabel}
             </button>
             <a
               href="https://buymeacoffee.com/lostpckt"
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full text-left px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              className={itemClass}
               onClick={() => setMenuOpen(false)}
             >
-              ☕ Buy me a coffee
+              <Coffee size={16} className="opacity-70" />
+              Buy me a coffee
             </a>
           </div>
         )}
       </div>
-
-      <div
-        onClick={onToggleDark}
-        className="flex items-center gap-1 border border-slate-600 rounded-full px-2 py-1.5 cursor-pointer hover:bg-slate-700 transition-colors shrink-0"
-        title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        <Sun
-          size={15}
-          className="transition-colors"
-          style={{ color: !dark ? '#f59e0b' : '#64748b' }}
-        />
-        <Moon
-          size={15}
-          className="transition-colors"
-          style={{ color: dark ? '#f1f5f9' : '#64748b' }}
-        />
-      </div>
     </header>
+    <HowToUseDialog open={howToOpen} onOpenChange={setHowToOpen} />
+    <ChangelogModal open={changelogOpen} onOpenChange={setChangelogOpen} />
     </>
   )
 }

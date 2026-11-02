@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SECTION_CARD, SECTION_HEADER, SECTION_TITLE } from '@/lib/section'
 import { compute, fmtHrs, ms, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
 import { utcToLocalParts, tzAbbr, localYearMonth } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
@@ -25,13 +26,11 @@ function StatCard({
   }[color]
 
   return (
-    <Card className="h-full">
-      <CardContent className="pt-4 pb-3 px-4">
-        <p className="text-[0.7rem] text-muted-foreground uppercase tracking-wide mb-1.5">{label}</p>
-        <p className={`text-2xl font-bold leading-none ${valueClass}`}>{value}</p>
-        <p className="text-xs text-muted-foreground mt-1.5">{sub}</p>
-      </CardContent>
-    </Card>
+    <div className="h-full rounded-lg bg-slate-50 dark:bg-slate-800/60 ring-1 ring-slate-200 dark:ring-slate-700 pt-4 pb-3 px-4">
+      <p className="text-[0.7rem] text-muted-foreground uppercase tracking-wide mb-1.5">{label}</p>
+      <p className={`text-2xl font-bold leading-none ${valueClass}`}>{value}</p>
+      <p className="text-xs text-muted-foreground mt-1.5">{sub}</p>
+    </div>
   )
 }
 
@@ -173,17 +172,20 @@ export default function Dashboard({ entries, tz }: Props) {
   ]
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        {cards.map(c => (
-          <StatCard key={c.label} {...c} />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        {cumulativeCards.map(c => (
-          <StatCard key={c.label} {...c} />
-        ))}
-      </div>
-    </div>
+    <Card className={SECTION_CARD}>
+      <CardHeader className={SECTION_HEADER}><CardTitle className={SECTION_TITLE}>Dashboard</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {cards.map(c => (
+            <StatCard key={c.label} {...c} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {cumulativeCards.map(c => (
+            <StatCard key={c.label} {...c} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

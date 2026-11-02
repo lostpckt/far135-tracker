@@ -8,8 +8,53 @@ import type { Entry } from '@/types/entry'
 const FORMAT  = 'far135-backup'
 const VERSION = 1
 
-const LAST_BACKUP_KEY = 'far135_last_backup'
-export const BACKUP_REMINDER_DAYS = 15
+const LAST_BACKUP_KEY   = 'far135_last_backup'
+const BACKUP_DUTIES_KEY = 'far135_backup_duties'    // duty entries in the log at the last backup
+const REMINDER_KEY      = 'far135_backup_reminder'  // the user's reminder setting
+
+// Remind after this many days or this many new duty entries, whichever comes first.
+// The choices stop at 14 days / 20 entries so the reminder can't be pushed out further.
+export interface ReminderSetting { days: number; duties: number }
+export const REMINDER_DAY_CHOICES  = [1, 3, 7, 10, 14]
+export const REMINDER_DUTY_CHOICES = [5, 10, 15, 20]
+const DEFAULT_REMINDER: ReminderSetting = { days: 14, duties: 20 }
+
+export function loadReminderSetting(): ReminderSetting {
+  try {
+    const r = JSON.parse(localStorage.getItem(REMINDER_KEY) || 'null')
+    return {
+      days:   REMINDER_DAY_CHOICES.includes(r?.days)    ? r.days   : DEFAULT_REMINDER.days,
+      duties: REMINDER_DUTY_CHOICES.includes(r?.duties) ? r.duties : DEFAULT_REMINDER.duties,
+    }
+  } catch { return DEFAULT_REMINDER }
+}
+
+export function saveReminderSetting(r: ReminderSetting) {
+  try { localStorage.setItem(REMINDER_KEY, JSON.stringify(r)) } catch { /* localStorage unavailable */ }
+}
+
+/** Duty entries (legs sharing Show and Release count once). */
+export function dutyCount(entries: Entry[]): number {
+  return new Set(entries.filter(e => !e.restDay).map(e => `${e.showTime}|${e.releaseTime}`)).size
+}
+
+function recordBackupDuties(n: number) {
+  try { localStorage.setItem(BACKUP_DUTIES_KEY, String(n)) } catch { /* localStorage unavailable */ }
+}
+
+/**
+ * Duty entries in the log at the last backup. Devices that backed up before
+ * this was tracked start counting from now, so they aren't nagged at once.
+ */
+export function backupDuties(entries: Entry[]): number {
+  try {
+    const v = Number(localStorage.getItem(BACKUP_DUTIES_KEY))
+    if (localStorage.getItem(BACKUP_DUTIES_KEY) !== null && Number.isFinite(v)) return v
+  } catch { /* localStorage unavailable */ }
+  const n = dutyCount(entries)
+  if (lastBackupMs() !== null) recordBackupDuties(n)
+  return n
+}
 
 export interface BackupFile {
   format: typeof FORMAT
@@ -107,6 +152,7 @@ export async function downloadBackup(entries: Entry[], tz: string): Promise<bool
   const saved = await saveFile(json, `far135_backup_${new Date().toISOString().slice(0, 10)}.json`, 'application/json')
   if (saved) {
     try { localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString()) } catch { /* localStorage unavailable */ }
+    recordBackupDuties(dutyCount(entries))
   }
   return saved
 }
@@ -114,7 +160,8 @@ export async function downloadBackup(entries: Entry[], tz: string): Promise<bool
 // After a restore, the file just restored from is itself a backup that exists
 // outside the browser, so count it — but never move the date backwards.
 // Returns the resulting last-backup time.
-export function recordRestoredBackup(exportedAt: string): number | null {
+export function recordRestoredBackup(exportedAt: string, entries: Entry[]): number | null {
+  recordBackupDuties(dutyCount(entries))   // the log now matches the restored file
   const t = Date.parse(exportedAt)
   const current = lastBackupMs()
   if (Number.isNaN(t) || (current !== null && current >= t)) return current

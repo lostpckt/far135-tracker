@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef, Fragment } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SECTION_CARD, SECTION_HEADER, SECTION_TITLE } from '@/lib/section'
 import { Badge } from '@/components/ui/badge'
+import ScrollX from '@/components/ScrollX'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { compute, computeDutyPeriod, fmtHobbs, fmtHrs, fmtFlight, restPeriodsInWindow } from '@/lib/calculations'
@@ -163,20 +165,20 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
 
   if (!legs.length) {
     return (
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Flight Log</CardTitle></CardHeader>
+      <Card className={SECTION_CARD}>
+        <CardHeader className={SECTION_HEADER}><CardTitle className={SECTION_TITLE}>Flight Log</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-center py-12 text-slate-400">No entries yet — add your first flight leg above.</p>
+          <p className="text-center py-12 text-slate-400">No entries yet — add your first duty entry above.</p>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Flight Log</CardTitle></CardHeader>
+    <Card className={SECTION_CARD}>
+      <CardHeader className={SECTION_HEADER}><CardTitle className={SECTION_TITLE}>Flight Log</CardTitle></CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <ScrollX>
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800">
@@ -400,7 +402,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
               )
             })}
           </table>
-        </div>
+        </ScrollX>
       </CardContent>
 
       <Dialog open={exceedanceReason !== null} onOpenChange={open => { if (!open) setExceedanceReason(null) }}>

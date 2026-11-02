@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import changelogRaw from '../../CHANGELOG.md?raw'
 
@@ -26,16 +26,26 @@ async function fetchDeployedChangelog(): Promise<string | null> {
   } catch { return null }
 }
 
-export default function ChangelogModal({ children }: { children: React.ReactNode }) {
+// Opens from `children` (a trigger), or is controlled with `open` / `onOpenChange`.
+export default function ChangelogModal({ children, open, onOpenChange }: {
+  children?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
   const [text, setText] = useState(changelogRaw)
 
-  function handleOpenChange(open: boolean) {
+  useEffect(() => {
     if (open) fetchDeployedChangelog().then(t => { if (t) setText(t) })
+  }, [open])
+
+  function handleOpenChange(o: boolean) {
+    if (o && open === undefined) fetchDeployedChangelog().then(t => { if (t) setText(t) })
+    onOpenChange?.(o)
   }
 
   return (
-    <Dialog onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Changelog</DialogTitle>

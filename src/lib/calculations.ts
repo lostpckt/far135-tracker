@@ -546,7 +546,7 @@ export function importCSV(text: string): { entries: Entry[]; skipped: SkippedRow
     if (!dep || !arr) { skipped.push({ line: li + 1, reason: 'missing departure or arrival' }); continue }
     const offN = parseHobbs(offBlocks)
     const onN  = parseHobbs(onBlocks)
-    if (offN === null || onN === null) { skipped.push({ line: li + 1, reason: 'missing Hobbs reading, or not in tenths (e.g. 12345.6)' }); continue }
+    if (offN === null || onN === null) { skipped.push({ line: li + 1, reason: 'missing Hobbs reading, or not in tenths (e.g. 1234.5)' }); continue }
     if (onN <= offN) { skipped.push({ line: li + 1, reason: 'On Blocks not greater than Off Blocks' }); continue }
 
     const part91 = get(row, part135Idx).trim() !== 'True'
