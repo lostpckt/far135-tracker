@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Globe } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -67,25 +68,24 @@ export function DateTimeInput({ type, value, onChange, className, invalid, field
   )
 }
 
-// Single / Dual pilot, as two side-by-side buttons (one is always selected).
+// Single / Dual pilot as two radio buttons; the filled dot shows the choice in
+// either theme (the old segmented buttons relied on fill color alone).
 export function CrewToggle({ value, onChange }: { value: 'S' | 'D'; onChange: (v: 'S' | 'D') => void }) {
+  const name = useId()
   return (
-    <div role="radiogroup" aria-label="Crew configuration" className="inline-flex h-8 w-max rounded-md border border-input overflow-hidden">
+    <div role="radiogroup" aria-label="Crew configuration" className="flex items-center gap-4 h-8">
       {(['S', 'D'] as const).map(v => (
-        <button
-          key={v}
-          type="button"
-          role="radio"
-          aria-checked={value === v}
-          onClick={() => onChange(v)}
-          className={`px-3.5 text-sm font-medium transition-colors ${v === 'D' ? 'border-l border-input' : ''} ${
-            value === v
-              ? 'bg-slate-900 text-white dark:bg-blue-600'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
+        <label key={v} className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+          <input
+            type="radio"
+            name={name}
+            value={v}
+            checked={value === v}
+            onChange={() => onChange(v)}
+            className="size-4 accent-blue-600 cursor-pointer"
+          />
           {v === 'S' ? 'Single' : 'Dual'}
-        </button>
+        </label>
       ))}
     </div>
   )

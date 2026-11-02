@@ -15,7 +15,7 @@
 
 ### Fixed
 - **Airport codes no longer cut off** in the leg boxes on a phone — wide letters (Q, M, W) made codes like KSQL show as "KSQ".
-- **Crew Configuration is two buttons, Single | Dual** — the dropdown was cut off in the edit dialog and the Add Duty Entry form on smaller screens, and couldn't be used with Apple Pencil. The buttons drop the "8 hr / 10 hr limit" text; on a phone they sit on their own row under Tail Number and Entity.
+- **Crew Configuration is two radio buttons, Single and Dual** — the dropdown was cut off in the edit dialog and the Add Duty Entry form on smaller screens, and couldn't be used with Apple Pencil. A filled dot marks the choice, so it's clear in light and dark mode. The "8 hr / 10 hr limit" text is gone; on a phone they sit on their own row under Tail Number and Entity.
 
 ### Changed
 - **Off Blocks and On Blocks no longer say "(Hobbs)"**, and the example Hobbs reading is 1234.5 everywhere (boxes, error messages, How to use).
