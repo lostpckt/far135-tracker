@@ -12,7 +12,6 @@ export interface LegData {
   arr: string
   offHobbs: string
   onHobbs: string
-  reason: string
   part91: boolean
 }
 
@@ -39,22 +38,11 @@ export default function LegRow({ index, data, onChange, onRemove, onMoveUp, onMo
 
   return (
     <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 mb-2">
-      <div className="flex gap-3 items-start">
-        {/* Leg number stays on one line; reorder and delete sit under it (no delete on Leg 1). */}
+      <div className="flex gap-2 items-start">
+        {/* Leg number stays on one line, delete under it (none on Leg 1). Reorder is at the far
+            right, away from delete, so a mis-tap can't remove a leg. */}
         <div className="flex flex-col items-center gap-1 pt-5 shrink-0 w-11">
           <span className="text-xs font-bold text-blue-600 whitespace-nowrap">Leg {n}</span>
-          {(onMoveUp || onMoveDown) && (
-            <div className="flex">
-              <button type="button" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Move leg ${n} up`} title="Move up"
-                className={`${iconBtn} text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:invisible`}>
-                <ChevronUp size={16} />
-              </button>
-              <button type="button" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Move leg ${n} down`} title="Move down"
-                className={`${iconBtn} text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:invisible`}>
-                <ChevronDown size={16} />
-              </button>
-            </div>
-          )}
           {onRemove && (
             <button type="button" onClick={onRemove} aria-label={`Delete leg ${n}`} title={`Delete leg ${n}`}
               className={`${iconBtn} p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950`}>
@@ -97,7 +85,7 @@ export default function LegRow({ index, data, onChange, onRemove, onMoveUp, onMo
               step="0.1"
               min="0"
               aria-invalid={bad('off')}
-              className="text-sm h-8 w-[110px]"
+              className="text-sm h-8 w-[104px]"
             />
           </div>
 
@@ -111,17 +99,7 @@ export default function LegRow({ index, data, onChange, onRemove, onMoveUp, onMo
               step="0.1"
               min="0"
               aria-invalid={bad('on')}
-              className="text-sm h-8 w-[110px]"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
-            <Label className="text-[0.7rem]">Exceedance Reason (optional)</Label>
-            <Input
-              value={data.reason}
-              onChange={e => set('reason', e.target.value)}
-              placeholder="e.g. Weather divert"
-              className="text-sm h-8"
+              className="text-sm h-8 w-[104px]"
             />
           </div>
 
@@ -139,6 +117,19 @@ export default function LegRow({ index, data, onChange, onRemove, onMoveUp, onMo
             </div>
           </div>
         </div>
+
+        {(onMoveUp || onMoveDown) && (
+          <div className="flex flex-col items-center gap-0.5 pt-4 shrink-0">
+            <button type="button" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Move leg ${n} up`} title="Move up"
+              className={`${iconBtn} text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:invisible`}>
+              <ChevronUp size={18} />
+            </button>
+            <button type="button" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Move leg ${n} down`} title="Move down"
+              className={`${iconBtn} text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:invisible`}>
+              <ChevronDown size={18} />
+            </button>
+          </div>
+        )}
       </div>
       {error && <div className="mt-2 pl-14"><FieldError msg={error.msg} /></div>}
     </div>

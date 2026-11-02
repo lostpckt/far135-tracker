@@ -28,9 +28,11 @@ export default function EditDutyDialog({ legs, entries, tz, onSave, onClose }: P
     entity:     mixedEntity ? '' : first.entity ?? '',
     crew: first.crew || 'S',
     showDate: s.d, showTime: s.t, relDate: r.d, relTime: r.t, showTz, relTz,
+    // One reason per duty; older entries may have had a different one per leg.
+    reason: [...new Set(legs.map(l => l.reason?.trim()).filter(Boolean))].join('; '),
     legs: legs.map(l => ({
       key: l.id, id: l.id, dep: l.dep, arr: l.arr,
-      offHobbs: l.offBlocks, onHobbs: l.onBlocks, reason: l.reason, part91: !!l.part91,
+      offHobbs: l.offBlocks, onHobbs: l.onBlocks, part91: !!l.part91,
     })),
   }
 

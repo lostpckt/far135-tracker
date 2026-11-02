@@ -18,6 +18,8 @@
 - **Crew Configuration is two radio buttons, Single and Dual** — the dropdown was cut off in the edit dialog and the Add Duty Entry form on smaller screens, and couldn't be used with Apple Pencil. A filled dot marks the choice, so it's clear in light and dark mode. The "8 hr / 10 hr limit" text is gone; on a phone they sit on their own row under Tail Number and Entity.
 
 ### Changed
+- **Leg ▲ ▼ reorder buttons moved to the right end of each leg**, away from the trash can under the leg number, so a mis-tap can't delete a leg.
+- **Exceedance Reason only appears when there's an exceedance, and is then required** — it's one box for the whole duty, under the legs, instead of a box on every leg. It appears as soon as the times and Hobbs readings put the duty over the flight time limit, says by how much, and must be filled in to save. Each leg now fits on one line on an iPad mini in portrait. A reason already saved on a duty still shows when editing, so it can be changed or cleared.
 - **Off Blocks and On Blocks no longer say "(Hobbs)"**, and the example Hobbs reading is 1234.5 everywhere (boxes, error messages, How to use).
 - **How to use reads more easily** — short paragraphs, with the flight time formula set out on its own line: Flight time = On Blocks − Off Blocks. It also says plainly to enter each time in the timezone you were in.
 - **One menu for everything in the header** — the home timezone, light/dark mode, How to use, What's new, Check for update and Buy me a coffee are all in a ☰ menu at the far right of the header, on every screen size and orientation (an iPad in landscape no longer spreads them across the header).

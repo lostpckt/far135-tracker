@@ -15,7 +15,7 @@ function blankDuty(): DutyFormState {
   return {
     tailNumber: '', entity: '', crew: 'S',
     showDate: utcToLocalParts(new Date().toISOString(), tz)?.date ?? '', showTime: '',
-    relDate: '', relTime: '', showTz: tz, relTz: tz,
+    relDate: '', relTime: '', showTz: tz, relTz: tz, reason: '',
     legs: [emptyLeg()],
   }
 }
