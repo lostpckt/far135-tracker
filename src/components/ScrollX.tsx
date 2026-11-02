@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 // A sideways-scrolling area that shows when there's more off screen: a fade at
-// the edge with more content, and a › arrow on the right fade until you reach the end.
-// The arrow sits below the column headers, centered, and stays mid-screen on a long table.
+// each edge with more content, with a ‹ or › arrow on it. The arrows sit below the
+// column headers, centered, and stay mid-screen on a long table.
+//
+// Tapping › moves a full screen: the column cut off at the right edge becomes the
+// first column (edges from the first table row). ‹ goes back a screen to a whole column.
+// Both stop exactly at either end, so the last column ends
+// flush with the edge rather than relying on the browser to clamp a smooth scroll.
 export default function ScrollX({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [more, setMore] = useState({ left: false, right: false })
@@ -23,17 +28,53 @@ export default function ScrollX({ children }: { children: React.ReactNode }) {
     return () => { el.removeEventListener('scroll', update); ro.disconnect() }
   }, [])
 
+  function step(dir: 1 | -1) {
+    const el = ref.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    const cur = el.scrollLeft
+    const want = cur + dir * el.clientWidth
+    // Left edges of the columns, in scroll coordinates.
+    const box = el.getBoundingClientRect()
+    const edges = [...(el.querySelector('tr')?.children ?? [])]
+      .map(c => c.getBoundingClientRect().left - box.left + cur)
+    let target = want
+    if (dir > 0) {
+      // The column cut off at the right edge becomes the first column.
+      const fits = edges.filter(x => x > cur + 4 && x <= want)
+      if (fits.length) target = Math.max(...fits)
+    } else {
+      // Back a full screen, starting on a whole column.
+      const fits = edges.filter(x => x < cur - 4 && x >= want)
+      if (fits.length) target = Math.min(...fits)
+    }
+    el.scrollTo({ left: Math.round(Math.min(max, Math.max(0, target))), behavior: 'smooth' })
+  }
+
+  const fade = 'pointer-events-none absolute inset-y-0 w-10 pt-11 pb-2 flex flex-col justify-center via-card/70 to-transparent transition-opacity'
+  const arrow = 'sticky top-[45vh] bottom-[45vh] p-1 text-slate-500 dark:text-slate-300'
+
   return (
     <div className="relative">
       <div ref={ref} className="overflow-x-auto">{children}</div>
-      <div aria-hidden className={`pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-card to-transparent transition-opacity ${more.left ? 'opacity-100' : 'opacity-0'}`} />
-      <div className={`pointer-events-none absolute inset-y-0 right-0 w-10 pt-11 pb-2 flex flex-col items-end justify-center bg-gradient-to-l from-card via-card/70 to-transparent transition-opacity ${more.right ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`${fade} left-0 items-start bg-gradient-to-r from-card ${more.left ? 'opacity-100' : 'opacity-0'}`}>
+        <button
+          type="button"
+          tabIndex={more.left ? 0 : -1}
+          aria-label="Scroll left for more columns"
+          onClick={() => step(-1)}
+          className={`${arrow} ${more.left ? 'pointer-events-auto' : ''}`}
+        >
+          <ChevronLeft size={22} strokeWidth={2.5} />
+        </button>
+      </div>
+      <div className={`${fade} right-0 items-end bg-gradient-to-l from-card ${more.right ? 'opacity-100' : 'opacity-0'}`}>
         <button
           type="button"
           tabIndex={more.right ? 0 : -1}
           aria-label="Scroll right for more columns"
-          onClick={() => ref.current?.scrollBy({ left: ref.current.clientWidth * 0.8, behavior: 'smooth' })}
-          className={`sticky top-[45vh] bottom-[45vh] p-1 text-slate-500 dark:text-slate-300 ${more.right ? 'pointer-events-auto' : ''}`}
+          onClick={() => step(1)}
+          className={`${arrow} ${more.right ? 'pointer-events-auto' : ''}`}
         >
           <ChevronRight size={22} strokeWidth={2.5} />
         </button>
