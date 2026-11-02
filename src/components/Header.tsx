@@ -33,6 +33,7 @@ export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh
   const [howToOpen, setHowToOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
   const phaseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
@@ -46,6 +47,18 @@ export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh
   }, [])
 
   useEffect(() => () => clearTimeout(phaseTimer.current), [])
+
+  // The header stays pinned to the top. Publish its height so in-page jumps
+  // (scrollIntoView) stop below it instead of under it — see scroll-padding-top in index.css.
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const set = () => document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Show a phase, optionally returning to idle after `ms`.
   function showPhase(p: CheckPhase, ms?: number) {
@@ -89,7 +102,7 @@ export default function Header({ dark, onToggleDark, tz, onTzChange, needRefresh
         {toast}
       </div>
     )}
-    <header className="bg-slate-900 text-white px-4 sm:px-6 py-3.5 flex items-center gap-3">
+    <header ref={headerRef} className="sticky top-0 z-40 bg-slate-900 text-white px-4 sm:px-6 py-3.5 flex items-center gap-3">
       <div className="flex-1 min-w-0">
         <h1 className="text-base sm:text-lg font-bold leading-tight">✈ FAR 135.267 Duty &amp; Flight Time Tracker</h1>
         <p className="text-xs opacity-60 mt-0.5">

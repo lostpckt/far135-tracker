@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 // A sideways-scrolling area that shows when there's more off screen: a fade at
 // each edge with more content, with a ‹ or › arrow on it. The arrows sit below the
-// column headers, centered, and stay mid-screen on a long table.
+// column headers and hold at the middle of the screen while the table is in view.
 //
 // Tapping › moves a full screen: the column cut off at the right edge becomes the
 // first column (edges from the first table row). ‹ goes back a screen to a whole column.
@@ -52,7 +52,15 @@ export default function ScrollX({ children }: { children: React.ReactNode }) {
   }
 
   const fade = 'pointer-events-none absolute inset-y-0 w-10 pt-11 pb-2 flex flex-col justify-center via-card/70 to-transparent transition-opacity'
-  const arrow = 'sticky top-[45vh] bottom-[45vh] p-1 text-slate-500 dark:text-slate-300'
+  const arrow = 'sticky p-1 text-slate-500 dark:text-slate-300'
+  // One resting spot: the middle of the screen area below the pinned top bar
+  // (--header-h, set by Header). Same value for top and bottom, so the arrow holds
+  // there instead of shifting between two spots. ARROW_HALF = half the 30 px button.
+  const ARROW_HALF = 15
+  const pin = {
+    top:    `calc((100vh + var(--header-h, 0px)) / 2 - ${ARROW_HALF}px)`,
+    bottom: `calc((100vh - var(--header-h, 0px)) / 2 - ${ARROW_HALF}px)`,
+  }
 
   return (
     <div className="relative">
@@ -63,6 +71,7 @@ export default function ScrollX({ children }: { children: React.ReactNode }) {
           tabIndex={more.left ? 0 : -1}
           aria-label="Scroll left for more columns"
           onClick={() => step(-1)}
+          style={pin}
           className={`${arrow} ${more.left ? 'pointer-events-auto' : ''}`}
         >
           <ChevronLeft size={22} strokeWidth={2.5} />
@@ -74,6 +83,7 @@ export default function ScrollX({ children }: { children: React.ReactNode }) {
           tabIndex={more.right ? 0 : -1}
           aria-label="Scroll right for more columns"
           onClick={() => step(1)}
+          style={pin}
           className={`${arrow} ${more.right ? 'pointer-events-auto' : ''}`}
         >
           <ChevronRight size={22} strokeWidth={2.5} />

@@ -128,3 +128,7 @@
     @apply font-sans;
     }
 }
+/* The header is sticky; keep in-page jumps (scrollIntoView) clear of it. */
+html {
+    scroll-padding-top: calc(var(--header-h, 0px) + 8px);
+}
