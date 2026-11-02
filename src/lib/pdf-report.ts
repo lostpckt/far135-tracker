@@ -59,7 +59,10 @@ function periodStats(allEntries: Entry[], period: Entry[], periodStart: number, 
   const part135Flight = tenthsToHrs(period
     .filter(e => !e.part91)
     .reduce((sum, e) => sum + legTenths(e), 0))
-  return { restDays, part135Flight }
+  const part91Flight = tenthsToHrs(period
+    .filter(e => e.part91)
+    .reduce((sum, e) => sum + legTenths(e), 0))
+  return { restDays, part135Flight, part91Flight }
 }
 
 interface ReportData {
@@ -348,7 +351,7 @@ export function generateQuarterlyReportPDF(
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= qStart && a < qEnd })
   if (!period.length) return false
 
-  const { restDays } = periodStats(entries, period, qStart, qEnd)
+  const { restDays, part91Flight } = periodStats(entries, period, qStart, qEnd)
 
   // §135.267(a) limits apply to the pilot's total Part 135 flying, so they're
   // computed across all entities even when the report is filtered to one.
@@ -370,6 +373,7 @@ export function generateQuarterlyReportPDF(
       limitRow('Quarterly Flight Hours Sec. 135.267(a)', qHrs, 500, 'quarterly'),
       limitRow('Two-Quarter Flight Hours Sec. 135.267(a)', tqHrs, 800, 'with previous quarter'),
       limitRow(`Calendar-Year Flight Hours to Q${qIdx + 1} end Sec. 135.267(a)`, ytd, 1400, 'annual'),
+      ['Part 91 Flight Hours (Quarter)', fmtFlight(part91Flight)],
     ],
     restDayStatLabel: rd => `${rd} / 13`,
     isOverallOk: (v, rd) => v === 0 && rd >= 13 && limitsOk,
@@ -390,7 +394,7 @@ export function generateMonthlyReportPDF(
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= mStart && a < mEnd })
   if (!period.length) return false
 
-  const { restDays, part135Flight } = periodStats(entries, period, mStart, mEnd)
+  const { restDays, part135Flight, part91Flight } = periodStats(entries, period, mStart, mEnd)
 
   const doc = renderPDF(entries, {
     periodEntries: period, periodStart: mStart, periodEnd: mEnd,
@@ -399,6 +403,7 @@ export function generateMonthlyReportPDF(
     extraScorecard: [
       ['24-hr Rest Periods This Month', `${restDays} (>=13/quarter required)`],
       ['Part 135 Flight Hours (Month)', fmtFlight(part135Flight)],
+      ['Part 91 Flight Hours (Month)', fmtFlight(part91Flight)],
     ],
     restDayStatLabel: rd => `${rd}`,
     isOverallOk: v => v === 0,

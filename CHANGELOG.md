@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-01
+
+### Added
+- **Reports show Part 91 hours** — the monthly report's scorecard has a "Part 91 Flight Hours (Month)" line right below "Part 135 Flight Hours (Month)", and the quarterly report has a "Part 91 Flight Hours (Quarter)" line below the flight-hour limit lines. Each totals the Part 91 flight time in the report's period (for the selected entity, if one is chosen). They're for reference only: Part 91 time still doesn't count toward any Sec. 135.267 limit.
+
 ## 2026-10-26
 
 ### Fixed
