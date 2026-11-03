@@ -55,14 +55,14 @@ function baseTableOpts(margin: number, fontSize: number) {
 // Rest periods come from all logged duty (rest is the pilot's, whichever entity
 // the duty was for); flight hours from the period's (entity-scoped) legs.
 function periodStats(allEntries: Entry[], period: Entry[], periodStart: number, periodEnd: number) {
-  const restDays = restPeriodsInWindow(allEntries, periodStart, periodEnd, Date.now())
+  const restPeriods = restPeriodsInWindow(allEntries, periodStart, periodEnd, Date.now())
   const part135Flight = tenthsToHrs(period
     .filter(e => !e.part91)
     .reduce((sum, e) => sum + legTenths(e), 0))
   const part91Flight = tenthsToHrs(period
     .filter(e => e.part91)
     .reduce((sum, e) => sum + legTenths(e), 0))
-  return { restDays, part135Flight, part91Flight }
+  return { restPeriods, part135Flight, part91Flight }
 }
 
 interface ReportData {
@@ -72,10 +72,10 @@ interface ReportData {
   periodLabel: string
   heading: string
   periodNoun: string
-  restDays: number
+  restPeriods: number
   extraScorecard: [string, string][]
-  restDayStatLabel: (restDays: number) => string
-  isOverallOk: (violations: number, restDays: number) => boolean
+  restPeriodStatLabel: (restPeriods: number) => string
+  isOverallOk: (violations: number, restPeriods: number) => boolean
 }
 
 function buildData(
@@ -96,7 +96,7 @@ function buildData(
   computed: Map<string, ReturnType<typeof compute>>
   dayMap: Map<string, { p135: number; p91: number; showTime: string; showTz?: string; releaseTime: string; releaseTz?: string; hasViolation: boolean }>
 } {
-  const { periodEntries, restDays } = d
+  const { periodEntries, restPeriods } = d
   const flightLegs  = periodEntries
   const part135Legs = flightLegs.filter(e => !e.part91)
   const part91Legs  = flightLegs.filter(e => e.part91)
@@ -133,9 +133,9 @@ function buildData(
   }
 
   const totalViolations = fails.flight + fails.duty + fails.rest + fails.lookback
-  const overallOk  = d.isOverallOk(totalViolations, restDays)
+  const overallOk  = d.isOverallOk(totalViolations, restPeriods)
   const statusText = overallOk ? 'COMPLIANT' : 'REVIEW REQUIRED'
-  const failDetail = !overallOk ? ` — ${totalViolations} violation(s)${!d.isOverallOk(0, restDays) ? ' and/or rest period shortfall' : ''} detected` : ''
+  const failDetail = !overallOk ? ` — ${totalViolations} violation(s)${!d.isOverallOk(0, restPeriods) ? ' and/or rest period shortfall' : ''} detected` : ''
 
   const scRows: [string, string][] = [
     ['Flight Time (Sec. 135.267(b)/(c))', fails.flight   === 0 ? 'PASS' : `${fails.flight} VIOLATION(S)`],
@@ -201,7 +201,7 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
     const statLine = [
       `Part 135 Legs: ${r.part135Legs.length}${r.part91Legs.length ? ` (+${r.part91Legs.length} Part 91)` : ''}`,
       `Total Flight Time: ${fmtFlight(r.totalFlight)}`,
-      `24-hr Rest Periods: ${d.restDayStatLabel(d.restDays)}`,
+      `24-hr Rest Periods: ${d.restPeriodStatLabel(d.restPeriods)}`,
       `Total Violations: ${r.totalViolations}`,
     ].join('   |   ')
     wrappedText(statLine, 9)
@@ -357,7 +357,7 @@ export function generateQuarterlyReportPDF(
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= qStart && a < qEnd })
   if (!period.length) return false
 
-  const { restDays, part91Flight } = periodStats(entries, period, qStart, qEnd)
+  const { restPeriods, part91Flight } = periodStats(entries, period, qStart, qEnd)
 
   // §135.267(a) limits apply to the pilot's total Part 135 flying, so they're
   // computed across all entities even when the report is filtered to one.
@@ -373,15 +373,15 @@ export function generateQuarterlyReportPDF(
   const doc = renderPDF(entries, {
     periodEntries: period, periodStart: qStart, periodEnd: qEnd,
     periodLabel: `${qLabel} ${year}`, heading: 'Quarterly Compliance Report', periodNoun: 'quarter',
-    restDays,
+    restPeriods,
     extraScorecard: [
-      ['24-hr Rest Periods (>=13/qtr)', `${restDays} of 13 required`],
+      ['24-hr Rest Periods (>=13/qtr)', `${restPeriods} of 13 required`],
       limitRow('Quarterly Flight Hours Sec. 135.267(a)', qHrs, 500, 'quarterly'),
       limitRow('Two-Quarter Flight Hours Sec. 135.267(a)', tqHrs, 800, 'with previous quarter'),
       limitRow(`Calendar-Year Flight Hours to Q${qIdx + 1} end Sec. 135.267(a)`, ytd, 1400, 'annual'),
       ['Part 91 Flight Hours (Quarter)', fmtFlight(part91Flight)],
     ],
-    restDayStatLabel: rd => `${rd} / 13`,
+    restPeriodStatLabel: rd => `${rd} / 13`,
     isOverallOk: (v, rd) => v === 0 && rd >= 13 && limitsOk,
   }, tz, entity, logDetail)
 
@@ -400,18 +400,18 @@ export function generateMonthlyReportPDF(
   const period = scoped.filter(e => { const a = ms(e.releaseTime) ?? ms(e.showTime); return a !== null && a >= mStart && a < mEnd })
   if (!period.length) return false
 
-  const { restDays, part135Flight, part91Flight } = periodStats(entries, period, mStart, mEnd)
+  const { restPeriods, part135Flight, part91Flight } = periodStats(entries, period, mStart, mEnd)
 
   const doc = renderPDF(entries, {
     periodEntries: period, periodStart: mStart, periodEnd: mEnd,
     periodLabel: mLabel, heading: 'Monthly Compliance Report', periodNoun: 'month',
-    restDays,
+    restPeriods,
     extraScorecard: [
-      ['24-hr Rest Periods This Month', `${restDays} (>=13/quarter required)`],
+      ['24-hr Rest Periods This Month', `${restPeriods} (>=13/quarter required)`],
       ['Part 135 Flight Hours (Month)', fmtFlight(part135Flight)],
       ['Part 91 Flight Hours (Month)', fmtFlight(part91Flight)],
     ],
-    restDayStatLabel: rd => `${rd}`,
+    restPeriodStatLabel: rd => `${rd}`,
     isOverallOk: v => v === 0,
   }, tz, entity, logDetail)
 

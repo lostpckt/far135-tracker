@@ -65,7 +65,7 @@ export function parseHobbs(val: string | undefined | null): number | null {
 }
 
 /** A Hobbs reading in tenths as text with one decimal: 123450 → "12345.0". */
-export function fmtTenths(t: number): string {
+function fmtTenths(t: number): string {
   return `${Math.floor(t / 10)}.${t % 10}`
 }
 
@@ -80,7 +80,7 @@ export function fmtHobbs(val: string | undefined | null): string {
 }
 
 /** Flight time in tenths from Hobbs readings in tenths: onHobbs - offHobbs. */
-export function flightTenths(offHobbs: number | null, onHobbs: number | null): number | null {
+function flightTenths(offHobbs: number | null, onHobbs: number | null): number | null {
   if (offHobbs === null || onHobbs === null) return null
   const diff = onHobbs - offHobbs
   return diff < 0 ? null : diff

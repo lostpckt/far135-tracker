@@ -1,4 +1,4 @@
-export const TIMEZONES = [
+const TIMEZONES = [
   { value: 'UTC',                 label: 'UTC / Zulu' },
   { value: 'America/New_York',    label: 'Eastern (ET)' },
   { value: 'America/Chicago',     label: 'Central (CT)' },
