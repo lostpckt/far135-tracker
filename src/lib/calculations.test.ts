@@ -257,10 +257,11 @@ describe('F. Duty periods and rest', () => {
 describe('G. Rest periods per quarter, §135.267(f)', () => {
   const restOf = (h: number) => restPeriodsInWindow(log(duty(0, 5, [1.0]), duty(5 + h, 5 + h + 4, [1.0])), BASE - 1000 * HOUR, BASE + 1000 * HOUR)
 
-  it('37. 24 h rest is 1; 47 h 59 m is 1; 48 h is 2 (current reading, pending operator)', () => {
+  it('37. each full 24 h is one rest period: 24 h is 1; 47 h 59 m is 1; 48 h is 2; 72 h is 3 (operator confirmed 2026-11-02)', () => {
     expect(restOf(24)).toBe(1)
     expect(restOf(47 + 59 / 60)).toBe(1)
     expect(restOf(48)).toBe(2)
+    expect(restOf(72)).toBe(3)
     expect(restOf(23 + 59 / 60)).toBe(0)
   })
 

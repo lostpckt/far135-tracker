@@ -6,8 +6,9 @@ import ScrollX from '@/components/ScrollX'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { compute, computeDutyPeriod, dutyJoinNote, fmtHobbs, fmtHrs, fmtFlight, restPeriodsInWindow } from '@/lib/calculations'
+import type { DutyComputed } from '@/lib/calculations'
 import { utcToLocalParts, localYearMonth, monthStartMs, fmtLocalDT } from '@/lib/timezone'
-import type { Entry } from '@/types/entry'
+import type { Entry, Computed } from '@/types/entry'
 
 interface Props {
   entries: Entry[]
@@ -133,6 +134,109 @@ function FlightLimitCell({ cQualifies, dutyFlight, rolling24, maxFlight }: { cQu
     : <><span className="font-semibold">{rolling24 !== null ? fmtHrs(rolling24) : '—'}</span><br /><span className="text-[0.68rem] text-slate-400">24-hr window · limit {maxFlight}h</span></>
 }
 
+// What a duty row shows: computeDutyPeriod() for a multi-leg duty, or one
+// leg's compute() put in the same shape (singleLegSummary).
+type DutySummary = Omit<DutyComputed, 'computedLegs' | 'totalFlight' | 'reqRest'> & {
+  totalFlight: number | null
+  reqRest: number | null
+}
+
+function singleLegSummary(e: Entry, c: Computed): DutySummary {
+  const p91 = e.part91
+  return {
+    ...c,
+    allPart91:  p91,
+    totalFlight: c.legFlight,
+    // A Part 91 leg has no §135.267 results to show.
+    flightOk:   p91 ? null : c.flightOk,
+    dutyOk:     p91 ? null : c.dutyOk,
+    lookbackOk: p91 ? null : c.lookbackOk,
+    restOk:     p91 ? null : c.restOk,
+    excReason:  e.reason || '(no reason recorded)',
+  }
+}
+
+const TD = 'px-3 py-2 border-b border-slate-100 dark:border-slate-700'
+
+// The row for one duty entry: a single-leg duty, or the summary row of a
+// multi-leg one (with ▸ to show its legs, and the pencil editing the whole duty).
+function DutyRow({ legs, d, note, tz, expanded, onToggle, onEdit, onDelete, onExceedance }: {
+  legs: Entry[]
+  d: DutySummary
+  note: string | null
+  tz: string
+  expanded: boolean
+  onToggle: () => void
+  onEdit: () => void
+  onDelete: () => void
+  onExceedance: (reason: string) => void
+}) {
+  const multi = legs.length > 1
+  const first = legs[0]
+  const p91Count = legs.filter(l => l.part91).length
+  const p91Badge = p91Count > 0
+    ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">{p91Count === legs.length ? 'Part 91' : `${p91Count} Part 91`}</Badge>
+    : null
+  const excBadge = d.excAmt > 0
+    ? <button onClick={() => onExceedance(d.excReason)}><Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(d.excAmt)}</Badge></button>
+    : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
+  const chevron = expanded ? <ChevronDown size={13}/> : <ChevronRight size={13}/>
+
+  return (
+    <tr className={d.allPart91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
+      <td className={`${TD} whitespace-nowrap`}>
+        {multi
+          ? <div className="flex items-center gap-1">
+              <button onClick={onToggle} className="text-slate-400 hover:text-blue-500 flex-shrink-0">{chevron}</button>
+              {fmtLocalDT(first.showTime, first.showTz ?? tz)}
+            </div>
+          : fmtLocalDT(first.showTime, first.showTz ?? tz)}
+      </td>
+      <td className={`${TD} whitespace-nowrap`}>{first.releaseTime ? fmtLocalDT(first.releaseTime, first.releaseTz ?? tz) : <span className="text-slate-400">—</span>}</td>
+      <td className={`${TD} whitespace-nowrap`}>{first.crew === 'D' ? 'Dual' : 'Single'}</td>
+      <td className={`${TD} whitespace-nowrap`}>
+        {multi
+          ? <>
+              {[first.dep, ...legs.map(l => l.arr)].filter(Boolean).map(s => s.toUpperCase()).join('→')}
+              <span className="text-slate-400 text-[0.65rem] ml-1">({legs.length} legs)</span>
+            </>
+          : <>{(first.dep || '—').toUpperCase()} → {(first.arr || '—').toUpperCase()}</>}
+        {p91Badge}
+        {first.tailNumber && <div className="text-[0.65rem] text-slate-400">{first.tailNumber}</div>}
+      </td>
+      <td className={`${TD} whitespace-nowrap`}>{fmtHobbs(first.offBlocks) || '—'}</td>
+      <td className={`${TD} whitespace-nowrap`}>{fmtHobbs(legs[legs.length - 1].onBlocks) || '—'}</td>
+      <td className={`${TD} font-semibold whitespace-nowrap`}>{fmtFlight(d.totalFlight).replace(/h$/, '')}</td>
+      <td className={`${TD} whitespace-nowrap`}>
+        {d.allPart91
+          ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
+          : <FlightLimitCell cQualifies={d.cQualifies} dutyFlight={d.dutyFlight} rolling24={d.rolling24} maxFlight={d.maxFlight} />
+        }
+      </td>
+      <td className={TD}><StatusBadge flag={d.flightOk} okText="OK" warnText="EXCEEDED" /></td>
+      <td className={`${TD} whitespace-nowrap`}><DutyTime hours={d.dutyPeriod} note={note} /></td>
+      <td className={TD}>
+        <StatusBadge flag={d.dutyOk} okText="OK" warnText="EXCEEDED" />
+        {!d.allPart91 && d.dutyOk === false && d.dutyPeriod !== null && (
+          <div className="text-[0.65rem] text-red-600 mt-0.5 whitespace-nowrap">+{fmtHrs(d.dutyPeriod - 14)} over · min {d.reqRest}h rest req'd</div>
+        )}
+      </td>
+      <td className={TD}><StatusBadge flag={d.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
+      <td className={`${TD} whitespace-nowrap`}>
+        <RestTime consRest={d.consRest} breakAfter={d.breakAfter} reqRest={d.allPart91 ? null : d.reqRest} />
+      </td>
+      <td className={`${TD} ${d.breakAfter !== null ? DASH_CELL : ''}`}>{d.breakAfter !== null ? '—' : <StatusBadge flag={d.restOk} okText="OK" warnText="DEFICIENT" />}</td>
+      <td className={TD}>{d.allPart91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
+      <td className={`${TD} whitespace-nowrap`}>
+        <button onClick={onEdit} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
+        {multi
+          ? <button onClick={onToggle} className="text-slate-400 hover:text-blue-500 rounded p-1" title={expanded ? 'Collapse legs' : 'Expand legs'}>{chevron}</button>
+          : <button onClick={onDelete} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>}
+      </td>
+    </tr>
+  )
+}
+
 const COLS = 16
 
 export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }: Props) {
@@ -245,136 +349,25 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                     const { key: dutyKey, legs } = item
                     const isDutyExpanded = expandedDuty.has(dutyKey)
 
-                    if (legs.length === 1) {
-                      // Single-leg duty: render as a plain row (no toggle)
-                      const e = legs[0]
-                      const c = compute(e, entries)
-                      const excBadge = c.excAmt > 0
-                        ? <button onClick={() => setExceedanceReason(e.reason || '(no reason recorded)')}><Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(c.excAmt)}</Badge></button>
-                        : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
-                      const p91Badge = e.part91
-                        ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">Part 91</Badge>
-                        : null
-                      return (
-                        <tr key={e.id} className={e.part91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtLocalDT(e.showTime, e.showTz ?? tz)}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.releaseTime ? fmtLocalDT(e.releaseTime, e.releaseTz ?? tz) : <span className="text-slate-400">—</span>}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{e.crew === 'D' ? 'Dual' : 'Single'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {(e.dep || '—').toUpperCase()} → {(e.arr || '—').toUpperCase()}{p91Badge}
-                            {e.tailNumber && <div className="text-[0.65rem] text-slate-400">{e.tailNumber}</div>}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.offBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(e.onBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(c.legFlight).replace(/h$/, '')}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {e.part91
-                              ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
-                              : <FlightLimitCell cQualifies={c.cQualifies} dutyFlight={c.dutyFlight} rolling24={c.rolling24} maxFlight={c.maxFlight} />
-                            }
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap"><DutyTime hours={c.dutyPeriod} note={dutyJoinNote(c, e, entries, tz)} /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
-                            <StatusBadge flag={e.part91 ? null : c.dutyOk} okText="OK" warnText="EXCEEDED" />
-                            {!e.part91 && c.dutyOk === false && c.dutyPeriod !== null && (
-                              <div className="text-[0.65rem] text-red-600 mt-0.5 whitespace-nowrap">+{fmtHrs(c.dutyPeriod - 14)} over · min {c.reqRest}h rest req'd</div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            <RestTime consRest={c.consRest} breakAfter={c.breakAfter} reqRest={e.part91 ? null : c.reqRest} />
-                          </td>
-                          <td className={`px-3 py-2 border-b border-slate-100 dark:border-slate-700 ${c.breakAfter !== null ? DASH_CELL : ''}`}>{c.breakAfter !== null ? '—' : <StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" />}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
-                            <button onClick={() => { if (confirm('Delete this entry?')) onDelete(e.id) }} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded p-1"><X size={13} /></button>
-                          </td>
-                        </tr>
-                      )
-                    }
-
-                    // ── Multi-leg duty period ─────────────────────────────────
-                    const { computedLegs, allPart91, totalFlight, rolling24, maxFlight, flightOk,
-                            dutyPeriod, dutyOk, reqRest, lookbackOk, consRest, restOk,
-                            excAmt, excReason, cQualifies, dutyFlight, dutyStart, dutyBreak, breakAfter } =
-                      computeDutyPeriod(legs, entries)
-
-                    const p91Count = legs.filter(l => l.part91).length
-                    const p91Badge = p91Count > 0
-                      ? <Badge className="bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[0.68rem] ml-1">{p91Count === legs.length ? 'Part 91' : `${p91Count} Part 91`}</Badge>
-                      : null
-
-                    const routeChain = [legs[0].dep, ...legs.map(l => l.arr)].filter(Boolean).map(s => s.toUpperCase()).join('→')
-
-                    const summaryExcBadge = excAmt > 0
-                      ? <button onClick={() => setExceedanceReason(excReason)}><Badge className="bg-red-50 text-red-700 text-[0.68rem] cursor-pointer hover:bg-red-100">{fmtHrs(excAmt)}</Badge></button>
-                      : <Badge className="bg-green-50 text-green-700 text-[0.68rem]">None</Badge>
+                    const multi = legs.length > 1
+                    const dp = multi ? computeDutyPeriod(legs, entries) : null
+                    const d = dp ?? singleLegSummary(legs[0], compute(legs[0], entries))
+                    const row = (
+                      <DutyRow
+                        legs={legs} d={d} note={dutyJoinNote(d, legs[0], entries, tz)} tz={tz}
+                        expanded={isDutyExpanded}
+                        onToggle={() => toggleDuty(dutyKey)}
+                        onEdit={() => multi ? onEditDuty(legs) : onEdit(legs[0])}
+                        onDelete={() => { if (confirm('Delete this entry?')) onDelete(legs[0].id) }}
+                        onExceedance={setExceedanceReason}
+                      />
+                    )
+                    if (!dp) return <Fragment key={legs[0].id}>{row}</Fragment>
+                    const { computedLegs } = dp
 
                     return (
                       <Fragment key={dutyKey}>
-                        {/* Duty period summary row */}
-                        <tr className={allPart91 ? 'bg-amber-50/40 dark:bg-amber-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => toggleDuty(dutyKey)}
-                                className="text-slate-400 hover:text-blue-500 flex-shrink-0"
-                              >
-                                {isDutyExpanded ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
-                              </button>
-                              {fmtLocalDT(legs[0].showTime, legs[0].showTz ?? tz)}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {legs[0].releaseTime ? fmtLocalDT(legs[0].releaseTime, legs[0].releaseTz ?? tz) : <span className="text-slate-400">—</span>}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {legs[0].crew === 'D' ? 'Dual' : 'Single'}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {routeChain}
-                            <span className="text-slate-400 text-[0.65rem] ml-1">({legs.length} legs)</span>
-                            {p91Badge}
-                            {legs[0].tailNumber && <div className="text-[0.65rem] text-slate-400">{legs[0].tailNumber}</div>}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[0].offBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHobbs(legs[legs.length - 1].onBlocks) || '—'}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 font-semibold whitespace-nowrap">{fmtFlight(totalFlight).replace(/h$/, '')}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {allPart91
-                              ? <span className="text-amber-600 dark:text-amber-400 text-[0.7rem]">Excluded (Part 91)</span>
-                              : <FlightLimitCell cQualifies={cQualifies} dutyFlight={dutyFlight} rolling24={rolling24} maxFlight={maxFlight} />
-                            }
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={flightOk} okText="OK" warnText="EXCEEDED" /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap"><DutyTime hours={dutyPeriod} note={dutyJoinNote({ dutyStart, dutyBreak, breakAfter }, legs[0], entries, tz)} /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
-                            <StatusBadge flag={dutyOk} okText="OK" warnText="EXCEEDED" />
-                            {!allPart91 && dutyOk === false && dutyPeriod !== null && (
-                              <div className="text-[0.65rem] text-red-600 mt-0.5 whitespace-nowrap">+{fmtHrs(dutyPeriod - 14)} over · min {reqRest}h rest req'd</div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            <RestTime consRest={consRest} breakAfter={breakAfter} reqRest={allPart91 ? null : reqRest} />
-                          </td>
-                          <td className={`px-3 py-2 border-b border-slate-100 dark:border-slate-700 ${breakAfter !== null ? DASH_CELL : ''}`}>{breakAfter !== null ? '—' : <StatusBadge flag={restOk} okText="OK" warnText="DEFICIENT" />}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
-                            {allPart91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : summaryExcBadge}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            <button onClick={() => onEditDuty(legs)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
-                            <button
-                              onClick={() => toggleDuty(dutyKey)}
-                              className="text-slate-400 hover:text-blue-500 rounded p-1"
-                              title={isDutyExpanded ? 'Collapse legs' : 'Expand legs'}
-                            >
-                              {isDutyExpanded ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
-                            </button>
-                          </td>
-                        </tr>
+                        {row}
 
                         {/* Expanded per-leg rows */}
                         {isDutyExpanded && legs.map((e, legIdx) => {
