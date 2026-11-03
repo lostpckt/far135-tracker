@@ -378,6 +378,26 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
   }
 }
 
+/**
+ * When the next Part 135 duty may start (ms), or null if there's no released
+ * Part 135 duty yet. The later of (a) the last Part 135 release plus its
+ * required rest and (b) the last release of ANY duty, Part 91 included, plus
+ * 10 h — a Part 91 duty after the last Part 135 one also needs 10 h of rest
+ * before the next Part 135 duty can qualify under §135.267(c). §135.267 rest
+ * requirements never attach to Part 91 legs, so (a) anchors on the last actual
+ * Part 135 duty period, not a trailing Part 91 leg. `entries` is sorted by show.
+ */
+export function nextLegalDutyMs(entries: Entry[]): number | null {
+  const duties  = entries.filter(e => !e.restDay)
+  const lastP135 = duties.filter(e => !e.part91).at(-1)
+  if (!lastP135?.releaseTime) return null
+  const reqRest = compute(lastP135, entries).reqRest
+  if (reqRest === null) return null
+  const releaseMs    = new Date(lastP135.releaseTime).getTime()
+  const lastAnyRelMs = Math.max(...duties.map(e => ms(e.releaseTime) ?? 0))
+  return Math.max(releaseMs + reqRest * HOUR, lastAnyRelMs + 10 * HOUR)
+}
+
 /** Part 135 flight time in tenths of legs released within [start, end). */
 function flightTenthsInWindow(entries: Entry[], start: number, end: number): number {
   return entries.reduce((sum, e) => {

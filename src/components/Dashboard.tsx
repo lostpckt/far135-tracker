@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SECTION_CARD, SECTION_HEADER, SECTION_TITLE } from '@/lib/section'
-import { compute, fmtHrs, ms, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
+import { compute, fmtHrs, ms, nextLegalDutyMs, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
 import { utcToLocalParts, tzAbbr, localYearMonth } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -58,11 +58,7 @@ export default function Dashboard({ entries, tz }: Props) {
   const lastAnchorMs = lastEntry ? (ms(lastEntry.releaseTime) ?? ms(lastEntry.showTime)) : null
   const rollingWindowActive = lastAnchorMs !== null && (now.getTime() - lastAnchorMs) <= 86400000
 
-  // §135.267 rest requirements never attach to Part 91 legs, so "Next Legal Duty"
-  // must anchor on the last actual Part 135 duty period, not a trailing Part 91 leg.
   const p135Entries    = entries.filter(e => !e.restDay && !e.part91)
-  const lastP135Entry  = p135Entries.length ? p135Entries[p135Entries.length - 1] : null
-  const lastP135Calc   = lastP135Entry ? compute(lastP135Entry, entries) : null
 
   // Duty periods (not legs) with any Part 135 compliance failure.
   const violatingDuties = new Set(p135Entries.filter(e => {
@@ -71,19 +67,13 @@ export default function Dashboard({ entries, tz }: Props) {
   }).map(e => `${e.showTime}|${e.releaseTime}`))
   const allWarnings = violatingDuties.size
 
-  // Next legal duty start: the later of (a) the last Part 135 release plus its
-  // required rest and (b) the last release of ANY duty, Part 91 included, plus
-  // 10 h — a Part 91 duty after the last Part 135 one also needs 10 h of rest
-  // before the next Part 135 duty can qualify under §135.267(c).
   type Color = 'green' | 'red' | 'blue' | 'amber'
   let nextDutyValue = '—'
   let nextDutySub   = ''
   let nextDutyColor: Color = 'blue'
 
-  if (lastP135Entry?.releaseTime && lastP135Calc && lastP135Calc.reqRest !== null) {
-    const releaseMs    = new Date(lastP135Entry.releaseTime).getTime()
-    const lastAnyRelMs = Math.max(...nonRestEntries.map(e => ms(e.releaseTime) ?? 0))
-    const legalMs      = Math.max(releaseMs + lastP135Calc.reqRest * 3600000, lastAnyRelMs + 10 * 3600000)
+  const legalMs = nextLegalDutyMs(entries)
+  if (legalMs !== null) {
     const nowMs     = now.getTime()
     const legalIso  = new Date(legalMs).toISOString()
     const abbr      = tzAbbr(tz, utcToLocalParts(legalIso, tz)?.date)
