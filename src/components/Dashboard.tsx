@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SECTION_CARD, SECTION_HEADER, SECTION_TITLE } from '@/lib/section'
-import { compute, fmtHrs, ms, nextLegalDutyMs, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
+import { compute, fmtHrs, ms, nextLegalDutyMs, dutyWarningCount, quarterRestCount, quarterFlightHours, twoQuarterFlightHours, annualFlightHours } from '@/lib/calculations'
 import { utcToLocalParts, tzAbbr, localYearMonth } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -58,14 +58,9 @@ export default function Dashboard({ entries, tz }: Props) {
   const lastAnchorMs = lastEntry ? (ms(lastEntry.releaseTime) ?? ms(lastEntry.showTime)) : null
   const rollingWindowActive = lastAnchorMs !== null && (now.getTime() - lastAnchorMs) <= 86400000
 
-  const p135Entries    = entries.filter(e => !e.restDay && !e.part91)
 
   // Duty periods (not legs) with any Part 135 compliance failure.
-  const violatingDuties = new Set(p135Entries.filter(e => {
-    const c = compute(e, entries)
-    return c.flightOk === false || c.dutyOk === false || c.restOk === false || c.lookbackOk === false
-  }).map(e => `${e.showTime}|${e.releaseTime}`))
-  const allWarnings = violatingDuties.size
+  const allWarnings = dutyWarningCount(entries)
 
   type Color = 'green' | 'red' | 'blue' | 'amber'
   let nextDutyValue = '—'

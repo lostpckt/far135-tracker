@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import ScrollX from '@/components/ScrollX'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Pencil, X, ChevronDown, ChevronRight } from 'lucide-react'
-import { compute, computeDutyPeriod, fmtHobbs, fmtHrs, fmtFlight, restPeriodsInWindow } from '@/lib/calculations'
+import { compute, computeDutyPeriod, dutyJoinNote, fmtHobbs, fmtHrs, fmtFlight, restPeriodsInWindow } from '@/lib/calculations'
 import { utcToLocalParts, localYearMonth, monthStartMs, fmtLocalDT } from '@/lib/timezone'
 import type { Entry } from '@/types/entry'
 
@@ -16,6 +16,30 @@ interface Props {
   onEditDuty: (legs: Entry[]) => void
   onDelete: (id: string) => void
 }
+
+// Duty time; when breaks under 10 h join this to other duty entries, a line
+// under it gives the whole duty period's start and its breaks.
+function DutyTime({ hours, note }: { hours: number | null; note: string | null }) {
+  return <>
+    {fmtHrs(hours)}
+    {note && <div className="text-[0.65rem] text-slate-500 dark:text-slate-400">{note}</div>}
+  </>
+}
+
+// Rest after this entry. Mid-duty (another duty entry follows within 10 h)
+// it was a break, not rest: "Same duty" and the break length.
+function RestTime({ consRest, breakAfter, reqRest }: { consRest: number | null; breakAfter: number | null; reqRest: number | null }) {
+  if (breakAfter !== null) return <>
+    Same duty<br />
+    <span className="text-[0.68rem] text-slate-400">{fmtHrs(breakAfter)} break</span>
+  </>
+  return <>
+    {consRest !== null ? fmtHrs(consRest) : <span className="text-slate-400">In progress</span>}<br />
+    {reqRest !== null && <span className="text-[0.68rem] text-slate-400">Req: {reqRest}h</span>}
+  </>
+}
+
+const DASH_CELL = 'text-slate-300 dark:text-slate-600'
 
 function StatusBadge({ flag, okText, warnText }: { flag: boolean | null; okText: string; warnText: string }) {
   if (flag === null) return <Badge className="bg-slate-100 text-slate-400 text-[0.68rem]">N/A</Badge>
@@ -250,7 +274,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                             }
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.flightOk} okText="OK" warnText="EXCEEDED" /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHrs(c.dutyPeriod)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap"><DutyTime hours={c.dutyPeriod} note={dutyJoinNote(c, e, entries, tz)} /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
                             <StatusBadge flag={e.part91 ? null : c.dutyOk} okText="OK" warnText="EXCEEDED" />
                             {!e.part91 && c.dutyOk === false && c.dutyPeriod !== null && (
@@ -259,10 +283,9 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {c.consRest !== null ? fmtHrs(c.consRest) : <span className="text-slate-400">In progress</span>}<br />
-                            {!e.part91 && <span className="text-[0.68rem] text-slate-400">Req: {c.reqRest}h</span>}
+                            <RestTime consRest={c.consRest} breakAfter={c.breakAfter} reqRest={e.part91 ? null : c.reqRest} />
                           </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" /></td>
+                          <td className={`px-3 py-2 border-b border-slate-100 dark:border-slate-700 ${c.breakAfter !== null ? DASH_CELL : ''}`}>{c.breakAfter !== null ? '—' : <StatusBadge flag={e.part91 ? null : c.restOk} okText="OK" warnText="DEFICIENT" />}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">{e.part91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : excBadge}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
                             <button onClick={() => onEdit(e)} className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900 rounded p-1 mr-0.5"><Pencil size={13} /></button>
@@ -275,7 +298,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                     // ── Multi-leg duty period ─────────────────────────────────
                     const { computedLegs, allPart91, totalFlight, rolling24, maxFlight, flightOk,
                             dutyPeriod, dutyOk, reqRest, lookbackOk, consRest, restOk,
-                            excAmt, excReason, cQualifies, dutyFlight } =
+                            excAmt, excReason, cQualifies, dutyFlight, dutyStart, dutyBreak, breakAfter } =
                       computeDutyPeriod(legs, entries)
 
                     const p91Count = legs.filter(l => l.part91).length
@@ -326,7 +349,7 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                             }
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={flightOk} okText="OK" warnText="EXCEEDED" /></td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">{fmtHrs(dutyPeriod)}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap"><DutyTime hours={dutyPeriod} note={dutyJoinNote({ dutyStart, dutyBreak, breakAfter }, legs[0], entries, tz)} /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
                             <StatusBadge flag={dutyOk} okText="OK" warnText="EXCEEDED" />
                             {!allPart91 && dutyOk === false && dutyPeriod !== null && (
@@ -335,10 +358,9 @@ export default function FlightLog({ entries, tz, onEdit, onEditDuty, onDelete }:
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={lookbackOk} okText="10-hr met" warnText="CHECK REST" /></td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
-                            {consRest !== null ? fmtHrs(consRest) : <span className="text-slate-400">In progress</span>}<br />
-                            {!allPart91 && <span className="text-[0.68rem] text-slate-400">Req: {reqRest}h</span>}
+                            <RestTime consRest={consRest} breakAfter={breakAfter} reqRest={allPart91 ? null : reqRest} />
                           </td>
-                          <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700"><StatusBadge flag={restOk} okText="OK" warnText="DEFICIENT" /></td>
+                          <td className={`px-3 py-2 border-b border-slate-100 dark:border-slate-700 ${breakAfter !== null ? DASH_CELL : ''}`}>{breakAfter !== null ? '—' : <StatusBadge flag={restOk} okText="OK" warnText="DEFICIENT" />}</td>
                           <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
                             {allPart91 ? <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-400 text-[0.68rem]">N/A</Badge> : summaryExcBadge}
                           </td>

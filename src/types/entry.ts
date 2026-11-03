@@ -36,6 +36,9 @@ export interface Computed {
   maxFlight: number
   rolling24: number | null
   dutyFlight: number | null     // Part 135 flight time in this duty period, h
+  dutyStart: string | null      // show of the whole duty period (UTC ISO); earlier than this entry's when breaks under 10 h join it to earlier duty
+  dutyBreak: number | null      // breaks under 10 h inside the duty period, h (0 when it's a single duty entry)
+  breakAfter: number | null     // break before the next entry of the same duty period, h; null when this entry ends the duty period
   cQualifies: boolean | null    // duty period meets §135.267(c), so its own flight time is what's limited
   excAmt: number
   reqRest: number | null

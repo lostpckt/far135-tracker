@@ -14,6 +14,13 @@
 - **Airport code check** — after you leave a Departure or Arrival field holding a 3-character code that matches a known airport, a "Confirm KSQL" button appears under it (for "SQL"); tap it to use the ICAO code, or "Keep SQL" to leave it. A code that matches two airports offers both (e.g. KCHU or PACH). Codes with no ICAO match, like L52 or 0Q3, are accepted as typed with no prompt. It never blocks saving. Works in the Add Duty Entry form and the Edit Duty Entry dialog, and offline. The airport list (from OurAirports, about 42 KB to download) loads in the background after the app opens.
 
 ### Fixed
+- **Mixed Part 135 / Part 91 days no longer read Rest DEFICIENT.** For example: a WCPA flight in the morning, a Lawton Part 91 flight after it, then WCPA again in the afternoon. Duties less than 10 hours apart now count as one duty period, from the first Show to the last Release, because a break under 10 hours isn't rest. In the Flight Log, each entry still has its own row under its own entity.
+  - Under the duty time, a line gives the start of the whole duty and its total break time, for example "from 07:00 · 1h 15m break".
+  - Every row except the last one shows **Same duty** and the break that followed it. The last row shows the real rest after the duty.
+  - Part 91 flight time is still left out of the flight-time limits, but Part 91 duty counts toward the 14-hour duty day.
+  - A run of short breaks is still caught: the duty period keeps growing until it passes 14 hours and reads **Duty EXCEEDED**, and the 10-hour look-back flags it as well.
+  - "Next Legal Duty" counts your required rest from the end of the whole duty period.
+  - The PDF report and the CSV export show the same wording. A long chain of duties gets one "Duty Period Exceeded" line, not one per entry.
 - **No gap above the Part 91 box on narrow iPhones** — when it wraps to its own line under Off/On Blocks, it now sits right below them.
 - **Airport codes no longer cut off** in the leg boxes on a phone — wide letters (Q, M, W) made codes like KSQL show as "KSQ".
 - **Crew Configuration is two radio buttons, Single and Dual** — the dropdown was cut off in the edit dialog and the Add Duty Entry form on smaller screens, and couldn't be used with Apple Pencil. A filled dot marks the choice, so it's clear in light and dark mode. The "8 hr / 10 hr limit" text is gone; on a phone they sit on their own row under Tail Number and Entity.

@@ -6,7 +6,7 @@ import {
   parseHobbs, fmtHobbs, legTenths, fmtHrs, compute, computeDutyPeriod,
   overlappingDuty, flightExceedsDuty, restPeriodsInWindow, quarterRestCount,
   quarterFlightHours, twoQuarterFlightHours, annualFlightHours, nextLegalDutyMs,
-  exportCSV, importCSV,
+  exportCSV, importCSV, dutyWarningCount, dutyJoinNote,
 } from '@/lib/calculations'
 import { at, duty, log, BASE, HOUR } from '@/lib/test-helpers'
 import type { Entry } from '@/types/entry'
@@ -74,7 +74,8 @@ describe('B. Rolling 24 hours, §135.267(b)', () => {
   })
 
   it('10. 8.1 h single pilot, not under (c), is EXCEEDED by 0.1 h', () => {
-    const l = log(duty(0, 5, [4.0]), duty(10, 15, [4.1]))   // only 5 h rest between: not (c)
+    // A 5 h break isn't rest, so this is one 0–15 duty with 8.1 h, and it's the first logged: not (c).
+    const l = log(duty(0, 5, [4.0]), duty(10, 15, [4.1]))
     const c = last(l)
     expect(c.cQualifies).toBe(false)
     expect(c.rolling24).toBe(8.1)
@@ -204,8 +205,9 @@ describe('E. 10-hour look-back, §135.267(d)', () => {
     expect(compute(d[0], d).lookbackOk).toBeNull()
   })
 
-  it('30. two separate rests of 6 h and 5 h: CHECK (must be unbroken)', () => {
-    // Window for the last duty is −2 to 22. Rests −1–5 (6 h) and 9–14 (5 h).
+  it('30. two separate breaks of 6 h and 5 h: CHECK (must be unbroken)', () => {
+    // Window for the last duty is −2 to 22. Breaks −1–5 (6 h) and 9–14 (5 h); being under
+    // 10 h they also make −12 to 22 one duty period (section L).
     const l = log(duty(-12, -1, [1.0]), duty(5, 9, [1.0]), duty(14, 22, [1.0]))
     expect(last(l).lookbackOk).toBe(false)
   })
@@ -220,9 +222,9 @@ describe('F. Duty periods and rest', () => {
 
   it('32. rest runs from Release to the next Show; a Part 91 duty ends it too', () => {
     const a = duty(0, 5, [2.0])
-    const l = log(a, duty(10, 12, [{ flight: 1.0, part91: true }]))
-    expect(compute(a[0], l).consRest).toBe(5)
-    expect(compute(a[0], l).restOk).toBe(false)
+    const l = log(a, duty(16, 18, [{ flight: 1.0, part91: true }]))
+    expect(compute(a[0], l).consRest).toBe(11)
+    expect(compute(a[0], l).restOk).toBe(true)
   })
 
   it('33. any Part 135 duty over 14 h is Duty EXCEEDED (strict reading); 14 h exactly is OK', () => {
@@ -339,6 +341,13 @@ describe('I. Next Legal Duty', () => {
     expect(nextLegalDutyMs(l)).toBe(BASE + 24 * HOUR)
   })
 
+  it('45f. required rest runs from the end of the whole duty period, Part 91 part included', () => {
+    // 8.6 h (12 h rest required) released at 12, then a Part 91 duty 14–17: one duty period
+    // ending at 17, so the next duty may start at 17 + 12 = 29.
+    const l = log(duty(0, 12, [8.6]), duty(14, 17, [{ flight: 1.0, part91: true }]))
+    expect(nextLegalDutyMs(l)).toBe(BASE + 29 * HOUR)
+  })
+
   it('45e. nothing logged, or only Part 91: no time shown', () => {
     expect(nextLegalDutyMs([])).toBeNull()
     expect(nextLegalDutyMs(duty(0, 4, [{ flight: 1.0, part91: true }]))).toBeNull()
@@ -392,5 +401,124 @@ describe('K. CSV export and import', () => {
     if ('error' in r) throw new Error(r.error)
     expect(r.entries).toHaveLength(2)
     expect(r.skipped).toEqual([{ line: 3, reason: expect.stringContaining('tenths') }])
+  })
+})
+
+// ── L. Mixed Part 135 / Part 91 days (approved 2026-11-02) ──────────────────
+// A gap under 10 h isn't rest, so duties separated by less than 10 h are one
+// duty period, from the first Show to the last Release. Part 91 duty is part of
+// it; Part 91 flight time is still left out of the flight totals.
+describe('L. Breaks under 10 h join duties into one duty period', () => {
+  it('L1. WCPA 135, Lawton 91, WCPA 135 between 0700 and 1700: one 10 h duty, all OK', () => {
+    const before = duty(-17, -14, [1.0])                                   // previous evening, 21 h rest
+    const am   = duty(7, 10, [2.0], { entity: 'WCPA' })
+    const p91  = duty(10.25, 12, [{ flight: 1.5, part91: true }], { entity: 'Lawton' })
+    const pm   = duty(13, 17, [3.0], { entity: 'WCPA' })
+    const next = duty(31, 35, [1.0])                                       // next morning, 14 h rest
+    const l = log(before, am, p91, pm, next)
+    for (const e of [am[0], pm[0]]) {
+      const c = compute(e, l)
+      expect(c.dutyPeriod).toBe(10)
+      expect(c.dutyStart).toBe(at(7))
+      expect(c.dutyBreak).toBe(1.25)
+      expect(c.dutyOk).toBe(true)
+      expect(c.dutyFlight).toBe(5)          // Lawton's 1.5 h left out
+      expect(c.consRest).toBe(14)
+      expect(c.restOk).toBe(true)
+      expect(c.cQualifies).toBe(true)
+      expect(c.flightOk).toBe(true)
+    }
+    expect(compute(am[0], l).breakAfter).toBe(0.25)
+    expect(compute(p91[0], l).breakAfter).toBe(1)
+    expect(compute(pm[0], l).breakAfter).toBeNull()
+    expect(compute(before[0], l).breakAfter).toBeNull()
+    expect(dutyWarningCount(l)).toBe(0)
+  })
+
+  it('L1b. the Flight Log note names the start of the whole duty and its breaks', () => {
+    const am  = duty('2026-07-01T13:00Z', '2026-07-01T16:00Z', [2.0], { showTz: 'America/Denver' })   // 07:00–10:00 MDT
+    const pm  = duty('2026-07-01T19:00Z', '2026-07-01T23:00Z', [3.0], { showTz: 'America/Denver' })   // 13:00–17:00 MDT
+    const solo = duty('2026-07-03T13:00Z', '2026-07-03T16:00Z', [2.0])
+    const l = log(am, pm, solo)
+    expect(dutyJoinNote(compute(am[0], l), am[0], l, 'UTC')).toBe('from 07:00 · 3h 00m break')
+    expect(dutyJoinNote(compute(pm[0], l), pm[0], l, 'UTC')).toBe('from 07:00 · 3h 00m break')
+    expect(dutyJoinNote(compute(solo[0], l), solo[0], l, 'UTC')).toBeNull()
+    // A duty period that started the day before shows the date and zone.
+    const late  = duty('2026-07-05T04:00Z', '2026-07-05T05:00Z', [0.5], { showTz: 'America/Denver' })  // 22:00 MDT Jul 4
+    const early = duty('2026-07-05T12:00Z', '2026-07-05T14:00Z', [1.0], { showTz: 'America/Denver' })  // 06:00 MDT Jul 5
+    const l2 = log(late, early)
+    expect(dutyJoinNote(compute(early[0], l2), early[0], l2, 'UTC')).toBe('from 07/04 22:00 MDT · 7h 00m break')
+  })
+
+  it('L2. 135 duty, 9 h break, 135 duty, 17 h in all: Duty EXCEEDED on both, one warning', () => {
+    const a = duty(0, 4, [2.0]), b = duty(13, 17, [2.0])
+    const l = log(a, b)
+    for (const e of [a[0], b[0]]) {
+      const c = compute(e, l)
+      expect(c.dutyPeriod).toBe(17)
+      expect(c.dutyBreak).toBe(9)
+      expect(c.dutyOk).toBe(false)
+    }
+    expect(dutyWarningCount(l)).toBe(1)
+  })
+
+  it('L3. three days of 3 h duties with 9 h breaks: every entry EXCEEDED, look-back CHECK', () => {
+    const l = log(...Array.from({ length: 6 }, (_, i) => duty(i * 12, i * 12 + 3, [1.0])))
+    for (const e of l) {
+      const c = compute(e, l)
+      expect(c.dutyOk).toBe(false)
+      expect(c.dutyPeriod).toBe(63)
+    }
+    expect(compute(l.at(-1)!, l).lookbackOk).toBe(false)
+    expect(dutyWarningCount(l)).toBe(1)
+  })
+
+  it('L4. the same chain with Part 91 duties in between is still flagged', () => {
+    const l = log(
+      duty(0, 3, [1.0]),
+      duty(12, 15, [{ flight: 1.0, part91: true }]),
+      duty(24, 27, [1.0]),
+    )
+    expect(compute(l[0], l).dutyOk).toBe(false)
+    expect(compute(l[2], l).dutyOk).toBe(false)
+    expect(compute(l[2], l).dutyPeriod).toBe(27)
+  })
+
+  it('L5. a gap of 9 h 59 m joins the duties; exactly 10 h keeps them separate', () => {
+    const a = duty(0, 4, [1.0])
+    const joined = log(a, duty(4 + 9 + 59 / 60, 18, [1.0]))
+    const apart  = log(a, duty(14, 18, [1.0]))
+    expect(compute(a[0], joined).dutyPeriod).toBe(18)
+    expect(compute(a[0], joined).consRest).toBeNull()
+    expect(compute(a[0], apart).dutyPeriod).toBe(4)
+    expect(compute(a[0], apart).consRest).toBe(10)
+    expect(compute(a[0], apart).dutyBreak).toBe(0)
+  })
+
+  it('L6. after a 0.6 h exceedance (12 h required), an 11 h gap stays separate and DEFICIENT', () => {
+    const a = duty(0, 12, [8.6])
+    const l = log(a, duty(23, 27, [1.0]))
+    const c = compute(a[0], l)
+    expect(c.dutyPeriod).toBe(12)
+    expect(c.consRest).toBe(11)
+    expect(c.restOk).toBe(false)
+    expect(dutyWarningCount(l)).toBe(1)
+  })
+
+  it('L7. a chain of Part 91 duties only: no flags', () => {
+    const l = log(...Array.from({ length: 3 }, (_, i) => duty(i * 12, i * 12 + 3, [{ flight: 1.0, part91: true }])))
+    for (const e of l) {
+      const c = compute(e, l)
+      expect(c.dutyOk).toBeNull()
+      expect(c.restOk).toBeNull()
+    }
+    expect(dutyWarningCount(l)).toBe(0)
+  })
+
+  it('L8. rest periods and the look-back still see only real rests', () => {
+    // 0–4 and 8–12 are one duty (4 h break); then 30 h off.
+    const l = log(duty(0, 4, [1.0]), duty(8, 12, [1.0]), duty(42, 46, [1.0]))
+    expect(restPeriodsInWindow(l, BASE - 100 * HOUR, BASE + 100 * HOUR)).toBe(1)
+    expect(compute(l[2], l).lookbackOk).toBe(true)
   })
 })

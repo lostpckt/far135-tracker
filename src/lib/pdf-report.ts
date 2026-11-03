@@ -2,10 +2,10 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Entry } from '@/types/entry'
 import {
-  ms, fmtHrs, fmtFlight, fmtDT, fmtHobbs, legTenths, tenthsToHrs, compute, restPeriodsInWindow,
+  ms, fmtHrs, fmtFlight, fmtDT, fmtHobbs, legTenths, tenthsToHrs, compute, restPeriodsInWindow, dutyJoinNote,
   quarterFlightHours, twoQuarterFlightHours, flightHoursInWindow,
 } from '@/lib/calculations'
-import { utcToLocalParts, monthStartMs, fmtLocalDT } from '@/lib/timezone'
+import { utcToLocalParts, monthStartMs, fmtLocalDT, deviceTz } from '@/lib/timezone'
 
 export type LogDetail = 'summary' | 'full' | 'both'
 
@@ -120,8 +120,14 @@ function buildData(
     totalTenths += legTenths(e)
     if (e.part91) continue
     if (c.flightOk   === false) flag('flight',   e, { date: anchorWhen(e, tz), type: 'Flight Time Exceeded',    detail: `Rolling 24-hr: ${fmtHrs(c.rolling24)} (limit ${c.maxFlight}h; duty period did not qualify under Sec. 135.267(c))` })
-    if (c.dutyOk     === false) flag('duty',     e, { date: fmtWhen(e.showTime, showZone(e, tz)),    type: 'Duty Period Exceeded',    detail: `Duty: ${fmtHrs(c.dutyPeriod)} (limit 14h)` })
-    if (c.restOk     === false) flag('rest',     e, { date: fmtWhen(e.releaseTime, releaseZone(e, tz)), type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` })
+    // One line per duty period, even when breaks under 10 h join several entries into it.
+    if (c.dutyOk     === false) {
+      const start = allEntries.find(x => x.showTime === c.dutyStart) ?? e
+      const brk   = c.dutyBreak ? ` incl. ${fmtHrs(c.dutyBreak)} break` : ''
+      flag('duty', start, { date: fmtWhen(start.showTime, showZone(start, tz)), type: 'Duty Period Exceeded', detail: `Duty: ${fmtHrs(c.dutyPeriod)}${brk} (limit 14h)` })
+    }
+    // Rest is judged after the duty period's last entry, not at a break inside it.
+    if (c.restOk     === false && c.breakAfter === null) flag('rest',     e, { date: fmtWhen(e.releaseTime, releaseZone(e, tz)), type: 'Rest Deficient',          detail: `Got ${fmtHrs(c.consRest)} before next show, required ${c.reqRest}h` })
     if (c.lookbackOk === false) flag('lookback', e, { date: anchorWhen(e, tz), type: '10-hr Look-Back Not Met', detail: 'Less than 10 consecutive hours of rest in the 24 hours before release' })
     if (c.excAmt > 0) exceedances.push({ date: anchorWhen(e, tz), route: `${(e.dep || '?').toUpperCase()}-${(e.arr || '?').toUpperCase()}`, over: fmtHrs(c.excAmt), reason: e.reason || '—', reqRest: c.reqRest! })
   }
@@ -280,11 +286,11 @@ function renderPDF(allEntries: Entry[], d: ReportData, tz: string | undefined, e
         c.cQualifies ? `${fmtHrs(c.dutyFlight)} / ${c.maxFlight}h (c)`
           : c.rolling24 !== null ? `${fmtHrs(c.rolling24)} / ${c.maxFlight}h` : '—',
         c.flightOk === null ? 'N/A' : c.flightOk ? 'OK' : 'EXCEEDED',
-        fmtHrs(c.dutyPeriod),
+        [fmtHrs(c.dutyPeriod), dutyJoinNote(c, e, allEntries, tz ?? deviceTz())].filter(Boolean).join('\n'),
         c.dutyOk === null ? 'N/A' : c.dutyOk ? 'OK' : 'EXCEEDED',
         c.lookbackOk === null ? 'N/A' : c.lookbackOk ? 'OK' : 'CHECK',
-        `${fmtHrs(c.consRest)} / ${c.reqRest}h`,
-        c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT',
+        c.breakAfter !== null ? `Same duty\n${fmtHrs(c.breakAfter)} break` : `${fmtHrs(c.consRest)} / ${c.reqRest}h`,
+        c.breakAfter !== null ? '—' : c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT',
         c.excAmt > 0 ? fmtHrs(c.excAmt) : '—',
       ])
     }

@@ -1,5 +1,5 @@
 import type { Entry, Computed } from '@/types/entry'
-import { monthStartMs, fmtLocalDT } from '@/lib/timezone'
+import { monthStartMs, fmtLocalDT, utcToLocalParts } from '@/lib/timezone'
 import { saveFile } from '@/lib/backup'
 
 export function uid(): string {
@@ -104,16 +104,27 @@ const DAY  = 86400000
 // assumes the log records all duty (there is no standby or on-call time).
 // Before the first logged duty, rest is unknown. Legacy rest-day entries
 // (restDay) and the legacy restStart/restEnd fields are ignored.
+//
+// A gap shorter than the 10 h minimum rest isn't rest, so duties separated by
+// less than 10 h are ONE duty period, from the first show to the last release
+// (user's operator reading, 2026-11-02). This is how a mixed day logs: a WCPA
+// Part 135 duty, a Lawton Part 91 duty, then WCPA again, each its own entry.
+// A chain of short breaks keeps one duty period growing, so it is caught by the
+// 14 h duty check (and by the (d) look-back), never lost between entries.
+
+const MIN_REST = 10 * 3600000
 
 interface DutyPeriodSpan {
   show: number
   release: number
   f135: number    // Part 135 flight time in this duty period, tenths
+  breakMs: number // breaks under 10 h inside it, between its duty entries
 }
 
 interface DutyIndex {
   periods: DutyPeriodSpan[]          // sorted by show
   byKey: Map<string, number>         // dutyKey(entry) → index in periods
+  breakAfter: Map<string, number>    // dutyKey → break (ms) before the next entry of the same duty period; absent for its last
 }
 
 function dutyKey(e: Entry): string {
@@ -134,11 +145,30 @@ function dutyIndex(all: Entry[]): DutyIndex {
     if (show === null) continue
     const key = dutyKey(e)
     let dp = map.get(key)
-    if (!dp) { dp = { show, release: ms(e.releaseTime) ?? show, f135: 0 }; map.set(key, dp) }
+    if (!dp) { dp = { show, release: ms(e.releaseTime) ?? show, f135: 0, breakMs: 0 }; map.set(key, dp) }
     if (!e.part91) dp.f135 += legTenths(e)
   }
+  // Join duty entries whose gap is under the minimum rest into one duty period.
   const keys = [...map.keys()].sort((a, b) => map.get(a)!.show - map.get(b)!.show)
-  const idx: DutyIndex = { periods: keys.map(k => map.get(k)!), byKey: new Map(keys.map((k, i) => [k, i])) }
+  const periods: DutyPeriodSpan[] = []
+  const byKey = new Map<string, number>()
+  const breakAfter = new Map<string, number>()
+  let prevKey = ''
+  for (const k of keys) {
+    const span = map.get(k)!
+    const cur = periods.at(-1)
+    if (cur && span.show - cur.release < MIN_REST) {
+      breakAfter.set(prevKey, Math.max(0, span.show - cur.release))
+      cur.breakMs += Math.max(0, span.show - cur.release)
+      cur.release  = Math.max(cur.release, span.release)
+      cur.f135    += span.f135
+    } else {
+      periods.push({ ...span })
+    }
+    byKey.set(k, periods.length - 1)
+    prevKey = k
+  }
+  const idx: DutyIndex = { periods, byKey, breakAfter }
   dutyIndexCache.set(all, idx)
   return idx
 }
@@ -232,7 +262,7 @@ export function compute(entry: Entry, all: Entry[]): Computed {
   const relMs    = ms(entry.releaseTime)
 
   // This entry's duty period, and the duty periods either side of it.
-  const { periods, byKey } = dutyIndex(all)
+  const { periods, byKey, breakAfter } = dutyIndex(all)
   const dpIdx = byKey.get(dutyKey(entry)) ?? -1
   const dp    = dpIdx >= 0 ? periods[dpIdx] : null
   const prev  = dpIdx > 0 ? periods[dpIdx - 1] : null
@@ -242,7 +272,12 @@ export function compute(entry: Entry, all: Entry[]): Computed {
   const legT   = flightTenths(offHobbs, onHobbs)
   const maxT   = entry.crew === 'D' ? 100 : 80
   c.legFlight  = legT !== null ? tenthsToHrs(legT) : null
-  c.dutyPeriod = hrs(showMs, relMs)
+  // The whole duty period this entry belongs to (several entries when the breaks are under 10 h).
+  c.dutyPeriod = dp && relMs !== null ? (dp.release - dp.show) / HOUR : hrs(showMs, relMs)
+  c.dutyStart  = dp ? new Date(dp.show).toISOString().slice(0, 16) + 'Z' : null
+  c.dutyBreak  = dp ? dp.breakMs / HOUR : null
+  const brk    = breakAfter.get(dutyKey(entry))
+  c.breakAfter = brk !== undefined ? brk / HOUR : null
   c.consRest   = dp && next ? Math.max(0, next.show - dp.release) / HOUR : null
   c.maxFlight  = tenthsToHrs(maxT)
   c.dutyFlight = dp ? tenthsToHrs(dp.f135) : null
@@ -343,6 +378,9 @@ export interface DutyComputed {
   excReason: string
   cQualifies: boolean | null
   dutyFlight: number | null
+  dutyStart: string | null
+  dutyBreak: number | null
+  breakAfter: number | null
 }
 
 export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
@@ -375,6 +413,9 @@ export function computeDutyPeriod(legs: Entry[], all: Entry[]): DutyComputed {
     excReason:   excLegIdx >= 0 ? (legs[excLegIdx].reason || '(no reason recorded)') : '',
     cQualifies:  allPart91 ? null : lastP135C?.cQualifies ?? null,
     dutyFlight:  lastC?.dutyFlight ?? null,
+    dutyStart:   lastC?.dutyStart ?? null,
+    dutyBreak:   lastC?.dutyBreak ?? null,
+    breakAfter:  lastC?.breakAfter ?? null,
   }
 }
 
@@ -393,9 +434,46 @@ export function nextLegalDutyMs(entries: Entry[]): number | null {
   if (!lastP135?.releaseTime) return null
   const reqRest = compute(lastP135, entries).reqRest
   if (reqRest === null) return null
-  const releaseMs    = new Date(lastP135.releaseTime).getTime()
+  // Required rest runs from the end of the whole duty period, which may go on
+  // past this entry (e.g. a Part 91 duty after a break under 10 h).
+  const { periods, byKey } = dutyIndex(entries)
+  const releaseMs    = periods[byKey.get(dutyKey(lastP135))!].release
   const lastAnyRelMs = Math.max(...duties.map(e => ms(e.releaseTime) ?? 0))
   return Math.max(releaseMs + reqRest * HOUR, lastAnyRelMs + 10 * HOUR)
+}
+
+/**
+ * For an entry that is part of a duty period joined from several entries
+ * (breaks under 10 h), e.g. "from 07:00 · 1h 15m break": when the whole duty
+ * period started and its total break time. The start shows as a time alone on
+ * the entry's own show date, otherwise with its date and zone. Null for an
+ * ordinary single duty.
+ */
+export function dutyJoinNote(
+  c: Pick<Computed, 'dutyStart' | 'dutyBreak' | 'breakAfter'>,
+  entry: Pick<Entry, 'showTime' | 'showTz'>,
+  all: Entry[],
+  tz: string,
+): string | null {
+  if (!c.dutyStart || (c.dutyStart === entry.showTime && c.breakAfter === null)) return null
+  const zone  = all.find(e => e.showTime === c.dutyStart)?.showTz ?? tz
+  const start = utcToLocalParts(c.dutyStart, zone)
+  const own   = utcToLocalParts(entry.showTime, entry.showTz ?? tz)
+  const when  = start && own && start.date === own.date ? start.time : fmtLocalDT(c.dutyStart, zone)
+  return `from ${when} · ${fmtHrs(c.dutyBreak)} break`
+}
+
+/**
+ * Number of duty periods (entries joined by breaks under 10 h count once) with
+ * any Part 135 compliance failure: flight, duty, rest or look-back.
+ */
+export function dutyWarningCount(entries: Entry[]): number {
+  const { byKey } = dutyIndex(entries)
+  return new Set(entries.filter(e => {
+    if (e.restDay || e.part91) return false
+    const c = compute(e, entries)
+    return c.flightOk === false || c.dutyOk === false || c.restOk === false || c.lookbackOk === false
+  }).map(e => byKey.get(dutyKey(e)))).size
 }
 
 /** Part 135 flight time in tenths of legs released within [start, end). */
@@ -453,7 +531,9 @@ export function exportCSV(entries: Entry[]): void {
     const c = compute(e, entries)
     // Rest runs from release to the next show (derived, not stored).
     const relMs   = ms(e.releaseTime)
-    const restEnd = relMs !== null && c.consRest !== null ? iso(relMs + c.consRest * HOUR) : ''
+    // Mid-duty (another entry of the same duty period follows) there was no rest, only a break.
+    const midDuty = c.breakAfter !== null
+    const restEnd = relMs !== null && c.consRest !== null && !midDuty ? iso(relMs + c.consRest * HOUR) : ''
     const basis   = e.part91 ? 'N/A' : c.cQualifies ? 'Sec. 135.267(c) duty period' : 'Sec. 135.267(b) rolling 24-hr'
     return [
       q(e.showTime), q(e.releaseTime || ''), q(e.pilot), q(e.crew === 'D' ? 'Dual' : 'Single'),
@@ -469,9 +549,9 @@ export function exportCSV(entries: Entry[]): void {
       q(c.dutyPeriod !== null ? c.dutyPeriod.toFixed(2) : ''),
       q(c.dutyOk === null ? 'N/A' : c.dutyOk ? 'OK' : 'EXCEEDED'),
       q(c.lookbackOk === null ? 'N/A' : c.lookbackOk ? 'OK' : 'CHECK'),
-      q(c.consRest !== null ? c.consRest.toFixed(2) : ''),
+      q(c.consRest !== null && !midDuty ? c.consRest.toFixed(2) : ''),
       q(c.reqRest),
-      q(c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT'),
+      q(midDuty ? 'Same duty' : c.restOk === null ? 'N/A' : c.restOk ? 'OK' : 'DEFICIENT'),
       q(c.excAmt.toFixed(2)),
       q(e.reason || ''),
       q(restEnd ? e.releaseTime : ''), q(restEnd),
