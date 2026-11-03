@@ -39,6 +39,10 @@ jobs:
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: npm ci --legacy-peer-deps
 
+      # A failing test stops here, so the live app keeps its last good version.
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
 
